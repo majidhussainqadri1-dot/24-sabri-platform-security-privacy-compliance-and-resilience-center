@@ -48,7 +48,18 @@ jobs:
             echo 'applied=false' >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          cat tools/corrective-source.part-* > /tmp/file24-source.tar.gz.b64
+          cat \
+            tools/corrective-source.part-00a \
+            tools/corrective-source.part-00b \
+            tools/corrective-source.part-00c \
+            tools/corrective-source.part-01 \
+            tools/corrective-source.part-02 \
+            tools/corrective-source.part-03 \
+            tools/corrective-source.part-04 \
+            tools/corrective-source.part-05 \
+            tools/corrective-source.part-06 \
+            tools/corrective-source.part-07 \
+            > /tmp/file24-source.tar.gz.b64
           base64 --decode /tmp/file24-source.tar.gz.b64 > /tmp/file24-source.tar.gz
           test "$(sha256sum /tmp/file24-source.tar.gz | awk '{print $1}')" = "2ccae50632472906d6d7cfe5f0cf064e6ebf1f6ce6466d317811c1f45ec40c17"
           ! tar -tzf /tmp/file24-source.tar.gz | grep -E '(^/|(^|/)\.\.(/|$))'
