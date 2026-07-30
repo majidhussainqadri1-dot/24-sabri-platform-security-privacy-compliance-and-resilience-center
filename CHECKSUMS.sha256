@@ -28,7 +28,7 @@ c3253177a98987685e05bdea337baf155756a237a4549918c8403f486049038b  ./plugin/sabri
 6fa845f7cf15206c78afe4b8cf3a80ce7794814a05cf392c1d78646af94771b2  ./plugin/sabri-security-center/src/Storage/IncidentRepository.php
 227d3dfde5f7a4fb7206b0ec61cda0a630e4179346198e7358170640723a42f4  ./plugin/sabri-security-center/src/Storage/RiskRepository.php
 48d5f0fbbb3c912367d85fb806a3efcde59438ed4ee2e7c3fd79c277660fa1bb  ./plugin/sabri-security-center/src/Storage/Schema.php
-52a9e575803e1421f0cc11c534990781db754c81f5b606977f1a6bb5f7e1d3519  ./plugin/sabri-security-center/src/Support/Sanitizer.php
+52a9e575803e1421f0cc11c534990781db754c81f5b606977f1d83fe5438b286  ./plugin/sabri-security-center/src/Support/Sanitizer.php
 562e099005ab77f2df30a9fac19ce6e16d80a85141eb67bf05466ce18ff5f260  ./plugin/sabri-security-center/src/System/Repair.php
 cb8d5620b0bc94ddde747e897b1522b641feafea913117d08d477a0b471b5153  ./plugin/sabri-security-center/src/System/SystemCheck.php
 91fab5c821b994579ed879d3c3b7b93826a1f8d2f208ebfff009ce6b484551c7  ./plugin/sabri-security-center/src/UpgradeManager.php
