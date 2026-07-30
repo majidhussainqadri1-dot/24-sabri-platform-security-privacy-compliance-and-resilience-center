@@ -30,7 +30,7 @@ jobs:
         run: |
           test ! -f .env
           ! grep -RInE --exclude='*.md' 'BEGIN (RSA|EC|OPENSSH|DSA) PRIVATE KEY' plugin tests
-          ! grep -RInE --exclude='*.md' '(api[_-]?key|client[_-]?secret|password|access[_-]?token)[[:space:]]*[:=][[:space:]]*["'"'][^"'"']{8,}' plugin tests
+          ! grep -RInE --exclude='*.md' "(api[_-]?key|client[_-]?secret|password|access[_-]?token)[[:space:]]*[:=][[:space:]]*['\"][^'\"]{8,}" plugin tests
       - name: Verify plugin version consistency
         run: |
           grep -q 'Version:     0.25.1' plugin/sabri-security-center/sabri-security-center.php
