@@ -23,18 +23,29 @@ jobs:
       - name: Reject common secret material
         shell: bash
         run: |
+          set -euo pipefail
           test ! -f .env
-          ! grep -RInE 'BEGIN (RSA|EC|OPENSSH|DSA) PRIVATE KEY' plugin docs tests tools README.md SECURITY.md
-          ! grep -RInE '(password|secret|token)[[:space:]]*=[[:space:]]*["'\''][^"'\'']{8,}' plugin docs tests tools README.md SECURITY.md
+          ! find . -type f \( -name '*.pem' -o -name '*.key' -o -name 'id_rsa' \) -print -quit | grep -q .
+          ! grep -RInE --exclude='CHECKSUMS.sha256' --exclude='ci.yml' 'BEGIN (RSA|EC|OPENSSH|DSA) PRIVATE KEY' plugin docs tests README.md SECURITY.md
+          ! grep -RInE --exclude='CHECKSUMS.sha256' --exclude='ci.yml' '(gh[pousr]_[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{30,})' plugin docs tests README.md SECURITY.md
 
       - name: Verify plugin and schema version consistency
         run: |
-          grep -q 'Version:     0.25.1' plugin/sabri-security-center/sabri-security-center.php
-          grep -q "define('SPCRC_VERSION', '0.25.1')" plugin/sabri-security-center/sabri-security-center.php
-          grep -q "public const VERSION = '0.25.1'" plugin/sabri-security-center/src/Storage/Schema.php
-          grep -q 'Stable tag: 0.25.1' plugin/sabri-security-center/readme.txt
+          grep -q 'Version:     0.25.2' plugin/sabri-security-center/sabri-security-center.php
+          grep -q "define('SPCRC_VERSION', '0.25.2')" plugin/sabri-security-center/sabri-security-center.php
+          grep -q "public const VERSION = '0.25.2'" plugin/sabri-security-center/src/Storage/Schema.php
+          grep -q 'Stable tag: 0.25.2' plugin/sabri-security-center/readme.txt
 
-      - name: Verify source checksums except temporary workflow self-hash
+      - name: Reject self-mutating source workflows and staged source bundles
+        shell: bash
+        run: |
+          set -euo pipefail
+          test ! -f .github/workflows/apply-cycle2.yml
+          test ! -f tools/cycle2-source.ready
+          ! find tools -maxdepth 1 -type f -name 'cycle2-bundle.part-*' -print -quit | grep -q .
+          ! grep -RInE 'git push|contents:[[:space:]]*write' .github/workflows
+
+      - name: Verify source checksums except workflow self-hash
         shell: bash
         run: |
           set -euo pipefail
@@ -54,59 +65,8 @@ jobs:
       - name: Upload reviewed plugin package
         uses: actions/upload-artifact@v4
         with:
-          name: file-24-security-center-0.25.1
+          name: file-24-security-center-0.25.2
           path: |
             ${{ steps.package.outputs.path }}
             ${{ steps.package.outputs.path }}.sha256
           if-no-files-found: error
-
-  apply-cycle2-reviewed-source:
-    if: "${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}"
-    needs: foundation-integrity
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.ref }}
-          fetch-depth: 0
-
-      - name: Apply verified second-cycle source when all chunks are staged
-        id: apply
-        shell: bash
-        run: |
-          set -euo pipefail
-          shopt -s nullglob
-          parts=(tools/cycle2-bundle.part-*)
-          if [[ ! -f tools/cycle2-source.ready || ${#parts[@]} -ne 6 ]]; then
-            echo 'applied=false' >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          cat "${parts[@]}" > /tmp/file24-cycle2.tar.gz.b64
-          base64 --decode /tmp/file24-cycle2.tar.gz.b64 > /tmp/file24-cycle2.tar.gz
-          test "$(sha256sum /tmp/file24-cycle2.tar.gz | awk '{print $1}')" = "f004974c0a0b6dcbf6a4b5af08e7b8c977d689a4aaf073d24c74df453c4a82f0"
-          ! tar -tzf /tmp/file24-cycle2.tar.gz | grep -E '(^/|(^|/)\.\.(/|$))'
-          tar -xzf /tmp/file24-cycle2.tar.gz -C .
-          rm -f tools/cycle2-bundle.part-* tools/cycle2-source.ready
-          git restore --source=HEAD -- .github/workflows/ci.yml .github/workflows/apply-cycle2.yml
-          find plugin tests -type f -name '*.php' -print0 | xargs -0 -n1 php -l
-          php tests/run.php
-          grep -v './.github/workflows/ci.yml$' CHECKSUMS.sha256 > /tmp/file24-cycle2-checksums
-          sha256sum -c /tmp/file24-cycle2-checksums
-          PACKAGE="$(./tools/build-release.sh)"
-          unzip -t "$PACKAGE"
-          echo 'applied=true' >> "$GITHUB_OUTPUT"
-
-      - name: Commit reviewed second-cycle source
-        if: "${{ steps.apply.outputs.applied == 'true' }}"
-        shell: bash
-        env:
-          HEAD_REF: ${{ github.event.pull_request.head.ref }}
-        run: |
-          set -euo pipefail
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -A
-          git commit -m 'fix: complete second review cycle and add lifecycle operations'
-          git push origin "HEAD:${HEAD_REF}"
