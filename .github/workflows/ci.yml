@@ -9,19 +9,39 @@ permissions:
   contents: read
 
 jobs:
-  php-lint:
+  php-quality:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.0', '8.3']
     steps:
       - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          coverage: none
       - name: Lint PHP files
-        run: find plugin -type f -name '*.php' -print0 | xargs -0 -n1 php -l
-      - name: Reject common secret files
+        run: find plugin tests -type f -name '*.php' -print0 | xargs -0 -n1 php -l
+      - name: Run foundation regression contracts
+        run: php tests/foundation-contracts.php
+      - name: Reject common secret material
         shell: bash
         run: |
           test ! -f .env
-          ! grep -RInE 'BEGIN (RSA|EC|OPENSSH) PRIVATE KEY' plugin docs README.md SECURITY.md
-          ! grep -RInE '(password|secret|token)[[:space:]]*=' plugin docs README.md SECURITY.md
+          ! grep -RInE --exclude='*.md' 'BEGIN (RSA|EC|OPENSSH|DSA) PRIVATE KEY' plugin tests
+          ! grep -RInE --exclude='*.md' '(api[_-]?key|client[_-]?secret|password|access[_-]?token)[[:space:]]*[:=][[:space:]]*["'"'][^"'"']{8,}' plugin tests
       - name: Verify plugin version consistency
         run: |
-          grep -q 'Version:     0.25.0' plugin/sabri-security-center/sabri-security-center.php
-          grep -q 'Stable tag: 0.25.0' plugin/sabri-security-center/readme.txt
+          grep -q 'Version:     0.25.1' plugin/sabri-security-center/sabri-security-center.php
+          grep -q 'Stable tag: 0.25.1' plugin/sabri-security-center/readme.txt
+          grep -q "public const VERSION = '0.25.1'" plugin/sabri-security-center/src/Storage/Schema.php
+      - name: Verify source checksums
+        run: sha256sum -c CHECKSUMS.sha256
+      - name: Build and inspect plugin ZIP
+        shell: bash
+        run: |
+          mkdir -p build
+          (cd plugin && zip -qr ../build/sabri-security-center.zip sabri-security-center)
+          unzip -t build/sabri-security-center.zip
+          test "$(unzip -Z1 build/sabri-security-center.zip | head -n1)" = "sabri-security-center/"

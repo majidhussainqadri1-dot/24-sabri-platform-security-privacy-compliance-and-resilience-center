@@ -56,7 +56,11 @@ final class Dashboard
 
         check_admin_referer('spcrc_run_system_check');
         $checks = $this->checks->run();
-        set_transient('spcrc_last_system_check_' . get_current_user_id(), $checks, 10 * MINUTE_IN_SECONDS);
+        $userId = get_current_user_id();
+        set_transient('spcrc_last_system_check_' . $userId, [
+            'checks' => $checks,
+            'checked_at' => gmdate('c'),
+        ], 10 * MINUTE_IN_SECONDS);
         $this->audit->record('system_check_run', 'file-24-security-center', 'completed', 'informational', ['check_count' => count($checks)]);
 
         wp_safe_redirect(add_query_arg(['page' => 'sabri-security-center', 'checked' => '1'], admin_url('admin.php')));
@@ -69,17 +73,19 @@ final class Dashboard
             wp_die(esc_html__('You are not allowed to view the Security Center.', 'sabri-security-center'));
         }
 
-        $checks = get_transient('spcrc_last_system_check_' . get_current_user_id());
-        if (! is_array($checks)) {
-            $checks = $this->checks->run();
-        }
-
+        $cached = get_transient('spcrc_last_system_check_' . get_current_user_id());
+        $checks = is_array($cached) && isset($cached['checks']) && is_array($cached['checks']) ? $cached['checks'] : $this->checks->run();
+        $checkedAt = is_array($cached) ? sanitize_text_field((string) ($cached['checked_at'] ?? '')) : '';
         $manifests = $this->modules->all();
         $stateRequests = $this->states->all();
         ?>
         <div class="wrap spcrc-wrap">
             <h1><?php esc_html_e('Sabri Platform Security Center', 'sabri-security-center'); ?></h1>
             <p class="spcrc-intro"><?php esc_html_e('Central governance and assurance dashboard. Native modules retain their own authentication, authorization, and data ownership.', 'sabri-security-center'); ?></p>
+
+            <?php if (isset($_GET['checked']) && sanitize_key((string) wp_unslash($_GET['checked'])) === '1') : ?>
+                <div class="notice notice-success is-dismissible"><p><?php esc_html_e('System checks were refreshed.', 'sabri-security-center'); ?></p></div>
+            <?php endif; ?>
 
             <div class="spcrc-grid" aria-label="<?php esc_attr_e('Security overview', 'sabri-security-center'); ?>">
                 <?php $this->metric(__('Registered modules', 'sabri-security-center'), (string) count($manifests)); ?>
@@ -90,7 +96,10 @@ final class Dashboard
 
             <section class="spcrc-panel">
                 <div class="spcrc-panel-heading">
-                    <h2><?php esc_html_e('System checks', 'sabri-security-center'); ?></h2>
+                    <div>
+                        <h2><?php esc_html_e('System checks', 'sabri-security-center'); ?></h2>
+                        <?php if ($checkedAt !== '') : ?><p class="description"><?php echo esc_html(sprintf(__('Last refreshed: %s UTC', 'sabri-security-center'), $checkedAt)); ?></p><?php endif; ?>
+                    </div>
                     <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
                         <input type="hidden" name="action" value="spcrc_run_system_check">
                         <?php wp_nonce_field('spcrc_run_system_check'); ?>
@@ -98,13 +107,14 @@ final class Dashboard
                     </form>
                 </div>
                 <table class="widefat striped">
-                    <thead><tr><th><?php esc_html_e('Check', 'sabri-security-center'); ?></th><th><?php esc_html_e('Status', 'sabri-security-center'); ?></th><th><?php esc_html_e('Detail', 'sabri-security-center'); ?></th></tr></thead>
+                    <caption class="screen-reader-text"><?php esc_html_e('Security system check results', 'sabri-security-center'); ?></caption>
+                    <thead><tr><th scope="col"><?php esc_html_e('Check', 'sabri-security-center'); ?></th><th scope="col"><?php esc_html_e('Status', 'sabri-security-center'); ?></th><th scope="col"><?php esc_html_e('Detail', 'sabri-security-center'); ?></th></tr></thead>
                     <tbody>
                     <?php foreach ($checks as $check) : ?>
                         <tr>
-                            <td><?php echo esc_html((string) $check['label']); ?></td>
-                            <td><span class="spcrc-status spcrc-status--<?php echo esc_attr((string) $check['status']); ?>"><?php echo esc_html(strtoupper((string) $check['status'])); ?></span></td>
-                            <td><?php echo esc_html((string) $check['detail']); ?></td>
+                            <td><?php echo esc_html((string) ($check['label'] ?? '')); ?></td>
+                            <td><span class="spcrc-status spcrc-status--<?php echo esc_attr((string) ($check['status'] ?? 'warning')); ?>"><?php echo esc_html(strtoupper((string) ($check['status'] ?? 'warning'))); ?></span></td>
+                            <td><?php echo esc_html((string) ($check['detail'] ?? '')); ?></td>
                         </tr>
                     <?php endforeach; ?>
                     </tbody>
@@ -114,16 +124,43 @@ final class Dashboard
             <section class="spcrc-panel">
                 <h2><?php esc_html_e('Module posture', 'sabri-security-center'); ?></h2>
                 <table class="widefat striped">
-                    <thead><tr><th><?php esc_html_e('Module', 'sabri-security-center'); ?></th><th><?php esc_html_e('Version', 'sabri-security-center'); ?></th><th><?php esc_html_e('Owner', 'sabri-security-center'); ?></th><th><?php esc_html_e('Posture', 'sabri-security-center'); ?></th></tr></thead>
+                    <caption class="screen-reader-text"><?php esc_html_e('Registered module posture', 'sabri-security-center'); ?></caption>
+                    <thead><tr><th scope="col"><?php esc_html_e('Module', 'sabri-security-center'); ?></th><th scope="col"><?php esc_html_e('Version', 'sabri-security-center'); ?></th><th scope="col"><?php esc_html_e('Owner', 'sabri-security-center'); ?></th><th scope="col"><?php esc_html_e('Posture', 'sabri-security-center'); ?></th></tr></thead>
                     <tbody>
-                    <?php foreach ($manifests as $manifest) : ?>
-                        <tr>
-                            <td><?php echo esc_html((string) $manifest['name']); ?></td>
-                            <td><?php echo esc_html((string) $manifest['version']); ?></td>
-                            <td><?php echo esc_html((string) $manifest['owner']); ?></td>
-                            <td><?php echo esc_html((string) $manifest['posture']); ?></td>
-                        </tr>
-                    <?php endforeach; ?>
+                    <?php if ($manifests === []) : ?>
+                        <tr><td colspan="4"><?php esc_html_e('No module manifests are registered.', 'sabri-security-center'); ?></td></tr>
+                    <?php else : ?>
+                        <?php foreach ($manifests as $manifest) : ?>
+                            <tr>
+                                <td><?php echo esc_html((string) ($manifest['name'] ?? '')); ?></td>
+                                <td><?php echo esc_html((string) ($manifest['version'] ?? '')); ?></td>
+                                <td><?php echo esc_html((string) ($manifest['owner'] ?? '')); ?></td>
+                                <td><?php echo esc_html((string) ($manifest['posture'] ?? 'unassessed')); ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                    </tbody>
+                </table>
+            </section>
+
+            <section class="spcrc-panel">
+                <h2><?php esc_html_e('Open security-state requests', 'sabri-security-center'); ?></h2>
+                <table class="widefat striped">
+                    <caption class="screen-reader-text"><?php esc_html_e('Open security-state requests', 'sabri-security-center'); ?></caption>
+                    <thead><tr><th scope="col"><?php esc_html_e('Module', 'sabri-security-center'); ?></th><th scope="col"><?php esc_html_e('State', 'sabri-security-center'); ?></th><th scope="col"><?php esc_html_e('Reason', 'sabri-security-center'); ?></th><th scope="col"><?php esc_html_e('Expires', 'sabri-security-center'); ?></th></tr></thead>
+                    <tbody>
+                    <?php if ($stateRequests === []) : ?>
+                        <tr><td colspan="4"><?php esc_html_e('No open security-state requests.', 'sabri-security-center'); ?></td></tr>
+                    <?php else : ?>
+                        <?php foreach ($stateRequests as $request) : ?>
+                            <tr>
+                                <td><?php echo esc_html((string) ($request['module_key'] ?? '')); ?></td>
+                                <td><?php echo esc_html((string) ($request['state'] ?? '')); ?></td>
+                                <td><?php echo esc_html((string) ($request['reason'] ?? '')); ?></td>
+                                <td><?php echo esc_html((string) ($request['expires_at'] ?? '')); ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
                     </tbody>
                 </table>
             </section>
