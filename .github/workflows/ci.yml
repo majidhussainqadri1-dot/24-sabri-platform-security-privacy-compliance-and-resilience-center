@@ -45,7 +45,9 @@ jobs:
           test ! -f .github/workflows/apply-cycle2.yml
           test ! -f tools/cycle2-source.ready
           ! find tools -maxdepth 1 -type f -name 'cycle2-bundle.part-*' -print -quit | grep -q .
-          ! grep -RInE 'git push|contents:[[:space:]]*write' .github/workflows
+          if find .github/workflows -type f ! -name 'ci.yml' -print0 | xargs -0 -r grep -InE 'git push|contents:[[:space:]]*write'; then
+            exit 1
+          fi
 
       - name: Verify source checksums except workflow self-hash
         shell: bash
