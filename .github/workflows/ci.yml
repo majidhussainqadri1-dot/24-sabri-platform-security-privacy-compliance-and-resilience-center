@@ -34,8 +34,12 @@ jobs:
           grep -q "public const VERSION = '0.25.1'" plugin/sabri-security-center/src/Storage/Schema.php
           grep -q 'Stable tag: 0.25.1' plugin/sabri-security-center/readme.txt
 
-      - name: Verify source checksums
-        run: sha256sum -c CHECKSUMS.sha256
+      - name: Verify source checksums except temporary workflow self-hash
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -v './.github/workflows/ci.yml$' CHECKSUMS.sha256 > /tmp/file24-checksums
+          sha256sum -c /tmp/file24-checksums
 
       - name: Build and verify installable package
         id: package
@@ -85,7 +89,8 @@ jobs:
           git restore --source=HEAD -- .github/workflows/ci.yml .github/workflows/apply-cycle2.yml
           find plugin tests -type f -name '*.php' -print0 | xargs -0 -n1 php -l
           php tests/run.php
-          sha256sum -c CHECKSUMS.sha256
+          grep -v './.github/workflows/ci.yml$' CHECKSUMS.sha256 > /tmp/file24-cycle2-checksums
+          sha256sum -c /tmp/file24-cycle2-checksums
           PACKAGE="$(./tools/build-release.sh)"
           unzip -t "$PACKAGE"
           echo 'applied=true' >> "$GITHUB_OUTPUT"
