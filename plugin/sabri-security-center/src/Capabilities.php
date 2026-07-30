@@ -34,27 +34,13 @@ final class Capabilities
         }
     }
 
+    /**
+     * File 24 deliberately does not auto-grant operational security capabilities
+     * to the Founder or any other identity label. Delegation must be explicit,
+     * reviewable and reversible through WordPress roles/capabilities.
+     */
     public static function register(): void
     {
-        add_filter('map_meta_cap', [self::class, 'mapFounderCapabilities'], 10, 4);
-    }
-
-    /**
-     * @param string[] $caps
-     * @param mixed[]  $args
-     * @return string[]
-     */
-    public static function mapFounderCapabilities(array $caps, string $cap, int $userId, array $args): array
-    {
-        if (! in_array($cap, self::all(), true)) {
-            return $caps;
-        }
-
-        $isFounder = (bool) apply_filters('spcrc/is_founder_user', false, $userId);
-        if ($isFounder) {
-            return ['read'];
-        }
-
-        return $caps;
+        do_action('spcrc/capabilities_registered', self::all());
     }
 }

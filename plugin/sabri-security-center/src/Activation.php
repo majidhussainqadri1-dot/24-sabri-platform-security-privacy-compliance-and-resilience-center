@@ -10,16 +10,38 @@ final class Activation
 {
     public static function activate(): void
     {
+        global $wp_version;
+
         if (version_compare(PHP_VERSION, '8.0', '<')) {
-            deactivate_plugins(plugin_basename(SPCRC_PLUGIN_FILE));
-            wp_die(esc_html__('Sabri Security Center requires PHP 8.0 or newer.', 'sabri-security-center'));
+            self::abort(__('Sabri Security Center requires PHP 8.0 or newer.', 'sabri-security-center'));
         }
 
-        Schema::install();
+        if (version_compare((string) $wp_version, '6.5', '<')) {
+            self::abort(__('Sabri Security Center requires WordPress 6.5 or newer.', 'sabri-security-center'));
+        }
+
+        $installed = Schema::install();
+        if (is_wp_error($installed)) {
+            self::abort($installed->get_error_message());
+        }
+
         Capabilities::install();
 
         update_option('spcrc_version', SPCRC_VERSION, false);
         update_option('spcrc_schema_version', Schema::VERSION, false);
-        update_option('spcrc_installed_at', gmdate('c'), false);
+        if (get_option('spcrc_installed_at', '') === '') {
+            update_option('spcrc_installed_at', gmdate('c'), false);
+        }
+        delete_option('spcrc_last_upgrade_error');
+    }
+
+    private static function abort(string $message): void
+    {
+        if (! function_exists('deactivate_plugins')) {
+            require_once ABSPATH . 'wp-admin/includes/plugin.php';
+        }
+
+        deactivate_plugins(plugin_basename(SPCRC_PLUGIN_FILE));
+        wp_die(esc_html($message));
     }
 }

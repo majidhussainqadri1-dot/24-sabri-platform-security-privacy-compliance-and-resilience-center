@@ -6,22 +6,18 @@ namespace Sabri\Platform\Security\Storage;
 
 final class Schema
 {
-    public const VERSION = '0.25.0';
+    public const VERSION = '0.25.1';
 
-    public static function install(): void
+    /** @return true|\WP_Error */
+    public static function install(): true|\WP_Error
     {
         global $wpdb;
 
         require_once ABSPATH . 'wp-admin/includes/upgrade.php';
         $charset = $wpdb->get_charset_collate();
+        $tables = self::tables();
 
-        $events = $wpdb->prefix . 'spcrc_security_events';
-        $incidents = $wpdb->prefix . 'spcrc_incidents';
-        $findings = $wpdb->prefix . 'spcrc_findings';
-        $privacy = $wpdb->prefix . 'spcrc_privacy_requests';
-        $manifests = $wpdb->prefix . 'spcrc_module_manifests';
-
-        dbDelta("CREATE TABLE {$events} (
+        dbDelta("CREATE TABLE {$tables['events']} (
             id bigint unsigned NOT NULL AUTO_INCREMENT,
             event_uuid char(36) NOT NULL,
             event_type varchar(120) NOT NULL,
@@ -39,7 +35,7 @@ final class Schema
             KEY risk_created (risk_level, created_at)
         ) {$charset};");
 
-        dbDelta("CREATE TABLE {$incidents} (
+        dbDelta("CREATE TABLE {$tables['incidents']} (
             id bigint unsigned NOT NULL AUTO_INCREMENT,
             incident_uuid char(36) NOT NULL,
             title varchar(200) NOT NULL,
@@ -56,7 +52,7 @@ final class Schema
             KEY updated_at (updated_at)
         ) {$charset};");
 
-        dbDelta("CREATE TABLE {$findings} (
+        dbDelta("CREATE TABLE {$tables['findings']} (
             id bigint unsigned NOT NULL AUTO_INCREMENT,
             finding_uuid char(36) NOT NULL,
             module_key varchar(120) NOT NULL DEFAULT '',
@@ -74,7 +70,46 @@ final class Schema
             KEY module_status (module_key, status)
         ) {$charset};");
 
-        dbDelta("CREATE TABLE {$privacy} (
+        dbDelta("CREATE TABLE {$tables['risks']} (
+            id bigint unsigned NOT NULL AUTO_INCREMENT,
+            risk_uuid char(36) NOT NULL,
+            module_key varchar(120) NOT NULL DEFAULT '',
+            title varchar(200) NOT NULL,
+            likelihood tinyint unsigned NOT NULL DEFAULT 1,
+            impact tinyint unsigned NOT NULL DEFAULT 1,
+            inherent_score smallint unsigned NOT NULL DEFAULT 1,
+            status varchar(40) NOT NULL DEFAULT 'open',
+            treatment varchar(30) NOT NULL DEFAULT 'mitigate',
+            owner_user_id bigint unsigned NULL,
+            due_at datetime NULL,
+            created_at datetime NOT NULL,
+            updated_at datetime NOT NULL,
+            PRIMARY KEY  (id),
+            UNIQUE KEY risk_uuid (risk_uuid),
+            KEY status_score (status, inherent_score),
+            KEY module_status (module_key, status),
+            KEY due_at (due_at)
+        ) {$charset};");
+
+        dbDelta("CREATE TABLE {$tables['controls']} (
+            id bigint unsigned NOT NULL AUTO_INCREMENT,
+            control_key varchar(120) NOT NULL,
+            title varchar(200) NOT NULL,
+            framework varchar(120) NOT NULL DEFAULT '',
+            status varchar(40) NOT NULL DEFAULT 'unassessed',
+            owner_user_id bigint unsigned NULL,
+            evidence_ref varchar(255) NOT NULL DEFAULT '',
+            last_tested_at datetime NULL,
+            created_at datetime NOT NULL,
+            updated_at datetime NOT NULL,
+            PRIMARY KEY  (id),
+            UNIQUE KEY control_key (control_key),
+            KEY status (status),
+            KEY framework (framework),
+            KEY updated_at (updated_at)
+        ) {$charset};");
+
+        dbDelta("CREATE TABLE {$tables['privacy']} (
             id bigint unsigned NOT NULL AUTO_INCREMENT,
             request_uuid char(36) NOT NULL,
             requester_user_id bigint unsigned NULL,
@@ -91,7 +126,7 @@ final class Schema
             KEY requester_type (requester_user_id, request_type)
         ) {$charset};");
 
-        dbDelta("CREATE TABLE {$manifests} (
+        dbDelta("CREATE TABLE {$tables['manifests']} (
             id bigint unsigned NOT NULL AUTO_INCREMENT,
             module_key varchar(120) NOT NULL,
             module_version varchar(60) NOT NULL DEFAULT '',
@@ -103,5 +138,33 @@ final class Schema
             UNIQUE KEY module_key (module_key),
             KEY posture_seen (posture, last_seen_at)
         ) {$charset};");
+
+        foreach ($tables as $key => $table) {
+            $found = $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $wpdb->esc_like($table)));
+            if ($found !== $table) {
+                return new \WP_Error(
+                    'spcrc_schema_install_failed',
+                    sprintf('Required File 24 table was not created: %s', $key)
+                );
+            }
+        }
+
+        return true;
+    }
+
+    /** @return array<string,string> */
+    public static function tables(): array
+    {
+        global $wpdb;
+
+        return [
+            'events' => $wpdb->prefix . 'spcrc_security_events',
+            'incidents' => $wpdb->prefix . 'spcrc_incidents',
+            'findings' => $wpdb->prefix . 'spcrc_findings',
+            'risks' => $wpdb->prefix . 'spcrc_risks',
+            'controls' => $wpdb->prefix . 'spcrc_controls',
+            'privacy' => $wpdb->prefix . 'spcrc_privacy_requests',
+            'manifests' => $wpdb->prefix . 'spcrc_module_manifests',
+        ];
     }
 }
