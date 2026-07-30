@@ -28,7 +28,7 @@ jobs:
           grep -q 'Stable tag: 0.25.0' plugin/sabri-security-center/readme.txt
 
   apply-reviewed-source:
-    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    if: "${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}"
     needs: php-lint
     runs-on: ubuntu-latest
     permissions:
@@ -61,7 +61,7 @@ jobs:
           echo 'applied=true' >> "$GITHUB_OUTPUT"
 
       - name: Commit reviewed corrective source
-        if: steps.apply.outputs.applied == 'true'
+        if: "${{ steps.apply.outputs.applied == 'true' }}"
         shell: bash
         env:
           HEAD_REF: ${{ github.event.pull_request.head.ref }}
