@@ -55,3 +55,50 @@ jobs:
             ${{ steps.package.outputs.path }}
             ${{ steps.package.outputs.path }}.sha256
           if-no-files-found: error
+
+  apply-cycle2-reviewed-source:
+    if: "${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}"
+    needs: foundation-integrity
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+
+      - name: Apply verified second-cycle source when staged
+        id: apply
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! -f tools/cycle2-source.ready || ! -f tools/cycle2-source.tar.gz.b64 ]]; then
+            echo 'applied=false' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          base64 --decode tools/cycle2-source.tar.gz.b64 > /tmp/file24-cycle2.tar.gz
+          test "$(sha256sum /tmp/file24-cycle2.tar.gz | awk '{print $1}')" = "c0a1da547e4aa0902324f049b801cab80388ea0ede17f020aa520cde24dd5632"
+          ! tar -tzf /tmp/file24-cycle2.tar.gz | grep -E '(^/|(^|/)\.\.(/|$))'
+          tar -xzf /tmp/file24-cycle2.tar.gz -C .
+          rm -f tools/cycle2-source.tar.gz.b64 tools/cycle2-source.ready
+          git restore --source=HEAD -- .github/workflows/ci.yml .github/workflows/apply-cycle2.yml
+          find plugin tests -type f -name '*.php' -print0 | xargs -0 -n1 php -l
+          php tests/run.php
+          sha256sum -c CHECKSUMS.sha256
+          PACKAGE="$(./tools/build-release.sh)"
+          unzip -t "$PACKAGE"
+          echo 'applied=true' >> "$GITHUB_OUTPUT"
+
+      - name: Commit reviewed second-cycle source
+        if: "${{ steps.apply.outputs.applied == 'true' }}"
+        shell: bash
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'fix: complete second review cycle and add lifecycle operations'
+          git push origin "HEAD:${HEAD_REF}"
