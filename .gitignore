@@ -1,0 +1,13 @@
+.DS_Store
+Thumbs.db
+*.log
+*.tmp
+*.swp
+.env
+.env.*
+/vendor/
+/node_modules/
+/build/
+/dist/
+coverage/
+.phpunit.result.cache

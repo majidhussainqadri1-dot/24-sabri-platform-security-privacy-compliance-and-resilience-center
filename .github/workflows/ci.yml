@@ -1,0 +1,25 @@
+name: Foundation Integrity
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  php-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Lint PHP files
+        run: find plugin -type f -name '*.php' -print0 | xargs -0 -n1 php -l
+      - name: Reject common secret files
+        run: |
+          test ! -f .env
+          ! grep -RInE '(BEGIN (RSA|EC|OPENSSH) PRIVATE KEY|password\s*=\s*["'"'][^"'"']+|secret\s*=\s*["'"'][^"'"']+)' plugin docs README.md SECURITY.md
+      - name: Verify plugin version consistency
+        run: |
+          grep -q 'Version:     0.25.0' plugin/sabri-security-center/sabri-security-center.php
+          grep -q 'Stable tag: 0.25.0' plugin/sabri-security-center/readme.txt
