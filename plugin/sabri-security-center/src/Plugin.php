@@ -35,6 +35,7 @@ final class Plugin
         }
 
         $this->booted = true;
+        UpgradeManager::maybeUpgrade();
         $this->modules = new ModuleRegistry();
         $this->states = new SecurityStateRegistry();
         $this->audit = new AuditLogger();

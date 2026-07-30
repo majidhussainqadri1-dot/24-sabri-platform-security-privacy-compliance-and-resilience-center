@@ -37,6 +37,7 @@ spl_autoload_register(static function (string $class): void {
 });
 
 register_activation_hook(__FILE__, [Sabri\Platform\Security\Activation::class, 'activate']);
+register_deactivation_hook(__FILE__, [Sabri\Platform\Security\Deactivation::class, 'deactivate']);
 
 add_action('plugins_loaded', static function (): void {
     Sabri\Platform\Security\Plugin::instance()->boot();

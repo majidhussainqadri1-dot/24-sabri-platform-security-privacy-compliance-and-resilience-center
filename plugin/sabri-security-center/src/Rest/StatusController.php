@@ -56,8 +56,8 @@ final class StatusController
         $payload = [
             'platform' => 'Sabri Social Homeopathy Platform',
             'security_program' => 'Foundation under active development',
-            'privacy_request_available' => true,
-            'responsible_disclosure_available' => true,
+            'privacy_request_available' => (bool) apply_filters('spcrc/privacy_request_intake_available', false),
+            'responsible_disclosure_available' => (bool) apply_filters('spcrc/responsible_disclosure_channel_available', false),
             'unsupported_claims' => [
                 'No claim of unhackable security',
                 'No claim of certification without independent evidence',

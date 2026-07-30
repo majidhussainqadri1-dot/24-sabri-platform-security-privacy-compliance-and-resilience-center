@@ -44,8 +44,17 @@ final class SystemCheck
     /** @return array<string,mixed> */
     private function checkDebugDisplay(): array
     {
-        $display = defined('WP_DEBUG_DISPLAY') && WP_DEBUG_DISPLAY;
-        return $this->result('debug_display', 'Public debug display disabled', ! $display, $display ? 'Enabled' : 'Disabled');
+        $debugEnabled = defined('WP_DEBUG') && WP_DEBUG;
+        $displayEnabled = defined('WP_DEBUG_DISPLAY') ? (bool) WP_DEBUG_DISPLAY : $debugEnabled;
+        $iniDisplay = filter_var((string) ini_get('display_errors'), FILTER_VALIDATE_BOOLEAN);
+        $publicDisplay = $displayEnabled || $iniDisplay;
+
+        return $this->result(
+            'debug_display',
+            'Public debug display disabled',
+            ! $publicDisplay,
+            $publicDisplay ? 'Enabled or inherited from PHP/WordPress debug settings' : 'Disabled'
+        );
     }
 
     /** @return array<string,mixed> */

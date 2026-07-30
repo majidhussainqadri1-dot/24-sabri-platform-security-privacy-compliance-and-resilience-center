@@ -36,3 +36,12 @@ File 24 emits `spcrc/security_state_requested`. File 20 may translate accepted r
 - `spcrc/backup_evidence`
 
 These report assurance status only; File 24 does not claim to provide off-site logging or immutable backups itself.
+
+## Public Trust Center availability flags
+
+Public claims are false by default until a real intake or private disclosure channel is connected:
+
+- `spcrc/privacy_request_intake_available`
+- `spcrc/responsible_disclosure_channel_available`
+
+A module or platform adapter must return `true` only after the underlying workflow is operational and tested.
