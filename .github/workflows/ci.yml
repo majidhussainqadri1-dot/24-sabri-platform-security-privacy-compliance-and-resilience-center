@@ -64,7 +64,7 @@ jobs:
           test "$(sha256sum /tmp/file24-source.tar.gz | awk '{print $1}')" = "2ccae50632472906d6d7cfe5f0cf064e6ebf1f6ce6466d317811c1f45ec40c17"
           ! tar -tzf /tmp/file24-source.tar.gz | grep -E '(^/|(^|/)\.\.(/|$))'
           tar -xzf /tmp/file24-source.tar.gz -C .
-          rm -f tools/corrective-source.tar.gz.b64 tools/corrective-source.part-* tools/corrective-source.ready .github/workflows/apply-corrective-bundle.yml
+          rm -f tools/corrective-source.tar.gz.b64 tools/corrective-source.part-* tools/corrective-source.ready
           find plugin tests -type f -name '*.php' -print0 | xargs -0 -n1 php -l
           php tests/run.php
           sha256sum -c CHECKSUMS.sha256
@@ -78,6 +78,7 @@ jobs:
           HEAD_REF: ${{ github.event.pull_request.head.ref }}
         run: |
           set -euo pipefail
+          git restore --source=HEAD -- .github/workflows/ci.yml .github/workflows/apply-corrective-bundle.yml
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -A
