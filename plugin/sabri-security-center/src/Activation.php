@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Sabri\Platform\Security;
 
+use Sabri\Platform\Security\Retention\RetentionManager;
 use Sabri\Platform\Security\Storage\Schema;
 
 final class Activation
@@ -26,6 +27,7 @@ final class Activation
         }
 
         Capabilities::install();
+        RetentionManager::ensureScheduled();
 
         update_option('spcrc_version', SPCRC_VERSION, false);
         update_option('spcrc_schema_version', Schema::VERSION, false);
