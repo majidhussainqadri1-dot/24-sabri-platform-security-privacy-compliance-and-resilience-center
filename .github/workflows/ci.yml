@@ -16,9 +16,11 @@ jobs:
       - name: Lint PHP files
         run: find plugin -type f -name '*.php' -print0 | xargs -0 -n1 php -l
       - name: Reject common secret files
+        shell: bash
         run: |
           test ! -f .env
-          ! grep -RInE '(BEGIN (RSA|EC|OPENSSH) PRIVATE KEY|password\s*=\s*["'"'][^"'"']+|secret\s*=\s*["'"'][^"'"']+)' plugin docs README.md SECURITY.md
+          ! grep -RInE 'BEGIN (RSA|EC|OPENSSH) PRIVATE KEY' plugin docs README.md SECURITY.md
+          ! grep -RInE '(password|secret|token)[[:space:]]*=' plugin docs README.md SECURITY.md
       - name: Verify plugin version consistency
         run: |
           grep -q 'Version:     0.25.0' plugin/sabri-security-center/sabri-security-center.php
