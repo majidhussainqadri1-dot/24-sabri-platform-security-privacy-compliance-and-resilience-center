@@ -6,7 +6,7 @@ namespace Sabri\Platform\Security\Storage;
 
 final class Schema
 {
-    public const VERSION = '0.25.3';
+    public const VERSION = '0.25.4';
 
     /** @return true|\WP_Error */
     public static function install(): true|\WP_Error
@@ -154,12 +154,47 @@ final class Schema
             KEY posture_seen (posture, last_seen_at)
         ) {$charset};");
 
-        foreach ($tables as $key => $table) {
+        dbDelta("CREATE TABLE {$tables['assurance']} (
+            id bigint unsigned NOT NULL AUTO_INCREMENT,
+            record_uuid char(36) NOT NULL,
+            record_type varchar(40) NOT NULL,
+            record_key varchar(120) NOT NULL,
+            title varchar(200) NOT NULL,
+            status varchar(40) NOT NULL DEFAULT 'unassessed',
+            owner_user_id bigint unsigned NULL,
+            jurisdiction varchar(80) NOT NULL DEFAULT '',
+            data_classes_json text NULL,
+            evidence_ref varchar(255) NOT NULL DEFAULT '',
+            notes text NULL,
+            reviewed_at datetime NULL,
+            next_review_at datetime NULL,
+            backup_completed_at datetime NULL,
+            restore_tested_at datetime NULL,
+            created_at datetime NOT NULL,
+            updated_at datetime NOT NULL,
+            PRIMARY KEY  (id),
+            UNIQUE KEY record_uuid (record_uuid),
+            UNIQUE KEY type_record (record_type, record_key),
+            KEY type_status (record_type, status),
+            KEY next_review (next_review_at),
+            KEY backup_restore (backup_completed_at, restore_tested_at),
+            KEY updated_at (updated_at)
+        ) {$charset};");
+
+        return self::verify();
+    }
+
+    /** @return true|\WP_Error */
+    public static function verify(): true|\WP_Error
+    {
+        global $wpdb;
+
+        foreach (self::tables() as $key => $table) {
             $found = $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $wpdb->esc_like($table)));
             if ($found !== $table) {
                 return new \WP_Error(
-                    'spcrc_schema_install_failed',
-                    sprintf('Required File 24 table was not created: %s', $key)
+                    'spcrc_schema_integrity_failed',
+                    sprintf('Required File 24 table is unavailable: %s', $key)
                 );
             }
         }
@@ -180,6 +215,7 @@ final class Schema
             'controls' => $wpdb->prefix . 'spcrc_controls',
             'privacy' => $wpdb->prefix . 'spcrc_privacy_requests',
             'manifests' => $wpdb->prefix . 'spcrc_module_manifests',
+            'assurance' => $wpdb->prefix . 'spcrc_assurance_records',
         ];
     }
 }

@@ -1,59 +1,58 @@
 # Sabri Platform Security, Privacy, Compliance and Resilience Center
 
-File 24 is the central security-governance and assurance layer for the Sabri Social Homeopathy Platform.
+File 24 is the central security-governance and assurance plane for the Sabri Social Homeopathy Platform. Native modules retain their own authentication, authorization and canonical data ownership.
 
-## Foundation scope (0.25.2)
+## Foundation scope — corrective candidate 0.25.6
 
-This corrective foundation establishes:
+This reviewed foundation establishes:
 
-- a versioned, bounded module-security manifest registry;
+- a versioned module-security manifest registry with persisted identity binding, guarded updates and concurrency detection;
 - a private role-aware Security Center dashboard;
 - bounded security-event storage with recursive redaction and external-event hooks;
-- operational security-finding intake and controlled status lifecycle contracts;
-- a private findings workflow with concurrency protection, explicit risk-acceptance authority and bounded accountability evidence;
-- risk, incident and control-catalog foundation workflows;
-- verified, non-destructive schema and capability repair;
-- expiring advisory security-state requests for File 20/native modules;
-- durable, replay-resistant privacy-request orchestration that records metadata before native-module processing;
-- per-module privacy-result evidence with optimistic request locking;
-- truthful native-module completion callbacks and request-level closure;
-- bounded retries that never replay completed or pending module work;
-- stale-dispatch detection with an hourly recovery scan;
-- a private Privacy Requests dashboard for verified-subject dispatch, retry and recent metadata review;
-- real File 00 and File 20 detection adapters;
+- risk, incident, control and security-finding workflows;
+- a bounded Assurance Registry for compliance applicability, vendor review and backup/restore evidence metadata;
+- verified, replay-resistant privacy orchestration that rejects malformed verification evidence before canonical request storage;
+- bounded retry and stale-dispatch recovery without automatic replay of uncertain native side effects;
+- fail-closed activation and runtime boot when schema, retention, privacy-recovery or version-state integrity cannot be verified;
+- non-destructive repair that verifies schema, capabilities, schedules and version state;
+- File 00 and File 20 adapters without duplicating their authority;
 - sanitized private status and public Trust Center REST payloads;
-- system checks for WordPress/PHP/HTTPS/schema/debug exposure, public-browsing compatibility, identity, shell, external logs, backup/restore evidence and upgrade errors;
-- bounded retention with locks, hold support and failure evidence;
-- contract tests, reproducible package tooling, checksums and CI gates.
+- reproducible packaging, checksums, SPDX SBOM, license inventory and CI gates.
 
-File 24 does **not** replace File 00 identity, native-module authorization, File 20 shell enforcement, hosting security, a WAF, a SIEM, legal counsel, immutable off-site backup or independent penetration testing.
+File 24 does **not** replace File 00 identity, native-module authorization, File 20 shell enforcement, hosting security, a WAF, a SIEM, legal counsel, a backup engine, immutable off-site evidence or independent penetration testing.
 
-## Privacy workflow contracts
+## Assurance boundary
 
-Native modules report asynchronous completion through the `spcrc/privacy_request_module_result` filter. File 24 accepts only bounded `completed`, `pending` or `failed` callback states and recalculates the canonical request status without storing exported personal data.
+The Assurance Registry stores only bounded status metadata and opaque references. It must never contain raw contracts, credentials, secrets, backup locations, identity documents, forensic payloads, patient records or private incident playbooks.
 
-Manual retries are limited to failed, partial or recovery-required requests. Completed and pending module operations are never replayed.
+A compliance entry records applicability status; it is not an automatic claim of legal compliance. A backup may be marked `verified` only when a successful-backup timestamp, a later restore-test timestamp and an opaque private evidence reference are present.
 
 ## Repository safety
 
-This public repository must never contain secrets, live vulnerabilities, forensic evidence, raw personal data, private vendor contracts, backup locations or internal incident playbooks. Those belong in a private security-operations store.
+This public repository contains sanitized source and documentation only. Live vulnerabilities, detailed risk registers, forensic evidence, vendor contracts, backup locations, keys, secrets and incident playbooks belong in approved private operational systems.
 
 ## Development status
 
-The implementation remains on Draft PR #1 and is not production-ready. Local and CI checks do not replace WordPress runtime, Hostinger staging, database upgrade/rollback, backup/restore, accessibility and independent security acceptance.
+The implementation remains on Draft PR #1 and is not production-ready. Automated checks do not replace real WordPress activation, MySQL/MariaDB migration and rollback, Hostinger staging, File 00/File 20 integration, accessibility review, restore drills, abuse testing or independent security acceptance.
 
-## Build
+## Build and QA
 
 ```bash
 php tests/run.php
 php tests/retention.php
 php tests/upgrade.php
+php tests/activation-cycle9.php
+php tests/boot-failure.php
 php tests/findings.php
 php tests/runtime.php
 php tests/privacy.php
+php tests/privacy-policy.php
+php tests/privacy-verification.php
 php tests/privacy-recovery.php
 php tests/admin-assets.php
+php tests/cycle9.php
+php tests/plugin-boot-cycle9.php
 ./tools/build-release.sh
 ```
 
-The package is created under `build/` with a SHA-256 receipt.
+The installable package and SHA-256 receipt are created under `build/`.

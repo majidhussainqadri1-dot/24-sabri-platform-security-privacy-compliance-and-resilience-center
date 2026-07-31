@@ -97,6 +97,17 @@ final class PrivacyRequestPolicy
             return new \WP_Error('spcrc_privacy_assignee_invalid', 'A valid assigned privacy operator is required.');
         }
 
+        // Validate method-specific proof and opaque-reference syntax only after
+        // all structural request fields pass. Invalid evidence must leave no
+        // canonical row and must not trigger avoidable native proof adapters.
+        $validation = $this->verification->validateEvidence(
+            $validation,
+            ['requester_user_id' => $requesterUserId]
+        );
+        if (is_wp_error($validation)) {
+            return $validation;
+        }
+
         $begin = $this->storage->begin($request);
         if (is_wp_error($begin)) {
             return $begin;

@@ -7,11 +7,49 @@ namespace Sabri\Platform\Security\Privacy;
 use Sabri\Platform\Security\Support\Sanitizer;
 
 /**
- * Persists bounded identity/authority verification evidence on the canonical
- * privacy-request row. It never stores identity documents or exported data.
+ * Validates and persists bounded identity/authority verification evidence on
+ * the canonical privacy-request row. It never stores identity documents or
+ * exported personal data.
  */
 final class PrivacyVerificationStore
 {
+    /** @param array<string,mixed> $evidence
+     *  @param array<string,mixed> $requestContext
+     *  @return array<string,mixed>|\WP_Error
+     */
+    public function validateEvidence(array $evidence, array $requestContext = []): array|\WP_Error
+    {
+        $safe = $this->sanitize($evidence);
+        if ($safe === null) {
+            return new \WP_Error(
+                'spcrc_privacy_verification_evidence_invalid',
+                'Privacy verification evidence is invalid or the reference is not an opaque case identifier.'
+            );
+        }
+
+        $verifiedAt = strtotime((string) $safe['verified_at'] . ' UTC');
+        if ($verifiedAt === false || $verifiedAt > time() + 300) {
+            return new \WP_Error(
+                'spcrc_privacy_verified_at_invalid',
+                'A valid, non-future verification timestamp is required before dispatch.'
+            );
+        }
+        if (! get_userdata((int) $safe['verified_by_user_id'])) {
+            return new \WP_Error(
+                'spcrc_privacy_verifier_invalid',
+                'A valid verifying operator is required before dispatch.'
+            );
+        }
+        if (! $this->evidenceConfirmed($requestContext, $safe)) {
+            return new \WP_Error(
+                'spcrc_privacy_verification_proof_missing',
+                'The selected verification method has no confirmed native or operator evidence.'
+            );
+        }
+
+        return $safe;
+    }
+
     /** @param array<string,mixed> $evidence
      *  @return true|\WP_Error
      */
@@ -22,36 +60,41 @@ final class PrivacyVerificationStore
         $requestUuid = Sanitizer::uuid($requestUuid);
         $existing = $this->get($requestUuid);
         if ($requestUuid === '' || $existing === null) {
-            return new \WP_Error('spcrc_privacy_verification_request_missing', 'Privacy request could not be found for verification evidence.');
+            return new \WP_Error(
+                'spcrc_privacy_verification_request_missing',
+                'Privacy request could not be found for verification evidence.'
+            );
         }
 
-        $safe = $this->sanitize($evidence);
-        if ($safe === null) {
-            return new \WP_Error('spcrc_privacy_verification_evidence_invalid', 'Privacy verification evidence is invalid or the reference is not an opaque case identifier.');
+        $validated = $this->validateEvidence($evidence, $existing);
+        if (is_wp_error($validated)) {
+            return $validated;
         }
 
         if ($this->hasEvidence($existing)) {
-            foreach (array_keys($safe) as $key) {
-                if ((string) ($existing[$key] ?? '') !== (string) $safe[$key]) {
-                    return new \WP_Error('spcrc_privacy_verification_collision', 'Privacy request verification evidence cannot be rebound.');
+            foreach (array_keys($validated) as $key) {
+                if ((string) ($existing[$key] ?? '') !== (string) $validated[$key]) {
+                    return new \WP_Error(
+                        'spcrc_privacy_verification_collision',
+                        'Privacy request verification evidence cannot be rebound.'
+                    );
                 }
             }
             return true;
         }
 
-        if (! $this->evidenceConfirmed($existing, $safe)) {
-            return new \WP_Error('spcrc_privacy_verification_proof_missing', 'The selected verification method has no confirmed native or operator evidence.');
-        }
-
         $lockVersion = absint($existing['lock_version'] ?? 0);
         $status = Sanitizer::key($existing['status'] ?? '', 40);
         if ($status !== 'dispatching') {
-            return new \WP_Error('spcrc_privacy_verification_state_invalid', 'Privacy verification evidence may be attached only before native dispatch.');
+            return new \WP_Error(
+                'spcrc_privacy_verification_state_invalid',
+                'Privacy verification evidence may be attached only before native dispatch.'
+            );
         }
 
         $updated = $wpdb->update(
             $wpdb->prefix . 'spcrc_privacy_requests',
-            array_merge($safe, [
+            array_merge($validated, [
                 'lock_version' => $lockVersion + 1,
                 'updated_at' => current_time('mysql', true),
             ]),
@@ -60,10 +103,16 @@ final class PrivacyVerificationStore
             ['%s', '%s', '%d']
         );
         if ($updated === false) {
-            return new \WP_Error('spcrc_privacy_verification_write_failed', 'Privacy verification evidence could not be stored.');
+            return new \WP_Error(
+                'spcrc_privacy_verification_write_failed',
+                'Privacy verification evidence could not be stored.'
+            );
         }
         if ($updated !== 1) {
-            return new \WP_Error('spcrc_privacy_verification_concurrent', 'Privacy request changed before verification evidence was stored.');
+            return new \WP_Error(
+                'spcrc_privacy_verification_concurrent',
+                'Privacy request changed before verification evidence was stored.'
+            );
         }
 
         return true;

@@ -1,15 +1,16 @@
-# Rollback — Foundation 0.25.2
+# Rollback — Foundation 0.25.6
 
 Rollback is code-first and evidence-preserving:
 
-1. Put the staging site into the appropriate File 20 maintenance/read-only state when available.
-2. Stop new privacy-request dispatch and record any request currently in `dispatching`, `pending`, `partial` or `recovery-required` state.
-3. Restore the prior reviewed File 24 plugin package.
-4. Do **not** drop File 24 tables automatically. The 0.25.2 privacy columns and evidence remain preserved for later controlled migration or reinstallation.
-5. Do not retry a privacy operation merely because the older code cannot interpret per-module evidence. Native completion or reconciliation must determine whether a side effect already occurred.
-6. Re-run the prior version's checks and verify native modules still enforce their own authorization.
-7. Confirm the 0.25.2 privacy-recovery cron is absent after rollback or explicitly clear `spcrc_privacy_recovery_scan`.
-8. If runtime integrity is not restored, use the previously tested full staging backup/restore procedure.
-9. Record the rollback as an incident/change event outside the public repository.
+1. Put staging into the appropriate File 20 maintenance/read-only state when available.
+2. Stop new privacy dispatch and record requests in `dispatching`, `pending`, `partial` or `recovery-required` state.
+3. Export a sanitized list of Assurance Registry keys/statuses only; do not export private evidence through this repository.
+4. Restore the prior reviewed File 24 package.
+5. Do **not** drop File 24 tables automatically. The assurance table and privacy evidence columns remain preserved.
+6. Clear `spcrc_privacy_recovery_scan` and the File 24 retention schedule only when the prior package does not own compatible callbacks.
+7. Do not retry privacy work merely because older code cannot interpret newer evidence.
+8. Re-run the prior package checks and confirm native modules still enforce their own authorization.
+9. If runtime integrity is not restored, use the previously tested full staging backup/restore procedure.
+10. Record rollback and reconciliation in the private operational change/incident system.
 
-A rollback is not accepted until login, public browsing, native permissions, database integrity, pending privacy-operation reconciliation and the Security Center fallback path are tested.
+Rollback acceptance requires login, anonymous public browsing, native permissions, database integrity, pending privacy reconciliation, cron ownership and the Security Center fallback path to be tested.

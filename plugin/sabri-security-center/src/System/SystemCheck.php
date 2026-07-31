@@ -153,12 +153,21 @@ final class SystemCheck
         $evidence = apply_filters('spcrc/backup_evidence', []);
         $lastSuccess = is_array($evidence) ? Sanitizer::isoTime($evidence['last_success_at'] ?? '') : '';
         $restoreTest = is_array($evidence) ? Sanitizer::isoTime($evidence['restore_tested_at'] ?? '') : '';
-        $available = $lastSuccess !== '' && $restoreTest !== '';
+        $lastTimestamp = $lastSuccess === '' ? false : strtotime($lastSuccess);
+        $restoreTimestamp = $restoreTest === '' ? false : strtotime($restoreTest);
+        $chronologyValid = $lastTimestamp !== false
+            && $restoreTimestamp !== false
+            && $restoreTimestamp >= $lastTimestamp
+            && $lastTimestamp <= time() + 300
+            && $restoreTimestamp <= time() + 300;
+
         return $this->result(
             'backup_evidence',
             'Backup and restore evidence adapter',
-            $available,
-            $available ? 'Backup and restore evidence received' : 'Complete backup and restore evidence not configured',
+            $chronologyValid,
+            $chronologyValid
+                ? 'Verified backup and later restore-test evidence received'
+                : 'Complete, chronological backup and restore evidence is not configured',
             'warning'
         );
     }
@@ -166,7 +175,27 @@ final class SystemCheck
     /** @return array<string,mixed> */
     private function checkUpgradeError(): array
     {
-        $error = Sanitizer::text(get_option('spcrc_last_upgrade_error', ''), 300);
+        $raw = get_option('spcrc_last_upgrade_error', '');
+        if (is_array($raw)) {
+            $code = Sanitizer::key($raw['error_code'] ?? '', 120);
+            $at = Sanitizer::isoTime($raw['at'] ?? '');
+            $from = Sanitizer::text($raw['from_schema'] ?? '', 40);
+            $target = Sanitizer::text($raw['target_schema'] ?? '', 40);
+            $parts = [];
+            if ($code !== '') {
+                $parts[] = 'Code: ' . $code;
+            }
+            if ($from !== '' || $target !== '') {
+                $parts[] = 'Schema: ' . ($from !== '' ? $from : 'unknown') . ' → ' . ($target !== '' ? $target : 'unknown');
+            }
+            if ($at !== '') {
+                $parts[] = 'Recorded: ' . $at;
+            }
+            $detail = $parts !== [] ? implode('; ', $parts) : 'Unrecognized structured upgrade failure evidence';
+            return $this->result('upgrade_error', 'No unresolved File 24 upgrade error', false, $detail);
+        }
+
+        $error = Sanitizer::text($raw, 300);
         return $this->result('upgrade_error', 'No unresolved File 24 upgrade error', $error === '', $error === '' ? 'None' : $error);
     }
 

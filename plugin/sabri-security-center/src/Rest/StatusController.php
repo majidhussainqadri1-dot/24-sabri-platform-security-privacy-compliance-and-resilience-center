@@ -6,6 +6,7 @@ namespace Sabri\Platform\Security\Rest;
 
 use Sabri\Platform\Security\Registry\ModuleRegistry;
 use Sabri\Platform\Security\Registry\SecurityStateRegistry;
+use Sabri\Platform\Security\Storage\AssuranceRepository;
 use Sabri\Platform\Security\Storage\ControlRepository;
 use Sabri\Platform\Security\Storage\FindingRepository;
 use Sabri\Platform\Security\Storage\IncidentRepository;
@@ -24,7 +25,8 @@ final class StatusController
         private ?RiskRepository $risks = null,
         private ?IncidentRepository $incidents = null,
         private ?ControlRepository $controls = null,
-        private ?FindingRepository $findings = null
+        private ?FindingRepository $findings = null,
+        private ?AssuranceRepository $assurance = null
     ) {
     }
 
@@ -63,6 +65,12 @@ final class StatusController
         }
         if ($this->controls && current_user_can('spcrc_manage_controls')) {
             $counts['controls'] = $this->controls->count();
+        }
+        if ($this->assurance && current_user_can('spcrc_manage_assurance')) {
+            $counts['assurance_records'] = $this->assurance->count();
+            $counts['compliance_records'] = $this->assurance->count('compliance');
+            $counts['vendor_records'] = $this->assurance->count('vendor');
+            $counts['backup_records'] = $this->assurance->count('backup');
         }
 
         $response = new \WP_REST_Response([

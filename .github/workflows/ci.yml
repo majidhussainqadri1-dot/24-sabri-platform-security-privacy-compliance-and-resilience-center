@@ -17,11 +17,12 @@ jobs:
       - name: Lint PHP files
         run: find plugin tests -type f -name '*.php' -print0 | xargs -0 -n1 php -l
 
-      - name: Run foundation contract tests
+      - name: Run foundation and adversarial contract tests
         run: |
           php tests/run.php
           php tests/retention.php
           php tests/upgrade.php
+          php tests/activation-cycle9.php
           php tests/boot-failure.php
           php tests/findings.php
           php tests/runtime.php
@@ -30,6 +31,8 @@ jobs:
           php tests/privacy-verification.php
           php tests/privacy-recovery.php
           php tests/admin-assets.php
+          php tests/cycle9.php
+          php tests/plugin-boot-cycle9.php
 
       - name: Reject common secret material
         shell: bash
@@ -40,12 +43,33 @@ jobs:
           ! grep -RInE --exclude='CHECKSUMS.sha256' --exclude='ci.yml' 'BEGIN (RSA|EC|OPENSSH|DSA) PRIVATE KEY' plugin docs tests README.md SECURITY.md
           ! grep -RInE --exclude='CHECKSUMS.sha256' --exclude='ci.yml' '(gh[pousr]_[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{30,})' plugin docs tests README.md SECURITY.md
 
-      - name: Verify plugin and schema version consistency
+      - name: Verify plugin, schema and package metadata
+        shell: bash
         run: |
-          grep -q 'Version:     0.25.4' plugin/sabri-security-center/sabri-security-center.php
-          grep -q "define('SPCRC_VERSION', '0.25.4')" plugin/sabri-security-center/sabri-security-center.php
-          grep -q "public const VERSION = '0.25.3'" plugin/sabri-security-center/src/Storage/Schema.php
-          grep -q 'Stable tag: 0.25.4' plugin/sabri-security-center/readme.txt
+          set -euo pipefail
+          grep -q 'Version:     0.25.6' plugin/sabri-security-center/sabri-security-center.php
+          grep -q "define('SPCRC_VERSION', '0.25.6')" plugin/sabri-security-center/sabri-security-center.php
+          grep -q "public const VERSION = '0.25.4'" plugin/sabri-security-center/src/Storage/Schema.php
+          grep -q 'Stable tag: 0.25.6' plugin/sabri-security-center/readme.txt
+          grep -q 'spcrc_assurance_records' plugin/sabri-security-center/src/Storage/Schema.php
+          grep -q 'spcrc_manage_assurance' plugin/sabri-security-center/src/Capabilities.php
+
+      - name: Verify corrective source contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          ! grep -F '$wpdb->replace' plugin/sabri-security-center/src/Registry/ModuleRegistry.php
+          ! grep -F '$repair->registerHooks()' plugin/sabri-security-center/src/Plugin.php
+          ! grep -F '$risks->registerHooks()' plugin/sabri-security-center/src/Plugin.php
+          ! grep -F '$incidents->registerHooks()' plugin/sabri-security-center/src/Plugin.php
+          ! grep -F '$controls->registerHooks()' plugin/sabri-security-center/src/Plugin.php
+          ! grep -RInE 'add_(action|filter)\(.spcrc/(upsert|write|save)_assurance' plugin/sabri-security-center/src
+          grep -q 'Schema::verify()' plugin/sabri-security-center/src/UpgradeManager.php
+
+      - name: Verify SPDX and license inventory
+        run: |
+          php -r '$d=json_decode(file_get_contents("plugin/sabri-security-center/SBOM.spdx.json"), true, 512, JSON_THROW_ON_ERROR); if (($d["spdxVersion"] ?? "") !== "SPDX-2.3") { exit(1); }'
+          grep -q 'GPL-2.0-or-later' plugin/sabri-security-center/LICENSES.md
 
       - name: Reject self-mutating source workflows and staged source bundles
         shell: bash
@@ -58,67 +82,58 @@ jobs:
             exit 1
           fi
 
-      - name: Report cycle 7 source hashes
+      - name: Report Cycle 9 source hashes
         run: |
           sha256sum \
             MANIFEST.md \
-            docs/REVIEW-AND-CORRECTION-0.25.4-CYCLE-7.md \
+            docs/REVIEW-AND-CORRECTION-0.25.6-CYCLE-9.md \
             plugin/sabri-security-center/readme.txt \
             plugin/sabri-security-center/sabri-security-center.php \
-            plugin/sabri-security-center/src/Admin/VerifiedPrivacyAdmin.php \
-            plugin/sabri-security-center/src/Integration/File00Adapter.php \
+            plugin/sabri-security-center/SBOM.spdx.json \
+            plugin/sabri-security-center/LICENSES.md \
+            plugin/sabri-security-center/src/Activation.php \
+            plugin/sabri-security-center/src/Admin/AssuranceAdmin.php \
             plugin/sabri-security-center/src/Plugin.php \
             plugin/sabri-security-center/src/Privacy/PrivacyRequestPolicy.php \
-            plugin/sabri-security-center/src/Privacy/PrivacyVerificationStore.php \
-            plugin/sabri-security-center/src/Privacy/RequestDispatcher.php \
+            plugin/sabri-security-center/src/Registry/ModuleRegistry.php \
+            plugin/sabri-security-center/src/Storage/AssuranceRepository.php \
             plugin/sabri-security-center/src/Storage/Schema.php \
+            plugin/sabri-security-center/src/System/Repair.php \
+            plugin/sabri-security-center/src/System/SystemCheck.php \
             plugin/sabri-security-center/src/UpgradeManager.php \
-            tests/boot-failure.php \
-            tests/privacy.php \
-            tests/privacy-policy.php \
-            tests/privacy-verification.php \
+            tests/activation-cycle9.php \
+            tests/cycle9.php \
+            tests/plugin-boot-cycle9.php \
             tests/run.php \
             tests/upgrade.php
 
-      - name: Verify source checksums except workflow self-hash
+      - name: Verify source checksums
         shell: bash
         run: |
           set -euo pipefail
           grep -v './.github/workflows/ci.yml$' CHECKSUMS.sha256 > /tmp/file24-checksums
           sha256sum -c /tmp/file24-checksums
 
-      - name: Build and verify installable package
+      - name: Build package twice and verify reproducibility
         id: package
         shell: bash
         run: |
-          PACKAGE="$(./tools/build-release.sh)"
-          test -f "$PACKAGE"
-          unzip -t "$PACKAGE"
-          unzip -l "$PACKAGE" | grep -q 'sabri-security-center/sabri-security-center.php'
-          echo "path=$PACKAGE" >> "$GITHUB_OUTPUT"
+          set -euo pipefail
+          PACKAGE_ONE="$(./tools/build-release.sh)"
+          cp "$PACKAGE_ONE" /tmp/file24-package-one.zip
+          PACKAGE_TWO="$(./tools/build-release.sh)"
+          cmp /tmp/file24-package-one.zip "$PACKAGE_TWO"
+          unzip -t "$PACKAGE_TWO"
+          unzip -l "$PACKAGE_TWO" | grep -q 'sabri-security-center/sabri-security-center.php'
+          unzip -l "$PACKAGE_TWO" | grep -q 'sabri-security-center/SBOM.spdx.json'
+          (cd "$(dirname "$PACKAGE_TWO")" && sha256sum -c "$(basename "$PACKAGE_TWO").sha256")
+          echo "path=$PACKAGE_TWO" >> "$GITHUB_OUTPUT"
 
       - name: Upload reviewed plugin package
         uses: actions/upload-artifact@v4
         with:
-          name: file-24-security-center-0.25.4
+          name: file-24-security-center-0.25.6
           path: |
             ${{ steps.package.outputs.path }}
             ${{ steps.package.outputs.path }}.sha256
-          if-no-files-found: error
-
-      - name: Upload sanitized source snapshot for corrective regression work
-        uses: actions/upload-artifact@v4
-        with:
-          name: file-24-sanitized-source-snapshot
-          path: |
-            .github/workflows/ci.yml
-            .gitignore
-            CHECKSUMS.sha256
-            MANIFEST.md
-            README.md
-            SECURITY.md
-            docs
-            plugin
-            tests
-            tools
           if-no-files-found: error

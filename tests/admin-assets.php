@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 const SPCRC_PLUGIN_URL = 'https://example.test/wp-content/plugins/sabri-security-center/';
-const SPCRC_VERSION = '0.25.1';
+const SPCRC_VERSION = '0.25.6';
 
 $GLOBALS['enqueued_styles'] = [];
 function sanitize_key(string $value): string { return preg_replace('/[^a-z0-9_\-]/', '', strtolower($value)) ?? ''; }
@@ -35,6 +35,11 @@ $GLOBALS['enqueued_styles'] = [];
 $_GET['page'] = 'sabri-security-privacy-requests';
 $loader->enqueue('security-center_page_sabri-security-privacy-requests');
 expectAdminAsset(isset($GLOBALS['enqueued_styles']['spcrc-admin']), 'Privacy submenu must load the shared Security Center stylesheet.');
+
+$GLOBALS['enqueued_styles'] = [];
+$_GET['page'] = 'sabri-security-assurance';
+$loader->enqueue('security-center_page_sabri-security-assurance');
+expectAdminAsset(isset($GLOBALS['enqueued_styles']['spcrc-admin']), 'Assurance submenu must load the shared Security Center stylesheet.');
 
 $GLOBALS['enqueued_styles'] = [];
 $_GET['page'] = 'unrelated-page';

@@ -39,7 +39,11 @@ final class ModuleRegistry
 
         foreach (array_slice($filtered, 0, self::MAX_MANIFESTS - 1) as $manifest) {
             if (! is_array($manifest)) {
-                do_action('spcrc/invalid_module_manifest', $manifest, new \WP_Error('spcrc_manifest_not_array', 'Manifest must be an array.'));
+                do_action(
+                    'spcrc/invalid_module_manifest',
+                    $manifest,
+                    new \WP_Error('spcrc_manifest_not_array', 'Manifest must be an array.')
+                );
                 continue;
             }
             $this->register($manifest);
@@ -53,7 +57,11 @@ final class ModuleRegistry
     {
         $incomingKey = Sanitizer::key($manifest['module_key'] ?? '', 120);
         if (! isset($this->manifests[$incomingKey]) && count($this->manifests) >= self::MAX_MANIFESTS) {
-            do_action('spcrc/invalid_module_manifest', $manifest, new \WP_Error('spcrc_manifest_limit', 'Module manifest limit reached.'));
+            do_action(
+                'spcrc/invalid_module_manifest',
+                $manifest,
+                new \WP_Error('spcrc_manifest_limit', 'Module manifest limit reached.')
+            );
             return false;
         }
 
@@ -63,14 +71,27 @@ final class ModuleRegistry
             return false;
         }
 
-        $key = $validated['module_key'];
-        $this->manifests[$key] = $validated;
-        $persisted = $this->persist($validated);
-        if (! $persisted) {
-            do_action('spcrc/module_manifest_persist_failed', $validated);
+        $key = (string) $validated['module_key'];
+        $memoryExisting = $this->manifests[$key] ?? null;
+        if (is_array($memoryExisting) && ! $this->sameIdentity($memoryExisting, $validated)) {
+            $error = new \WP_Error(
+                'spcrc_manifest_identity_collision',
+                'A module key cannot be rebound to a different module name or owner.'
+            );
+            do_action('spcrc/invalid_module_manifest', $manifest, $error);
+            return false;
         }
 
-        return $persisted;
+        $persisted = $this->persist($validated);
+        if (is_wp_error($persisted)) {
+            do_action('spcrc/module_manifest_persist_failed', $validated, $persisted);
+            return false;
+        }
+
+        // Update runtime state only after durable persistence succeeds. A failed
+        // write must not make an untrusted manifest appear canonical in memory.
+        $this->manifests[$key] = $validated;
+        return true;
     }
 
     /** @return array<string,array<string,mixed>> */
@@ -131,38 +152,81 @@ final class ModuleRegistry
         ];
     }
 
-    /** @param array<string,mixed> $manifest */
-    private function persist(array $manifest): bool
+    /** @param array<string,mixed> $manifest
+     *  @return true|\WP_Error
+     */
+    private function persist(array $manifest): true|\WP_Error
     {
         global $wpdb;
+
         $table = $wpdb->prefix . 'spcrc_module_manifests';
         $json = wp_json_encode($manifest, JSON_UNESCAPED_SLASHES);
         if (! is_string($json)) {
-            return false;
+            return new \WP_Error('spcrc_manifest_encode_failed', 'Module manifest could not be encoded.');
         }
 
         $hash = hash('sha256', $json);
-        $existing = $wpdb->get_row(
-            $wpdb->prepare("SELECT manifest_hash, last_seen_at FROM {$table} WHERE module_key = %s", $manifest['module_key']),
-            ARRAY_A
-        );
+        $existing = $this->stored($table, (string) $manifest['module_key']);
+        if (is_array($existing)) {
+            $storedManifest = $this->decodeStoredManifest($existing);
+            if (is_wp_error($storedManifest)) {
+                return $storedManifest;
+            }
+            if (! $this->sameIdentity($storedManifest, $manifest)) {
+                return new \WP_Error(
+                    'spcrc_manifest_identity_collision',
+                    'A module key cannot be rebound to a different module name or owner.'
+                );
+            }
 
-        if (is_array($existing) && hash_equals((string) $existing['manifest_hash'], $hash)) {
-            $lastSeen = strtotime((string) $existing['last_seen_at'] . ' UTC');
-            if ($lastSeen !== false && (time() - $lastSeen) < self::HEARTBEAT_SECONDS) {
+            if (hash_equals((string) ($existing['manifest_hash'] ?? ''), $hash)) {
+                $lastSeen = strtotime((string) ($existing['last_seen_at'] ?? '') . ' UTC');
+                if ($lastSeen !== false && (time() - $lastSeen) < self::HEARTBEAT_SECONDS) {
+                    return true;
+                }
+
+                $heartbeat = $wpdb->update(
+                    $table,
+                    ['last_seen_at' => current_time('mysql', true)],
+                    [
+                        'module_key' => $manifest['module_key'],
+                        'manifest_hash' => (string) $existing['manifest_hash'],
+                    ],
+                    ['%s'],
+                    ['%s', '%s']
+                );
+                return $heartbeat === false
+                    ? new \WP_Error('spcrc_manifest_heartbeat_failed', 'Module manifest heartbeat could not be stored.')
+                    : true;
+            }
+
+            $written = $wpdb->update(
+                $table,
+                [
+                    'module_version' => $manifest['version'],
+                    'manifest_hash' => $hash,
+                    'posture' => $manifest['posture'],
+                    'manifest_json' => $json,
+                    'last_seen_at' => current_time('mysql', true),
+                ],
+                [
+                    'module_key' => $manifest['module_key'],
+                    'manifest_hash' => (string) $existing['manifest_hash'],
+                ],
+                ['%s', '%s', '%s', '%s', '%s'],
+                ['%s', '%s']
+            );
+            if ($written === false) {
+                return new \WP_Error('spcrc_manifest_update_failed', 'Module manifest could not be updated.');
+            }
+            if ($written === 1) {
                 return true;
             }
 
-            return $wpdb->update(
-                $table,
-                ['last_seen_at' => current_time('mysql', true)],
-                ['module_key' => $manifest['module_key']],
-                ['%s'],
-                ['%s']
-            ) !== false;
+            return $this->resolveConcurrentWrite($table, $manifest, $hash, 'update');
         }
 
-        return $wpdb->replace(
+        $inserted = $wpdb->insert(
             $table,
             [
                 'module_key' => $manifest['module_key'],
@@ -173,7 +237,89 @@ final class ModuleRegistry
                 'last_seen_at' => current_time('mysql', true),
             ],
             ['%s', '%s', '%s', '%s', '%s', '%s']
-        ) !== false;
+        );
+        if ($inserted !== false) {
+            return true;
+        }
+
+        return $this->resolveConcurrentWrite($table, $manifest, $hash, 'insert');
+    }
+
+    /** @return array<string,mixed>|null */
+    private function stored(string $table, string $moduleKey): ?array
+    {
+        global $wpdb;
+
+        $row = $wpdb->get_row(
+            $wpdb->prepare(
+                "SELECT module_version, manifest_hash, manifest_json, last_seen_at FROM {$table} WHERE module_key = %s",
+                $moduleKey
+            ),
+            ARRAY_A
+        );
+        return is_array($row) ? $row : null;
+    }
+
+    /** @param array<string,mixed> $stored
+     *  @return array<string,mixed>|\WP_Error
+     */
+    private function decodeStoredManifest(array $stored): array|\WP_Error
+    {
+        $decoded = json_decode((string) ($stored['manifest_json'] ?? ''), true);
+        if (! is_array($decoded)) {
+            return new \WP_Error(
+                'spcrc_manifest_stored_identity_invalid',
+                'Stored module identity could not be verified safely.'
+            );
+        }
+        return $decoded;
+    }
+
+    /** @param array<string,mixed> $manifest
+     *  @return true|\WP_Error
+     */
+    private function resolveConcurrentWrite(string $table, array $manifest, string $hash, string $operation): true|\WP_Error
+    {
+        $current = $this->stored($table, (string) $manifest['module_key']);
+        if (! is_array($current)) {
+            return new \WP_Error(
+                'spcrc_manifest_' . $operation . '_failed',
+                'Module manifest could not be stored.'
+            );
+        }
+
+        $storedManifest = $this->decodeStoredManifest($current);
+        if (is_wp_error($storedManifest)) {
+            return $storedManifest;
+        }
+        if (! $this->sameIdentity($storedManifest, $manifest)) {
+            return new \WP_Error(
+                'spcrc_manifest_identity_collision',
+                'A concurrent writer attempted to bind the module key to a different identity.'
+            );
+        }
+        if (hash_equals((string) ($current['manifest_hash'] ?? ''), $hash)) {
+            return true;
+        }
+
+        return new \WP_Error(
+            'spcrc_manifest_concurrent_' . $operation,
+            'Module manifest changed concurrently and was not overwritten.'
+        );
+    }
+
+    /** @param array<string,mixed> $left
+     *  @param array<string,mixed> $right
+     */
+    private function sameIdentity(array $left, array $right): bool
+    {
+        return hash_equals(
+            Sanitizer::text($left['name'] ?? '', 200),
+            Sanitizer::text($right['name'] ?? '', 200)
+        ) && hash_equals(
+            Sanitizer::text($left['owner'] ?? '', 120),
+            Sanitizer::text($right['owner'] ?? '', 120)
+        );
     }
 
     /** @return array<string,mixed> */
@@ -187,7 +333,13 @@ final class ModuleRegistry
             'posture' => 'foundation',
             'data_classes' => ['C1 Internal', 'C2 Personal Metadata', 'C5 Security Evidence References'],
             'public_routes' => ['/wp-json/sabri-security/v1/trust'],
-            'private_routes' => ['/wp-admin/admin.php?page=sabri-security-center', '/wp-admin/admin.php?page=sabri-security-findings', '/wp-admin/admin.php?page=sabri-security-privacy-requests', '/wp-json/sabri-security/v1/status'],
+            'private_routes' => [
+                '/wp-admin/admin.php?page=sabri-security-center',
+                '/wp-admin/admin.php?page=sabri-security-findings',
+                '/wp-admin/admin.php?page=sabri-security-privacy-requests',
+                '/wp-admin/admin.php?page=sabri-security-assurance',
+                '/wp-json/sabri-security/v1/status',
+            ],
             'capabilities' => Capabilities::all(),
             'external_vendors' => [],
             'privacy_operations' => [],

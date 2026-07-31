@@ -4,14 +4,14 @@ Tags: security, privacy, compliance, resilience, audit
 Requires at least: 6.5
 Tested up to: 7.0
 Requires PHP: 8.0
-Stable tag: 0.25.4
+Stable tag: 0.25.6
 License: GPLv2 or later
 
 Central governance and assurance control plane for the Sabri Social Homeopathy Platform.
 
 == Description ==
 
-Foundation 0.25.4 provides a private Security Center dashboard, bounded module manifests and audit events, risk/incident/control foundations, a private security-findings triage interface, durable and replay-resistant privacy-request orchestration, bounded retry policy and reconciliation operations, verified privacy intake, fail-closed upgrade integrity, advisory security-state requests, system checks, non-destructive repair, and sanitized REST status/Trust Center payloads.
+Foundation 0.25.6 provides a private Security Center dashboard, bounded module manifests and audit events, risk/incident/control foundations, a private security-findings triage interface, durable and replay-resistant privacy-request orchestration, bounded retry policy and reconciliation operations, verified privacy intake, fail-closed upgrade integrity, advisory security-state requests, system checks, non-destructive repair, and sanitized REST status/Trust Center payloads.
 
 It does not replace native-module authorization, File 00 identity, File 20 enforcement, hosting security, legal counsel, backups, or independent security testing.
 
@@ -27,6 +27,20 @@ It does not replace native-module authorization, File 00 identity, File 20 enfor
 8. Run Security Center checks and the non-destructive repair only when needed.
 
 == Changelog ==
+
+= 0.25.6 =
+* Added a bounded private Assurance Registry for compliance applicability, vendor review and backup/restore evidence metadata.
+* Added the `spcrc_manage_assurance` capability and nonce-protected assurance administration workflow.
+* Required final compliance/vendor determinations and verified backups to include bounded review evidence.
+* Rejected credentials, contact data, identity-number patterns, URLs and storage paths from assurance notes.
+* Minimized backup evidence adapter output and required chronological backup/restore evidence.
+* Rejected malformed privacy verification evidence before a canonical request row is created.
+* Replaced destructive manifest replacement with persisted identity binding, guarded insert/update and concurrency detection.
+* Added same-version schema verification before normal runtime boot.
+* Required retention and privacy-recovery schedules during activation, upgrade and repair; failed activation removes partial schedules.
+* Corrected successful plugin boot calls to remove nonexistent repository/repair hook methods.
+* Preserved structured upgrade failure details in System Checks.
+* Added successful-boot, activation, assurance and adversarial regression tests plus SPDX/license evidence.
 
 = 0.25.4 =
 * Added explicit identity-and-authority verification evidence before privacy dispatch.

@@ -9,6 +9,7 @@ final class AssetLoader
     private const PAGES = [
         'sabri-security-findings',
         'sabri-security-privacy-requests',
+        'sabri-security-assurance',
     ];
 
     public function registerHooks(): void

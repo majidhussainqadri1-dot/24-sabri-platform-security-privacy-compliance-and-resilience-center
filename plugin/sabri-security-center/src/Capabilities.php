@@ -19,6 +19,7 @@ final class Capabilities
             'spcrc_view_security_events',
             'spcrc_manage_incidents',
             'spcrc_manage_privacy_requests',
+            'spcrc_manage_assurance',
             'spcrc_run_security_assessments',
             'spcrc_manage_security_settings',
         ];

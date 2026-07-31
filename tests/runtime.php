@@ -40,6 +40,7 @@ expectRuntime(in_array('spcrc_accept_critical_risk', Capabilities::all(), true),
 expectRuntime(! in_array('spcrc_accept_critical_risk', Capabilities::autoGranted(), true), 'Risk acceptance must not be auto-granted.');
 Capabilities::install();
 expectRuntime(! empty($GLOBALS['runtime_role']->caps['spcrc_manage_findings']), 'Finding management must be granted to administrators.');
+expectRuntime(! empty($GLOBALS['runtime_role']->caps['spcrc_manage_assurance']), 'Assurance management must be granted to administrators.');
 expectRuntime(empty($GLOBALS['runtime_role']->caps['spcrc_accept_critical_risk']), 'Critical risk acceptance must require explicit delegation.');
 
 echo "PASS: runtime capability contracts\n";

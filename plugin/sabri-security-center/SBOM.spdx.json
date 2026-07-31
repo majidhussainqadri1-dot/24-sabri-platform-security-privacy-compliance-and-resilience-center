@@ -1,0 +1,35 @@
+{
+  "spdxVersion": "SPDX-2.3",
+  "dataLicense": "CC0-1.0",
+  "SPDXID": "SPDXRef-DOCUMENT",
+  "name": "Sabri Platform Security Center 0.25.6",
+  "documentNamespace": "https://sabrihomeopathy.com/spdx/file-24/0.25.6/2026-08-01",
+  "creationInfo": {
+    "created": "2026-08-01T00:00:00Z",
+    "creators": [
+      "Organization: Sabri Social Homeopathy Platform",
+      "Tool: File 24 reviewed build process"
+    ]
+  },
+  "packages": [
+    {
+      "name": "sabri-security-center",
+      "SPDXID": "SPDXRef-Package-SabriSecurityCenter",
+      "versionInfo": "0.25.6",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "GPL-2.0-or-later",
+      "licenseDeclared": "GPL-2.0-or-later",
+      "copyrightText": "Copyright Dr. Allamah Majid Hussain Sabri Muhaddith Mursheed",
+      "supplier": "Organization: Sabri Social Homeopathy Platform",
+      "primaryPackagePurpose": "APPLICATION"
+    }
+  ],
+  "relationships": [
+    {
+      "spdxElementId": "SPDXRef-DOCUMENT",
+      "relationshipType": "DESCRIBES",
+      "relatedSpdxElement": "SPDXRef-Package-SabriSecurityCenter"
+    }
+  ]
+}
