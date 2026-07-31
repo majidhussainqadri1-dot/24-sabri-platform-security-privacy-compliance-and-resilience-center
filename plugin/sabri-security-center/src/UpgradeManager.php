@@ -20,7 +20,17 @@ final class UpgradeManager
         }
 
         try {
-            Schema::install();
+            $installed = Schema::install();
+            if (is_wp_error($installed)) {
+                self::recordFailure([
+                    'error_code' => $installed->get_error_code(),
+                    'from_schema' => $installedSchema,
+                    'target_schema' => Schema::VERSION,
+                ]);
+                do_action('spcrc/upgrade_failed', $installed, $installedSchema, Schema::VERSION);
+                return;
+            }
+
             Capabilities::install();
             RetentionManager::ensureScheduled();
             update_option('spcrc_schema_version', Schema::VERSION, false);
@@ -29,13 +39,19 @@ final class UpgradeManager
             delete_option('spcrc_last_upgrade_error');
             do_action('spcrc/upgraded', $installedSchema, Schema::VERSION, $installedPlugin, SPCRC_VERSION);
         } catch (\Throwable $exception) {
-            update_option('spcrc_last_upgrade_error', [
-                'at' => gmdate('c'),
+            self::recordFailure([
+                'error_code' => 'upgrade_exception',
+                'exception_class' => get_class($exception),
                 'from_schema' => $installedSchema,
                 'target_schema' => Schema::VERSION,
-                'exception_class' => get_class($exception),
-            ], false);
+            ]);
             do_action('spcrc/upgrade_failed', $exception, $installedSchema, Schema::VERSION);
         }
+    }
+
+    /** @param array<string,string> $details */
+    private static function recordFailure(array $details): void
+    {
+        update_option('spcrc_last_upgrade_error', ['at' => gmdate('c')] + $details, false);
     }
 }
