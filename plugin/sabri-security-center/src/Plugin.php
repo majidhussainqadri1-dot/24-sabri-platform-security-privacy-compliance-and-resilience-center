@@ -14,6 +14,7 @@ use Sabri\Platform\Security\Rest\StatusController;
 use Sabri\Platform\Security\Retention\RetentionManager;
 use Sabri\Platform\Security\Storage\AuditLogger;
 use Sabri\Platform\Security\Storage\ControlRepository;
+use Sabri\Platform\Security\Storage\FindingRepository;
 use Sabri\Platform\Security\Storage\IncidentRepository;
 use Sabri\Platform\Security\Storage\RiskRepository;
 use Sabri\Platform\Security\System\Repair;
@@ -42,6 +43,7 @@ final class Plugin
         $audit = new AuditLogger();
         $modules = new ModuleRegistry();
         $states = new SecurityStateRegistry($modules, $audit);
+        $findings = new FindingRepository($audit);
         $risks = new RiskRepository($audit);
         $incidents = new IncidentRepository($audit);
         $controls = new ControlRepository($audit);
@@ -54,13 +56,14 @@ final class Plugin
         (new RetentionManager($audit))->registerHooks();
         $modules->registerHooks();
         $states->registerHooks();
+        $findings->registerHooks();
         $risks->registerHooks();
         $incidents->registerHooks();
         $controls->registerHooks();
         $privacy->registerHooks();
         $repair->registerHooks();
         (new Dashboard($modules, $states, $checks, $audit, $risks, $incidents, $controls, $repair))->registerHooks();
-        (new StatusController($modules, $states, $checks, $risks, $incidents, $controls))->registerHooks();
+        (new StatusController($modules, $states, $checks, $risks, $incidents, $controls, $findings))->registerHooks();
 
         do_action('spcrc/booted', $this);
     }
