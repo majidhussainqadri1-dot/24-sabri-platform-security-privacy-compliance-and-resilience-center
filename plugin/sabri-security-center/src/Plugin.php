@@ -44,7 +44,13 @@ final class Plugin
         $this->booted = true;
         load_plugin_textdomain('sabri-security-center', false, dirname(plugin_basename(SPCRC_PLUGIN_FILE)) . '/languages');
 
-        UpgradeManager::maybeUpgrade();
+        $upgrade = UpgradeManager::maybeUpgrade();
+        if (is_wp_error($upgrade)) {
+            $this->registerUpgradeFailureNotice();
+            do_action('spcrc/boot_blocked', $upgrade);
+            return;
+        }
+
         Capabilities::registerHooks();
         $audit = new AuditLogger();
         $modules = new ModuleRegistry();
@@ -79,5 +85,19 @@ final class Plugin
         (new StatusController($modules, $states, $checks, $risks, $incidents, $controls, $findings))->registerHooks();
 
         do_action('spcrc/booted', $this);
+    }
+
+    private function registerUpgradeFailureNotice(): void
+    {
+        add_action('admin_notices', static function (): void {
+            if (! current_user_can('activate_plugins')) {
+                return;
+            }
+            ?>
+            <div class="notice notice-error">
+                <p><?php esc_html_e('File 24 Security Center did not start because a required schema or retention integrity check failed. No File 24 operational service was booted. Review the recorded upgrade evidence and repair the staging environment before retrying.', 'sabri-security-center'); ?></p>
+            </div>
+            <?php
+        });
     }
 }
