@@ -40,10 +40,10 @@ jobs:
 
       - name: Verify plugin and schema version consistency
         run: |
-          grep -q 'Version:     0.25.2' plugin/sabri-security-center/sabri-security-center.php
-          grep -q "define('SPCRC_VERSION', '0.25.2')" plugin/sabri-security-center/sabri-security-center.php
+          grep -q 'Version:     0.25.3' plugin/sabri-security-center/sabri-security-center.php
+          grep -q "define('SPCRC_VERSION', '0.25.3')" plugin/sabri-security-center/sabri-security-center.php
           grep -q "public const VERSION = '0.25.2'" plugin/sabri-security-center/src/Storage/Schema.php
-          grep -q 'Stable tag: 0.25.2' plugin/sabri-security-center/readme.txt
+          grep -q 'Stable tag: 0.25.3' plugin/sabri-security-center/readme.txt
 
       - name: Reject self-mutating source workflows and staged source bundles
         shell: bash
@@ -55,6 +55,12 @@ jobs:
           if grep -RInE --exclude='ci.yml' 'git push|contents:[[:space:]]*write' .github/workflows; then
             exit 1
           fi
+
+      - name: Report 0.25.3 release hashes
+        run: |
+          sha256sum \
+            plugin/sabri-security-center/sabri-security-center.php \
+            plugin/sabri-security-center/readme.txt
 
       - name: Verify source checksums except workflow self-hash
         shell: bash
@@ -76,7 +82,7 @@ jobs:
       - name: Upload reviewed plugin package
         uses: actions/upload-artifact@v4
         with:
-          name: file-24-security-center-0.25.2
+          name: file-24-security-center-0.25.3
           path: |
             ${{ steps.package.outputs.path }}
             ${{ steps.package.outputs.path }}.sha256
