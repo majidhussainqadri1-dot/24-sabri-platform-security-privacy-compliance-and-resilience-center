@@ -18,14 +18,15 @@ d9dc73dd7a941bfcc068fa2bf86491a0b4a2b13ac5449663c28c1a04f68fd0ff  ./docs/REVIEW-
 4cbbf1aca2d16b8ee81e3e76413e9a3f927c3e1310e9d15a8a6d3060ff37c88c  ./plugin/sabri-security-center/src/Admin/AssetLoader.php
 44a49f7824b2c79faee61a262bdaf1d8c46bf84e3c6441d43bb46703fb968f0e  ./plugin/sabri-security-center/src/Admin/Dashboard.php
 4780306f665abf99794d9e99f3d507cc5e49ccf104897720baf142812992b7b7  ./plugin/sabri-security-center/src/Admin/FindingAdmin.php
-8c412a637d1550abb7cb06db8c198ccac94487042ded16be80043966a2e9af30  ./plugin/sabri-security-center/src/Admin/PrivacyAdmin.php
+e4cb82620f8df430082577a7e20a2ba27c028f719800d73d1f18d0c9b914ebcc  ./plugin/sabri-security-center/src/Admin/PrivacyAdmin.php
 beb206b5f972ebf1ec1104c2fae1cd8c26bf1bef62a422c725094addf43c38f2  ./plugin/sabri-security-center/src/Capabilities.php
 86e8d5ee82873350e369a5808390d86e502ff5c301c31e10097bc7ea753c5d12  ./plugin/sabri-security-center/src/Deactivation.php
 1746fbc1c46f98bbe09149a6e211ee39a21a83a647d682177d14f519819574b2  ./plugin/sabri-security-center/src/Integration/File00Adapter.php
 5a71f895fe87f4e0708dc7fca0ae2c81a06c0b3221c0eac7e021b5ced39d34a8  ./plugin/sabri-security-center/src/Integration/File20Adapter.php
-5f4db923aea54ec8a36567fdc10e85aa23a0b8900ed854cffa215640169124d8  ./plugin/sabri-security-center/src/Plugin.php
+1f47073572da9d29efc068624bbb34c1610262439ab520374e19c1b947af082f  ./plugin/sabri-security-center/src/Plugin.php
+77897be0f45488cc8a5c3fa01c765c4a90cc8939bec083b250b857411f8c9b0f  ./plugin/sabri-security-center/src/Privacy/PrivacyRequestPolicy.php
 0d4993c7d2125ad0de8aa12120c162bd2f8ff8abdf2ae9548cbf957b0487b114  ./plugin/sabri-security-center/src/Privacy/RecoveryManager.php
-5ce82dff03f8ba91b04903551fde279f676b98667923f11c783fcfd94c629e52  ./plugin/sabri-security-center/src/Privacy/RequestDispatcher.php
+ce50ec1b2886c292ee1307870ae49cae16e28be6ed0c2b32a50260a4ae664635  ./plugin/sabri-security-center/src/Privacy/RequestDispatcher.php
 cdcee43a3bf23cc69d84f18cc1415d9540737b330ad466b17105f964211aecf5  ./plugin/sabri-security-center/src/Registry/ModuleRegistry.php
 48e8cd37b9b42bb1fbadd77a766d87343f963c829c40723b5927a047b32afc06  ./plugin/sabri-security-center/src/Registry/SecurityStateRegistry.php
 1692cfd9605810389c38e72252a818f461d6b2b98badccfe2ed0b0bec36fbf1c  ./plugin/sabri-security-center/src/Retention/RetentionManager.php
@@ -46,6 +47,7 @@ f8ec73c6eb4044d3384b5eb236b0d50cd40ff702f93355463ebbaad88493d540  ./tests/bootst
 700ea5183cb6af53b86f91f1a9d36fce2031cebf2c6de0db00d0dee8f9a489ca  ./tests/admin-assets.php
 a9a9754f448ffc5768097667b53f8a908d850d53b9ff986326831572f3dcf234  ./tests/findings.php
 ad21f5aa8217d2f3a58a958706646231e20e6290d64504813e58085e22ab59db  ./tests/privacy.php
+2e63a5b6788ddf2982f9e895f860776c54611e82e0c91369cb2b66ddddd5d0f7  ./tests/privacy-policy.php
 9291cf2a3f75cc98c1f240690ed176359e69ad4f23bedad753cb7007278b027f  ./tests/privacy-recovery.php
 0400ed15cdc946361cdeaa95199995bf142ac7dedfa6e14c3cc1f211c95b2b5d  ./tests/run.php
 6d918a1cb7ec8836146df780cfe60b5d4721359dadd4e5add4cb511778cfd942  ./tests/retention.php
