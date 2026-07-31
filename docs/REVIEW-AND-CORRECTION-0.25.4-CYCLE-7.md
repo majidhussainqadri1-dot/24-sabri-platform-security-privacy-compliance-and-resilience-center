@@ -6,9 +6,6 @@
 - Schema revision: `0.25.3`
 - Pull request status: Draft and unmerged
 - Environment status: automated foundation QA only; WordPress, MySQL and Hostinger staging acceptance remain outstanding
-- Accepted source head: `8841ab64a502249d46d01cdd1ccf79510cdc831f`
-- Accepted CI run: `30646634862`
-- Installable ZIP SHA-256: `a9406c9ab9eaf637bfc676013352157a9ce98e5bdab233006fba56a97b1677af`
 
 ## Governing boundary
 
@@ -114,8 +111,6 @@ Cycle 7 tests cover:
 - schema and retention failure boot blocking;
 - generic non-sensitive upgrade-failure notice;
 - PHP syntax, secret scanning, checksums and reproducible packaging.
-
-GitHub Actions run `30646634862` completed successfully. All test, integrity, checksum, package-build, archive-verification and artifact-upload steps passed.
 
 ## Explicitly incomplete
 
