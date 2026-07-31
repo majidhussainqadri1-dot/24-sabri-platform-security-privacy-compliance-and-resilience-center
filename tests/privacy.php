@@ -3,11 +3,11 @@
 declare(strict_types=1);
 
 const ARRAY_A = 'ARRAY_A';
-const SPCRC_VERSION = '0.25.2';
+const SPCRC_VERSION = '0.25.4';
 
 $GLOBALS['privacy_filters'] = [];
 $GLOBALS['privacy_actions'] = [];
-$GLOBALS['privacy_users'] = [7 => true, 8 => true];
+$GLOBALS['privacy_users'] = [7 => true, 8 => true, 99 => true];
 $GLOBALS['current_user_id'] = 99;
 
 final class WP_Error
@@ -45,7 +45,7 @@ function wp_generate_uuid4(): string
     static $counter = 100;
     return sprintf('00000000-0000-4000-8000-%012d', $counter++);
 }
-function current_time(string $type, bool $gmt = false): string { return '2026-07-31 09:00:00'; }
+function current_time(string $type, bool $gmt = false): string { return '2026-07-31 15:00:00'; }
 function get_current_user_id(): int { return (int) $GLOBALS['current_user_id']; }
 function get_userdata(int $userId): object|false { return ! empty($GLOBALS['privacy_users'][$userId]) ? (object) ['ID' => $userId] : false; }
 function absint(mixed $value): int { return abs((int) $value); }
@@ -128,6 +128,7 @@ require_once $base . 'Support/Sanitizer.php';
 require_once $base . 'Storage/AuditLogger.php';
 require_once $base . 'Storage/PrivacyRequestRepository.php';
 require_once $base . 'Registry/ModuleRegistry.php';
+require_once $base . 'Privacy/PrivacyRequestPolicy.php';
 require_once $base . 'Privacy/RequestDispatcher.php';
 
 use Sabri\Platform\Security\Privacy\RequestDispatcher;
@@ -138,6 +139,22 @@ use Sabri\Platform\Security\Storage\PrivacyRequestRepository;
 function expectPrivacy(bool $condition, string $message): void
 {
     if (! $condition) { fwrite(STDERR, "FAIL: {$message}\n"); exit(1); }
+}
+
+/** @param array<string,mixed> $request
+ *  @return array<string,mixed>
+ */
+function verifiedPrivacy(array $request): array
+{
+    return $request + [
+        'assigned_user_id' => 99,
+        'verification_method' => 'manual-document-review',
+        'authority_basis' => 'self',
+        'verification_reference' => 'case:test-privacy',
+        'verified_by_user_id' => 99,
+        'verified_at' => '2026-07-31T15:00:00Z',
+        'verification_attested' => true,
+    ];
 }
 
 $modules = new ModuleRegistry();
@@ -176,23 +193,24 @@ add_filter('spcrc/privacy_request/file-00-membership-core', static function ($re
     return ['ok' => true, 'status' => 'queued', 'reference' => 'native-workflow:test'];
 }, 10, 3);
 
-$unverified = $dispatcher->dispatch([
+$unverified = $dispatcher->dispatch(verifiedPrivacy([
     'request_uuid' => '10000000-0000-4000-8000-000000000001',
     'request_type' => 'access',
     'requester_user_id' => 999,
-], ['file-00-membership-core']);
-expectPrivacy(($unverified['error'] ?? '') === 'spcrc_privacy_subject_unverified', 'Unverified subject must fail before dispatch.');
+]), ['file-00-membership-core']);
+expectPrivacy(($unverified['error'] ?? '') === 'spcrc_privacy_subject_missing', 'Missing subject must fail before dispatch.');
 expectPrivacy($handlerCalls === 0, 'No module handler may run when durable pre-dispatch validation fails.');
 
 $uuid = '10000000-0000-4000-8000-000000000002';
-$pending = $dispatcher->dispatch([
+$pending = $dispatcher->dispatch(verifiedPrivacy([
     'request_uuid' => $uuid,
     'request_type' => 'access',
     'requester_user_id' => 7,
     'jurisdiction' => 'Pakistan',
-], ['file-00-membership-core']);
+]), ['file-00-membership-core']);
 expectPrivacy($pending['ok'] === true && $pending['status'] === 'pending', 'Queued native workflow must be pending, not falsely completed.');
 expectPrivacy(($GLOBALS['wpdb']->privacy[$uuid]['status'] ?? '') === 'pending', 'Pending aggregate status must be durably stored.');
+expectPrivacy(($GLOBALS['wpdb']->privacy[$uuid]['verification_method'] ?? '') === 'manual-document-review', 'Verification method must be stored durably.');
 $storedModules = json_decode((string) ($GLOBALS['wpdb']->privacy[$uuid]['module_results_json'] ?? ''), true);
 expectPrivacy(($storedModules['file-00-membership-core']['status'] ?? '') === 'queued', 'Per-module result must be durably stored.');
 expectPrivacy($handlerCalls === 1, 'Validated request must dispatch exactly once.');
@@ -209,11 +227,11 @@ expectPrivacy(! empty($GLOBALS['wpdb']->privacy[$uuid]['completed_at']), 'Comple
 $closedCallback = $dispatcher->completeModule($uuid, 'file-00-membership-core', ['ok' => true, 'status' => 'completed']);
 expectPrivacy(($closedCallback['error'] ?? '') === 'spcrc_privacy_callback_closed', 'Closed requests must reject replayed completion callbacks.');
 
-$collision = $dispatcher->dispatch([
+$collision = $dispatcher->dispatch(verifiedPrivacy([
     'request_uuid' => $uuid,
     'request_type' => 'access',
     'requester_user_id' => 8,
-], ['file-00-membership-core']);
+]), ['file-00-membership-core']);
 expectPrivacy(($collision['error'] ?? '') === 'spcrc_privacy_request_collision', 'Request UUID cannot be rebound to another subject.');
 expectPrivacy($handlerCalls === 1, 'Collision must not trigger module processing.');
 
@@ -225,11 +243,11 @@ add_filter('spcrc/privacy_request/retry-module', static function ($result, $type
         : ['ok' => true, 'status' => 'completed', 'reference' => 'retry:done'];
 }, 10, 3);
 $retryUuid = '10000000-0000-4000-8000-000000000003';
-$firstFailure = $dispatcher->dispatch([
+$firstFailure = $dispatcher->dispatch(verifiedPrivacy([
     'request_uuid' => $retryUuid,
     'request_type' => 'access',
     'requester_user_id' => 7,
-], ['retry-module']);
+]), ['retry-module']);
 expectPrivacy($firstFailure['status'] === 'failed' && $retryCalls === 1, 'Explicitly retry-safe native failure must produce a durable failed request.');
 $GLOBALS['wpdb']->privacy[$retryUuid]['next_retry_at'] = gmdate('Y-m-d H:i:s', time() - 1);
 $retrySuccess = $dispatcher->retry($retryUuid, 99);
@@ -239,11 +257,11 @@ expectPrivacy((int) ($GLOBALS['wpdb']->privacy[$retryUuid]['dispatch_attempts'] 
 
 $GLOBALS['wpdb']->failFinalize = true;
 $storageUuid = '10000000-0000-4000-8000-000000000004';
-$storageFailed = $dispatcher->dispatch([
+$storageFailed = $dispatcher->dispatch(verifiedPrivacy([
     'request_uuid' => $storageUuid,
     'request_type' => 'access',
     'requester_user_id' => 7,
-], ['file-00-membership-core']);
+]), ['file-00-membership-core']);
 expectPrivacy($storageFailed['ok'] === false && $storageFailed['status'] === 'storage-failed', 'Post-operation finalization failure must surface recovery-required state.');
 expectPrivacy(($GLOBALS['wpdb']->privacy[$storageUuid]['status'] ?? '') === 'dispatching', 'Failed finalization must leave durable dispatching evidence rather than claim completion.');
 $GLOBALS['wpdb']->failFinalize = false;
@@ -258,4 +276,4 @@ expectPrivacy($handlerCalls === 2, 'Unsafe stale retry must not call the native 
 
 expectPrivacy(count($requests->recent(10)) === 3, 'Privacy request repository must return bounded recent metadata.');
 
-echo "PASS: privacy callbacks, safe retry, stale recovery and duplicate-side-effect prevention\n";
+echo "PASS: privacy callbacks, verification evidence, safe retry and duplicate-side-effect prevention\n";
