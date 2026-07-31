@@ -11,17 +11,22 @@ use Sabri\Platform\Security\Support\Sanitizer;
 
 final class RequestDispatcher
 {
-    private PrivacyRequestRepository $requests;
+    private PrivacyRequestPolicy $requests;
 
     public function __construct(
         private AuditLogger $audit,
         private ModuleRegistry $modules,
-        ?PrivacyRequestRepository $requests = null
+        PrivacyRequestPolicy|PrivacyRequestRepository|null $requests = null
     ) {
-        if ($requests === null && ! class_exists(PrivacyRequestRepository::class, false)) {
+        if (! class_exists(PrivacyRequestRepository::class, false)) {
             require_once dirname(__DIR__) . '/Storage/PrivacyRequestRepository.php';
         }
-        $this->requests = $requests ?? new PrivacyRequestRepository();
+        if (! class_exists(PrivacyRequestPolicy::class, false)) {
+            require_once __DIR__ . '/PrivacyRequestPolicy.php';
+        }
+        $this->requests = $requests instanceof PrivacyRequestPolicy
+            ? $requests
+            : new PrivacyRequestPolicy($requests instanceof PrivacyRequestRepository ? $requests : new PrivacyRequestRepository());
     }
 
     public function registerHooks(): void
@@ -84,7 +89,7 @@ final class RequestDispatcher
         }
 
         $requestType = Sanitizer::key($request['request_type'] ?? '', 40);
-        if (! in_array($requestType, PrivacyRequestRepository::types(), true)) {
+        if (! in_array($requestType, PrivacyRequestPolicy::types(), true)) {
             return ['ok' => false, 'request_uuid' => $requestId, 'status' => 'failed', 'error' => 'invalid_request_type'];
         }
 
@@ -163,29 +168,6 @@ final class RequestDispatcher
      */
     public function completeModule(string $requestUuid, string $moduleKey, array $result): array
     {
-        $reportedStatus = Sanitizer::key($result['status'] ?? '', 40);
-        if ($reportedStatus === 'failed' && ! Sanitizer::boolean($result['retry_safe'] ?? false)) {
-            $error = new \WP_Error(
-                'spcrc_privacy_callback_retry_safety_required',
-                'A failed native callback must explicitly attest that retry is safe, otherwise the existing pending evidence is preserved for reconciliation.'
-            );
-            $this->audit->record(
-                'privacy_request_module_callback_rejected',
-                Sanitizer::key($moduleKey, 120),
-                'recovery-required',
-                'high',
-                ['request_uuid' => Sanitizer::uuid($requestUuid), 'error_code' => $error->get_error_code()]
-            );
-            return [
-                'ok' => false,
-                'request_uuid' => Sanitizer::uuid($requestUuid),
-                'module_key' => Sanitizer::key($moduleKey, 120),
-                'status' => 'recovery-required',
-                'error' => $error->get_error_code(),
-                'message' => $error->get_error_message(),
-            ];
-        }
-
         $stored = $this->requests->completeModule($requestUuid, $moduleKey, $result);
         if (is_wp_error($stored)) {
             $this->audit->record(
@@ -212,7 +194,7 @@ final class RequestDispatcher
             'privacy_request_module_callback_stored',
             Sanitizer::key($moduleKey, 120),
             Sanitizer::key($stored['status'] ?? 'pending', 40),
-            ! empty($stored['ok']) ? 'informational' : 'medium',
+            ! empty($stored['ok']) ? 'informational' : (Sanitizer::key($stored['status'] ?? '', 40) === 'recovery-required' ? 'high' : 'medium'),
             ['request_uuid' => Sanitizer::uuid($requestUuid)]
         );
         do_action('spcrc/privacy_request_module_result_stored', $requestUuid, $moduleKey, $stored);
@@ -245,9 +227,9 @@ final class RequestDispatcher
 
             $manifest = $this->modules->get($moduleKey);
             if ($manifest === null) {
-                $result = ['ok' => false, 'status' => 'failed', 'code' => 'unknown_module', 'message' => 'Module is not registered.'];
+                $result = ['ok' => false, 'status' => 'failed', 'code' => 'unknown_module', 'message' => 'Module is not registered.', 'retry_safe' => false];
             } elseif (! in_array($requestType, (array) ($manifest['privacy_operations'] ?? []), true)) {
-                $result = ['ok' => false, 'status' => 'failed', 'code' => 'operation_not_declared', 'message' => 'Module did not declare this privacy operation.'];
+                $result = ['ok' => false, 'status' => 'failed', 'code' => 'operation_not_declared', 'message' => 'Module did not declare this privacy operation.', 'retry_safe' => false];
             } else {
                 try {
                     $nativeResult = apply_filters("spcrc/privacy_request/{$moduleKey}", null, $requestType, $context);
@@ -255,9 +237,10 @@ final class RequestDispatcher
                 } catch (\Throwable $exception) {
                     $result = [
                         'ok' => false,
-                        'status' => 'dispatching',
+                        'status' => 'recovery-required',
                         'code' => 'handler_exception',
                         'message' => 'Native privacy handler failed after dispatch; manual reconciliation is required before retry.',
+                        'retry_safe' => false,
                     ];
                     do_action('spcrc/privacy_request_handler_exception', $moduleKey, $requestType, $exception);
                 }
@@ -281,7 +264,7 @@ final class RequestDispatcher
     private function finalizeResponse(string $requestId, string $requestType, string $expectedStatus): array
     {
         $results = $this->requests->moduleResults($requestId);
-        $aggregate = PrivacyRequestRepository::aggregateResults($results);
+        $aggregate = PrivacyRequestPolicy::aggregateResults($results);
         $errorCode = $this->firstFailureCode($results);
         $finalized = $this->requests->finalize($requestId, $aggregate['status'], $expectedStatus, $errorCode);
         if (is_wp_error($finalized)) {
@@ -344,14 +327,15 @@ final class RequestDispatcher
         if (is_wp_error($result)) {
             return [
                 'ok' => false,
-                'status' => 'dispatching',
+                'status' => 'recovery-required',
                 'code' => Sanitizer::key($result->get_error_code(), 120),
                 'message' => 'Native privacy handler reported failure after dispatch; manual reconciliation is required before retry.',
+                'retry_safe' => false,
             ];
         }
 
         if ($result === null) {
-            return ['ok' => false, 'status' => 'failed', 'code' => 'handler_missing', 'message' => 'No privacy handler accepted the request.'];
+            return ['ok' => false, 'status' => 'failed', 'code' => 'handler_missing', 'message' => 'No privacy handler accepted the request.', 'retry_safe' => false];
         }
 
         if (is_array($result)) {
@@ -361,8 +345,9 @@ final class RequestDispatcher
             if (! in_array($status, $allowed, true)) {
                 $status = $ok ? 'accepted' : 'failed';
             }
-            if (! $ok && in_array($status, ['failed', 'rejected', 'unavailable'], true) && ! Sanitizer::boolean($result['retry_safe'] ?? false)) {
-                $status = 'dispatching';
+            $retrySafe = Sanitizer::boolean($result['retry_safe'] ?? false);
+            if (! $ok && in_array($status, ['failed', 'rejected', 'unavailable'], true) && ! $retrySafe) {
+                $status = 'recovery-required';
             }
 
             return [
@@ -371,16 +356,17 @@ final class RequestDispatcher
                 'code' => Sanitizer::key($result['code'] ?? '', 120),
                 'reference' => Sanitizer::text($result['reference'] ?? '', 200),
                 'message' => Sanitizer::text($result['message'] ?? '', 300),
+                'retry_safe' => $retrySafe,
             ];
         }
 
         if (is_bool($result)) {
             return $result
-                ? ['ok' => true, 'status' => 'accepted', 'code' => '']
-                : ['ok' => false, 'status' => 'dispatching', 'code' => 'ambiguous_native_failure', 'message' => 'Native handler returned an ambiguous failure; reconciliation is required.'];
+                ? ['ok' => true, 'status' => 'accepted', 'code' => '', 'retry_safe' => false]
+                : ['ok' => false, 'status' => 'recovery-required', 'code' => 'ambiguous_native_failure', 'message' => 'Native handler returned an ambiguous failure; reconciliation is required.', 'retry_safe' => false];
         }
 
-        return ['ok' => false, 'status' => 'dispatching', 'code' => 'invalid_handler_response', 'message' => 'Privacy handler returned an invalid response after dispatch; reconciliation is required.'];
+        return ['ok' => false, 'status' => 'recovery-required', 'code' => 'invalid_handler_response', 'message' => 'Privacy handler returned an invalid response after dispatch; reconciliation is required.', 'retry_safe' => false];
     }
 
     /** @param array<string,array<string,mixed>> $results */
