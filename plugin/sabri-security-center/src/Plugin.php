@@ -7,7 +7,7 @@ namespace Sabri\Platform\Security;
 use Sabri\Platform\Security\Admin\AssetLoader;
 use Sabri\Platform\Security\Admin\Dashboard;
 use Sabri\Platform\Security\Admin\FindingAdmin;
-use Sabri\Platform\Security\Admin\PrivacyAdmin;
+use Sabri\Platform\Security\Admin\VerifiedPrivacyAdmin;
 use Sabri\Platform\Security\Integration\File00Adapter;
 use Sabri\Platform\Security\Integration\File20Adapter;
 use Sabri\Platform\Security\Privacy\PrivacyRequestPolicy;
@@ -75,7 +75,7 @@ final class Plugin
         (new AssetLoader())->registerHooks();
         (new Dashboard($modules, $states, $checks, $audit, $risks, $incidents, $controls, $repair))->registerHooks();
         (new FindingAdmin($findings))->registerHooks();
-        (new PrivacyAdmin($privacyRequests, $privacy, $modules))->registerHooks();
+        (new VerifiedPrivacyAdmin($privacyRequests, $privacy, $modules))->registerHooks();
         (new StatusController($modules, $states, $checks, $risks, $incidents, $controls, $findings))->registerHooks();
 
         do_action('spcrc/booted', $this);
