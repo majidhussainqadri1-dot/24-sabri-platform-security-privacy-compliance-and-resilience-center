@@ -20,7 +20,7 @@ e8ad1f36ac614d849190d0a20e9bd396486cb46a95a2c544248ea5791066e603  ./docs/ROLLBAC
 41c3c357598caf013d072e942bbf3731d07cb44d17ab876e67d38f4f14926bf0  ./plugin/sabri-security-center/src/Admin/PrivacyAdmin.php
 beb206b5f972ebf1ec1104c2fae1cd8c26bf1bef62a422c725094addf43c38f2  ./plugin/sabri-security-center/src/Capabilities.php
 b9046e3a112ca12147c8128ea5e64683124b1023ffd78ee629c56224fc43ae19  ./plugin/sabri-security-center/src/Deactivation.php
-ee2fb0e2da66c8397a4c654aa57b5b4c70b90ed8e26518eda95547f9d3a6c15f  ./plugin/sabri-security-center/src/Integration/File00Adapter.php
+1746fbc1c46f98bbe09149a6e211ee39a21a83a647d682177d14f519819574b2  ./plugin/sabri-security-center/src/Integration/File00Adapter.php
 5a71f895fe87f4e0708dc7fca0ae2c81a06c0b3221c0eac7e021b5ced39d34a8  ./plugin/sabri-security-center/src/Integration/File20Adapter.php
 f757c235335dc1fc1659efc60337f619c0f41b279f19dac18f8d1410a24ffc22  ./plugin/sabri-security-center/src/Plugin.php
 07bdf88e6a06ff41d846e6f11da0b9a2d511c728428c163b8b278ef1d1080c34  ./plugin/sabri-security-center/src/Privacy/RequestDispatcher.php
@@ -44,7 +44,7 @@ f8ec73c6eb4044d3384b5eb236b0d50cd40ff702f93355463ebbaad88493d540  ./tests/bootst
 700ea5183cb6af53b86f91f1a9d36fce2031cebf2c6de0db00d0dee8f9a489ca  ./tests/admin-assets.php
 a9a9754f448ffc5768097667b53f8a908d850d53b9ff986326831572f3dcf234  ./tests/findings.php
 072bfd14c7f31c3a9448c04d5482553bdccb516e087d4cebbc499f3f01583820  ./tests/privacy.php
-c7f4c493c3115d9a38b5328f93e21eef26a788b33ca65891620e1e7789a330df  ./tests/run.php
+4c4b20102638b3bb9c1a1b2c4410b354250863a4e634843a61533d910289f9cf  ./tests/run.php
 6d918a1cb7ec8836146df780cfe60b5d4721359dadd4e5add4cb511778cfd942  ./tests/retention.php
 31be723f85c9a3795d04b01110c0605bbcbedb6096e37fd79df181eccbd27a4b  ./tests/runtime.php
 81071eff1b721f22210dc995fd77932101fcbf554baabca4d29a9173fba6c49e  ./tests/upgrade.php
