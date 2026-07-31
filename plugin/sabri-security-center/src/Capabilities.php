@@ -13,6 +13,7 @@ final class Capabilities
             'spcrc_view_overview',
             'spcrc_view_module_posture',
             'spcrc_manage_controls',
+            'spcrc_manage_findings',
             'spcrc_manage_risks',
             'spcrc_view_security_events',
             'spcrc_manage_incidents',
