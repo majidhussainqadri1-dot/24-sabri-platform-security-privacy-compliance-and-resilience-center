@@ -10,13 +10,16 @@ Sensitive operational material is intentionally excluded.
 - Scoped submenu asset loader: `plugin/sabri-security-center/src/Admin/AssetLoader.php`
 - Verified privacy-request operations: `plugin/sabri-security-center/src/Admin/VerifiedPrivacyAdmin.php`
 - Durable privacy metadata and module outcomes: `plugin/sabri-security-center/src/Storage/PrivacyRequestRepository.php`
-- Bounded privacy verification evidence: `plugin/sabri-security-center/src/Privacy/PrivacyVerificationStore.php`
+- Bounded privacy verification evidence and proof policy: `plugin/sabri-security-center/src/Privacy/PrivacyVerificationStore.php`
 - Privacy verification, dispatch, callback and retry policy: `plugin/sabri-security-center/src/Privacy/PrivacyRequestPolicy.php`, `plugin/sabri-security-center/src/Privacy/RequestDispatcher.php`
+- Fail-closed schema and retention upgrade boundary: `plugin/sabri-security-center/src/UpgradeManager.php`, `plugin/sabri-security-center/src/Plugin.php`
 - Stale-dispatch recovery scanner: `plugin/sabri-security-center/src/Privacy/RecoveryManager.php`
 - Cycle 7 review record: `docs/REVIEW-AND-CORRECTION-0.25.4-CYCLE-7.md`
 - Foundation contract tests: `tests/`
-- Runtime integration guard: `tests/runtime.php`
+- Runtime capability guard: `tests/runtime.php`
+- Runtime boot-failure guard: `tests/boot-failure.php`
 - Privacy callback, verification, retry and stale-recovery guards: `tests/privacy.php`, `tests/privacy-policy.php`
+- Opaque-reference and method-specific proof guard: `tests/privacy-verification.php`
 - Privacy recovery scheduling guard: `tests/privacy-recovery.php`
 - Scoped admin asset guard: `tests/admin-assets.php`
 - Reproducible package tooling: `tools/build-release.sh`
