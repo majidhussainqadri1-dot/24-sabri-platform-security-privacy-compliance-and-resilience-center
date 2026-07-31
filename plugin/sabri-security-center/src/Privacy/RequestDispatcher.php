@@ -33,7 +33,7 @@ final class RequestDispatcher
     {
         add_action('spcrc/dispatch_privacy_request', [$this, 'dispatch'], 10, 2);
         add_filter('spcrc/privacy_request_dispatch', [$this, 'filterDispatch'], 10, 3);
-        add_filter('spcrc/privacy_request_retry', [$this, 'filterRetry'], 10, 3);
+        add_filter('spcrc/privacy_request_retry', [$this, 'filterRetry'], 10, 4);
         add_filter('spcrc/privacy_request_module_result', [$this, 'filterModuleResult'], 10, 4);
     }
 
@@ -53,15 +53,17 @@ final class RequestDispatcher
         return $this->dispatch($request, $moduleKeys);
     }
 
-    /** @return array<string,mixed> */
-    public function filterRetry(mixed $current, string $requestUuid, int $assignedUserId = 0): array
+    /** @param array<string,mixed> $authorization
+     *  @return array<string,mixed>
+     */
+    public function filterRetry(mixed $current, string $requestUuid, int $assignedUserId = 0, array $authorization = []): array
     {
         if ($current !== null) {
             return is_array($current)
                 ? $current
                 : ['ok' => false, 'status' => 'failed', 'error' => 'invalid_upstream_privacy_retry_result'];
         }
-        return $this->retry($requestUuid, $assignedUserId);
+        return $this->retry($requestUuid, $assignedUserId, $authorization);
     }
 
     /** @param array<string,mixed> $result
@@ -98,6 +100,11 @@ final class RequestDispatcher
             return ['ok' => false, 'request_uuid' => $requestId, 'status' => 'failed', 'error' => 'no_modules_requested'];
         }
 
+        $preflight = $this->preflightModules($moduleKeys, $requestType);
+        if (is_wp_error($preflight)) {
+            return $this->rejectedResponse($requestId, $requestType, $preflight, 'privacy_request_preflight_rejected');
+        }
+
         $begin = $this->requests->begin([
             'request_uuid' => $requestId,
             'request_type' => $requestType,
@@ -105,6 +112,12 @@ final class RequestDispatcher
             'assigned_user_id' => $request['assigned_user_id'] ?? get_current_user_id(),
             'jurisdiction' => $request['jurisdiction'] ?? '',
             'due_at' => $request['due_at'] ?? '',
+            'verification_method' => $request['verification_method'] ?? '',
+            'authority_basis' => $request['authority_basis'] ?? '',
+            'verification_reference' => $request['verification_reference'] ?? '',
+            'verified_by_user_id' => $request['verified_by_user_id'] ?? 0,
+            'verified_at' => $request['verified_at'] ?? '',
+            'verification_attested' => $request['verification_attested'] ?? false,
             'module_keys' => $moduleKeys,
         ]);
         if (is_wp_error($begin)) {
@@ -121,6 +134,11 @@ final class RequestDispatcher
                 'requester_user_id' => absint($begin['requester_user_id'] ?? 0),
                 'jurisdiction' => Sanitizer::text($begin['jurisdiction'] ?? '', 80),
                 'due_at' => Sanitizer::isoTime($begin['due_at'] ?? ''),
+                'verification_method' => Sanitizer::key($begin['verification_method'] ?? '', 40),
+                'authority_basis' => Sanitizer::key($begin['authority_basis'] ?? '', 40),
+                'verification_reference' => Sanitizer::text($begin['verification_reference'] ?? '', 200),
+                'verified_by_user_id' => absint($begin['verified_by_user_id'] ?? 0),
+                'verified_at' => Sanitizer::isoTime($begin['verified_at'] ?? ''),
             ]
         );
 
@@ -128,10 +146,10 @@ final class RequestDispatcher
     }
 
     /** @return array<string,mixed> */
-    public function retry(string $requestUuid, int $assignedUserId = 0): array
+    public function retry(string $requestUuid, int $assignedUserId = 0, array $authorization = []): array
     {
         $requestUuid = Sanitizer::uuid($requestUuid);
-        $claim = $this->requests->claimRetry($requestUuid, $assignedUserId > 0 ? $assignedUserId : get_current_user_id());
+        $claim = $this->requests->claimRetry($requestUuid, $assignedUserId > 0 ? $assignedUserId : get_current_user_id(), $authorization);
         if (is_wp_error($claim)) {
             return $this->rejectedResponse($requestUuid, '', $claim, 'privacy_request_retry_rejected');
         }
@@ -148,6 +166,11 @@ final class RequestDispatcher
                 'requester_user_id' => absint($claim['requester_user_id'] ?? 0),
                 'jurisdiction' => Sanitizer::text($claim['jurisdiction'] ?? '', 80),
                 'due_at' => Sanitizer::isoTime($claim['due_at'] ?? ''),
+                'verification_method' => Sanitizer::key($claim['verification_method'] ?? '', 40),
+                'authority_basis' => Sanitizer::key($claim['authority_basis'] ?? '', 40),
+                'verification_reference' => Sanitizer::text($claim['verification_reference'] ?? '', 200),
+                'verified_by_user_id' => absint($claim['verified_by_user_id'] ?? 0),
+                'verified_at' => Sanitizer::isoTime($claim['verified_at'] ?? ''),
                 'retry' => true,
             ]
         );
@@ -378,6 +401,30 @@ final class RequestDispatcher
             }
         }
         return '';
+    }
+
+    /** @param string[] $moduleKeys
+     *  @return true|\WP_Error
+     */
+    private function preflightModules(array $moduleKeys, string $requestType): true|\WP_Error
+    {
+        foreach ($moduleKeys as $moduleKey) {
+            $manifest = $this->modules->get($moduleKey);
+            if ($manifest === null) {
+                return new \WP_Error(
+                    'spcrc_privacy_module_unknown',
+                    sprintf('Privacy module is not registered: %s', $moduleKey)
+                );
+            }
+            if (! in_array($requestType, (array) ($manifest['privacy_operations'] ?? []), true)) {
+                return new \WP_Error(
+                    'spcrc_privacy_operation_not_declared',
+                    sprintf('Module %s did not declare privacy operation %s.', $moduleKey, $requestType)
+                );
+            }
+        }
+
+        return true;
     }
 
     /** @return string[] */
