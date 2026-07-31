@@ -106,7 +106,8 @@ final class RequestDispatcher
             return $this->rejectedResponse($requestId, $requestType, $begin);
         }
 
-        $results = $this->runModules(
+        $this->runModules(
+            $requestId,
             $moduleKeys,
             $requestType,
             [
@@ -118,7 +119,7 @@ final class RequestDispatcher
             ]
         );
 
-        return $this->finalizeResponse($requestId, $requestType, $results, 'dispatching');
+        return $this->finalizeResponse($requestId, $requestType, 'dispatching');
     }
 
     /** @return array<string,mixed> */
@@ -132,8 +133,8 @@ final class RequestDispatcher
 
         $requestType = Sanitizer::key($claim['request_type'] ?? '', 40);
         $retryModules = $this->moduleKeys($claim['retry_modules'] ?? []);
-        $storedResults = is_array($claim['module_results'] ?? null) ? $claim['module_results'] : [];
-        $newResults = $this->runModules(
+        $this->runModules(
+            $requestUuid,
             $retryModules,
             $requestType,
             [
@@ -146,11 +147,7 @@ final class RequestDispatcher
             ]
         );
 
-        foreach ($newResults as $moduleKey => $result) {
-            $storedResults[$moduleKey] = $result;
-        }
-
-        $response = $this->finalizeResponse($requestUuid, $requestType, $storedResults, 'dispatching');
+        $response = $this->finalizeResponse($requestUuid, $requestType, 'dispatching');
         $this->audit->record(
             'privacy_request_retry_dispatched',
             'file-24-security-center',
@@ -207,49 +204,63 @@ final class RequestDispatcher
 
     /** @param string[] $moduleKeys
      *  @param array<string,mixed> $context
-     *  @return array<string,array<string,mixed>>
      */
-    private function runModules(array $moduleKeys, string $requestType, array $context): array
+    private function runModules(string $requestUuid, array $moduleKeys, string $requestType, array $context): void
     {
-        $results = [];
         foreach ($moduleKeys as $moduleKey) {
+            $claimed = $this->requests->claimModule($requestUuid, $moduleKey);
+            if (is_wp_error($claimed)) {
+                $this->audit->record(
+                    'privacy_request_module_claim_failed',
+                    $moduleKey,
+                    'recovery-required',
+                    'high',
+                    ['request_uuid' => $requestUuid, 'error_code' => $claimed->get_error_code()]
+                );
+                continue;
+            }
+
             $manifest = $this->modules->get($moduleKey);
             if ($manifest === null) {
-                $results[$moduleKey] = ['ok' => false, 'status' => 'failed', 'code' => 'unknown_module', 'message' => 'Module is not registered.'];
-                continue;
+                $result = ['ok' => false, 'status' => 'failed', 'code' => 'unknown_module', 'message' => 'Module is not registered.'];
+            } elseif (! in_array($requestType, (array) ($manifest['privacy_operations'] ?? []), true)) {
+                $result = ['ok' => false, 'status' => 'failed', 'code' => 'operation_not_declared', 'message' => 'Module did not declare this privacy operation.'];
+            } else {
+                try {
+                    $nativeResult = apply_filters("spcrc/privacy_request/{$moduleKey}", null, $requestType, $context);
+                    $result = $this->normalizeResult($nativeResult);
+                } catch (\Throwable $exception) {
+                    $result = [
+                        'ok' => false,
+                        'status' => 'failed',
+                        'code' => 'handler_exception',
+                        'message' => 'Native privacy handler failed unexpectedly.',
+                    ];
+                    do_action('spcrc/privacy_request_handler_exception', $moduleKey, $requestType, $exception);
+                }
             }
 
-            $operations = (array) ($manifest['privacy_operations'] ?? []);
-            if (! in_array($requestType, $operations, true)) {
-                $results[$moduleKey] = ['ok' => false, 'status' => 'failed', 'code' => 'operation_not_declared', 'message' => 'Module did not declare this privacy operation.'];
-                continue;
-            }
-
-            try {
-                $result = apply_filters("spcrc/privacy_request/{$moduleKey}", null, $requestType, $context);
-                $results[$moduleKey] = $this->normalizeResult($result);
-            } catch (\Throwable $exception) {
-                $results[$moduleKey] = [
-                    'ok' => false,
-                    'status' => 'failed',
-                    'code' => 'handler_exception',
-                    'message' => 'Native privacy handler failed unexpectedly.',
-                ];
-                do_action('spcrc/privacy_request_handler_exception', $moduleKey, $requestType, $exception);
+            $stored = $this->requests->storeModuleResult($requestUuid, $moduleKey, $result);
+            if (is_wp_error($stored)) {
+                $this->audit->record(
+                    'privacy_request_module_result_storage_failed',
+                    $moduleKey,
+                    'recovery-required',
+                    'high',
+                    ['request_uuid' => $requestUuid, 'error_code' => $stored->get_error_code()]
+                );
+                do_action('spcrc/privacy_request_module_reconciliation_required', $requestUuid, $moduleKey, $result, $stored);
             }
         }
-
-        return $results;
     }
 
-    /** @param array<string,array<string,mixed>> $results
-     *  @return array<string,mixed>
-     */
-    private function finalizeResponse(string $requestId, string $requestType, array $results, string $expectedStatus): array
+    /** @return array<string,mixed> */
+    private function finalizeResponse(string $requestId, string $requestType, string $expectedStatus): array
     {
+        $results = $this->requests->moduleResults($requestId);
         $aggregate = PrivacyRequestRepository::aggregateResults($results);
         $errorCode = $this->firstFailureCode($results);
-        $finalized = $this->requests->finalize($requestId, $aggregate['status'], $results, $expectedStatus, $errorCode);
+        $finalized = $this->requests->finalize($requestId, $aggregate['status'], $expectedStatus, $errorCode);
         if (is_wp_error($finalized)) {
             $this->audit->record(
                 'privacy_request_finalization_failed',
