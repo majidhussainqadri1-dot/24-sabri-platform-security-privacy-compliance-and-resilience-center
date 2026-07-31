@@ -28,6 +28,8 @@ final class RequestDispatcher
     {
         add_action('spcrc/dispatch_privacy_request', [$this, 'dispatch'], 10, 2);
         add_filter('spcrc/privacy_request_dispatch', [$this, 'filterDispatch'], 10, 3);
+        add_filter('spcrc/privacy_request_retry', [$this, 'filterRetry'], 10, 3);
+        add_filter('spcrc/privacy_request_module_result', [$this, 'filterModuleResult'], 10, 4);
     }
 
     /** @param mixed $current
@@ -46,6 +48,30 @@ final class RequestDispatcher
         return $this->dispatch($request, $moduleKeys);
     }
 
+    /** @return array<string,mixed> */
+    public function filterRetry(mixed $current, string $requestUuid, int $assignedUserId = 0): array
+    {
+        if ($current !== null) {
+            return is_array($current)
+                ? $current
+                : ['ok' => false, 'status' => 'failed', 'error' => 'invalid_upstream_privacy_retry_result'];
+        }
+        return $this->retry($requestUuid, $assignedUserId);
+    }
+
+    /** @param array<string,mixed> $result
+     *  @return array<string,mixed>
+     */
+    public function filterModuleResult(mixed $current, string $requestUuid, string $moduleKey, array $result): array
+    {
+        if ($current !== null) {
+            return is_array($current)
+                ? $current
+                : ['ok' => false, 'status' => 'failed', 'error' => 'invalid_upstream_privacy_callback_result'];
+        }
+        return $this->completeModule($requestUuid, $moduleKey, $result);
+    }
+
     /** @param array<string,mixed> $request
      *  @param string[] $moduleKeys
      *  @return array<string,mixed>
@@ -62,10 +88,7 @@ final class RequestDispatcher
             return ['ok' => false, 'request_uuid' => $requestId, 'status' => 'failed', 'error' => 'invalid_request_type'];
         }
 
-        $moduleKeys = array_values(array_unique(array_filter(array_map(
-            static fn (mixed $key): string => Sanitizer::key($key, 120),
-            array_slice($moduleKeys, 0, 100)
-        ))));
+        $moduleKeys = $this->moduleKeys($moduleKeys);
         if ($moduleKeys === []) {
             return ['ok' => false, 'request_uuid' => $requestId, 'status' => 'failed', 'error' => 'no_modules_requested'];
         }
@@ -77,30 +100,118 @@ final class RequestDispatcher
             'assigned_user_id' => $request['assigned_user_id'] ?? get_current_user_id(),
             'jurisdiction' => $request['jurisdiction'] ?? '',
             'due_at' => $request['due_at'] ?? '',
+            'module_keys' => $moduleKeys,
         ]);
         if (is_wp_error($begin)) {
+            return $this->rejectedResponse($requestId, $requestType, $begin);
+        }
+
+        $results = $this->runModules(
+            $moduleKeys,
+            $requestType,
+            [
+                'request_uuid' => $requestId,
+                'request_type' => $requestType,
+                'requester_user_id' => absint($begin['requester_user_id'] ?? 0),
+                'jurisdiction' => Sanitizer::text($begin['jurisdiction'] ?? '', 80),
+                'due_at' => Sanitizer::isoTime($begin['due_at'] ?? ''),
+            ]
+        );
+
+        return $this->finalizeResponse($requestId, $requestType, $results, 'dispatching');
+    }
+
+    /** @return array<string,mixed> */
+    public function retry(string $requestUuid, int $assignedUserId = 0): array
+    {
+        $requestUuid = Sanitizer::uuid($requestUuid);
+        $claim = $this->requests->claimRetry($requestUuid, $assignedUserId > 0 ? $assignedUserId : get_current_user_id());
+        if (is_wp_error($claim)) {
+            return $this->rejectedResponse($requestUuid, '', $claim, 'privacy_request_retry_rejected');
+        }
+
+        $requestType = Sanitizer::key($claim['request_type'] ?? '', 40);
+        $retryModules = $this->moduleKeys($claim['retry_modules'] ?? []);
+        $storedResults = is_array($claim['module_results'] ?? null) ? $claim['module_results'] : [];
+        $newResults = $this->runModules(
+            $retryModules,
+            $requestType,
+            [
+                'request_uuid' => $requestUuid,
+                'request_type' => $requestType,
+                'requester_user_id' => absint($claim['requester_user_id'] ?? 0),
+                'jurisdiction' => Sanitizer::text($claim['jurisdiction'] ?? '', 80),
+                'due_at' => Sanitizer::isoTime($claim['due_at'] ?? ''),
+                'retry' => true,
+            ]
+        );
+
+        foreach ($newResults as $moduleKey => $result) {
+            $storedResults[$moduleKey] = $result;
+        }
+
+        $response = $this->finalizeResponse($requestUuid, $requestType, $storedResults, 'dispatching');
+        $this->audit->record(
+            'privacy_request_retry_dispatched',
+            'file-24-security-center',
+            Sanitizer::key($response['status'] ?? 'failed', 40),
+            ! empty($response['ok']) ? 'informational' : 'medium',
+            ['request_uuid' => $requestUuid, 'modules' => $retryModules]
+        );
+        return $response;
+    }
+
+    /** @param array<string,mixed> $result
+     *  @return array<string,mixed>
+     */
+    public function completeModule(string $requestUuid, string $moduleKey, array $result): array
+    {
+        $stored = $this->requests->completeModule($requestUuid, $moduleKey, $result);
+        if (is_wp_error($stored)) {
             $this->audit->record(
-                'privacy_request_rejected_before_dispatch',
-                'file-24-security-center',
+                'privacy_request_module_callback_rejected',
+                Sanitizer::key($moduleKey, 120),
                 'blocked',
                 'medium',
-                ['request_uuid' => $requestId, 'request_type' => $requestType, 'error_code' => $begin->get_error_code()]
+                [
+                    'request_uuid' => Sanitizer::uuid($requestUuid),
+                    'error_code' => $stored->get_error_code(),
+                ]
             );
-
             return [
                 'ok' => false,
-                'request_uuid' => $requestId,
+                'request_uuid' => Sanitizer::uuid($requestUuid),
+                'module_key' => Sanitizer::key($moduleKey, 120),
                 'status' => 'failed',
-                'error' => $begin->get_error_code(),
-                'message' => Sanitizer::text($begin->get_error_message(), 300),
+                'error' => $stored->get_error_code(),
+                'message' => Sanitizer::text($stored->get_error_message(), 300),
             ];
         }
 
-        $requesterUserId = absint($begin['requester_user_id'] ?? 0);
-        $jurisdiction = Sanitizer::text($begin['jurisdiction'] ?? '', 80);
-        $dueAt = Sanitizer::isoTime($begin['due_at'] ?? '');
-        $results = [];
+        $this->audit->record(
+            'privacy_request_module_callback_stored',
+            Sanitizer::key($moduleKey, 120),
+            Sanitizer::key($stored['status'] ?? 'pending', 40),
+            ! empty($stored['ok']) ? 'informational' : 'medium',
+            ['request_uuid' => Sanitizer::uuid($requestUuid)]
+        );
+        do_action('spcrc/privacy_request_module_result_stored', $requestUuid, $moduleKey, $stored);
 
+        return [
+            'ok' => ! empty($stored['ok']),
+            'request_uuid' => Sanitizer::uuid($requestUuid),
+            'module_key' => Sanitizer::key($moduleKey, 120),
+            'status' => Sanitizer::key($stored['status'] ?? 'pending', 40),
+        ];
+    }
+
+    /** @param string[] $moduleKeys
+     *  @param array<string,mixed> $context
+     *  @return array<string,array<string,mixed>>
+     */
+    private function runModules(array $moduleKeys, string $requestType, array $context): array
+    {
+        $results = [];
         foreach ($moduleKeys as $moduleKey) {
             $manifest = $this->modules->get($moduleKey);
             if ($manifest === null) {
@@ -114,18 +225,31 @@ final class RequestDispatcher
                 continue;
             }
 
-            $result = apply_filters("spcrc/privacy_request/{$moduleKey}", null, $requestType, [
-                'request_uuid' => $requestId,
-                'request_type' => $requestType,
-                'requester_user_id' => $requesterUserId,
-                'jurisdiction' => $jurisdiction,
-                'due_at' => $dueAt,
-            ]);
-            $results[$moduleKey] = $this->normalizeResult($result);
+            try {
+                $result = apply_filters("spcrc/privacy_request/{$moduleKey}", null, $requestType, $context);
+                $results[$moduleKey] = $this->normalizeResult($result);
+            } catch (\Throwable $exception) {
+                $results[$moduleKey] = [
+                    'ok' => false,
+                    'status' => 'failed',
+                    'code' => 'handler_exception',
+                    'message' => 'Native privacy handler failed unexpectedly.',
+                ];
+                do_action('spcrc/privacy_request_handler_exception', $moduleKey, $requestType, $exception);
+            }
         }
 
-        $aggregate = $this->aggregate($results);
-        $finalized = $this->requests->finalize($requestId, $aggregate['status']);
+        return $results;
+    }
+
+    /** @param array<string,array<string,mixed>> $results
+     *  @return array<string,mixed>
+     */
+    private function finalizeResponse(string $requestId, string $requestType, array $results, string $expectedStatus): array
+    {
+        $aggregate = PrivacyRequestRepository::aggregateResults($results);
+        $errorCode = $this->firstFailureCode($results);
+        $finalized = $this->requests->finalize($requestId, $aggregate['status'], $results, $expectedStatus, $errorCode);
         if (is_wp_error($finalized)) {
             $this->audit->record(
                 'privacy_request_finalization_failed',
@@ -161,6 +285,25 @@ final class RequestDispatcher
         return $response;
     }
 
+    private function rejectedResponse(string $requestId, string $requestType, \WP_Error $error, string $event = 'privacy_request_rejected_before_dispatch'): array
+    {
+        $this->audit->record(
+            $event,
+            'file-24-security-center',
+            'blocked',
+            'medium',
+            ['request_uuid' => $requestId, 'request_type' => $requestType, 'error_code' => $error->get_error_code()]
+        );
+
+        return [
+            'ok' => false,
+            'request_uuid' => $requestId,
+            'status' => 'failed',
+            'error' => $error->get_error_code(),
+            'message' => Sanitizer::text($error->get_error_message(), 300),
+        ];
+    }
+
     /** @return array<string,mixed> */
     private function normalizeResult(mixed $result): array
     {
@@ -188,49 +331,40 @@ final class RequestDispatcher
             return [
                 'ok' => $ok,
                 'status' => $status,
+                'code' => Sanitizer::key($result['code'] ?? '', 120),
                 'reference' => Sanitizer::text($result['reference'] ?? '', 200),
                 'message' => Sanitizer::text($result['message'] ?? '', 300),
             ];
         }
 
         if (is_bool($result)) {
-            return ['ok' => $result, 'status' => $result ? 'accepted' : 'failed'];
+            return ['ok' => $result, 'status' => $result ? 'accepted' : 'failed', 'code' => ''];
         }
 
         return ['ok' => false, 'status' => 'failed', 'code' => 'invalid_handler_response', 'message' => 'Privacy handler returned an invalid response.'];
     }
 
-    /** @param array<string,array<string,mixed>> $results
-     *  @return array{ok:bool,status:string}
-     */
-    private function aggregate(array $results): array
+    /** @param array<string,array<string,mixed>> $results */
+    private function firstFailureCode(array $results): string
     {
-        if ($results === []) {
-            return ['ok' => false, 'status' => 'failed'];
-        }
-
-        $failed = 0;
-        $pending = 0;
         foreach ($results as $result) {
             if (! Sanitizer::boolean($result['ok'] ?? false)) {
-                ++$failed;
-                continue;
-            }
-            if (($result['status'] ?? '') !== 'completed') {
-                ++$pending;
+                return Sanitizer::key($result['code'] ?? 'module_failed', 120);
             }
         }
+        return '';
+    }
 
-        if ($failed === count($results)) {
-            return ['ok' => false, 'status' => 'failed'];
-        }
-        if ($failed > 0) {
-            return ['ok' => false, 'status' => 'partial'];
-        }
-        if ($pending > 0) {
-            return ['ok' => true, 'status' => 'pending'];
+    /** @return string[] */
+    private function moduleKeys(mixed $moduleKeys): array
+    {
+        if (! is_array($moduleKeys)) {
+            return [];
         }
 
-        return ['ok' => true, 'status' => 'completed'];
+        return array_values(array_unique(array_filter(array_map(
+            static fn (mixed $key): string => Sanitizer::key($key, 120),
+            array_slice($moduleKeys, 0, 100)
+        ))));
     }
 }
