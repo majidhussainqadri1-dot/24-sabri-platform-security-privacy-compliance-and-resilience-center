@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Sabri\Platform\Security;
 
+use Sabri\Platform\Security\Admin\AssetLoader;
 use Sabri\Platform\Security\Admin\Dashboard;
 use Sabri\Platform\Security\Admin\FindingAdmin;
+use Sabri\Platform\Security\Admin\PrivacyAdmin;
 use Sabri\Platform\Security\Integration\File00Adapter;
 use Sabri\Platform\Security\Integration\File20Adapter;
 use Sabri\Platform\Security\Privacy\RequestDispatcher;
@@ -17,6 +19,7 @@ use Sabri\Platform\Security\Storage\AuditLogger;
 use Sabri\Platform\Security\Storage\ControlRepository;
 use Sabri\Platform\Security\Storage\FindingRepository;
 use Sabri\Platform\Security\Storage\IncidentRepository;
+use Sabri\Platform\Security\Storage\PrivacyRequestRepository;
 use Sabri\Platform\Security\Storage\RiskRepository;
 use Sabri\Platform\Security\System\Repair;
 use Sabri\Platform\Security\System\SystemCheck;
@@ -49,7 +52,8 @@ final class Plugin
         $incidents = new IncidentRepository($audit);
         $controls = new ControlRepository($audit);
         $checks = new SystemCheck($modules);
-        $privacy = new RequestDispatcher($audit, $modules);
+        $privacyRequests = new PrivacyRequestRepository();
+        $privacy = new RequestDispatcher($audit, $modules, $privacyRequests);
         $repair = new Repair($audit, $modules);
 
         (new File00Adapter())->registerHooks();
@@ -63,8 +67,10 @@ final class Plugin
         $controls->registerHooks();
         $privacy->registerHooks();
         $repair->registerHooks();
+        (new AssetLoader())->registerHooks();
         (new Dashboard($modules, $states, $checks, $audit, $risks, $incidents, $controls, $repair))->registerHooks();
         (new FindingAdmin($findings))->registerHooks();
+        (new PrivacyAdmin($privacyRequests, $privacy, $modules))->registerHooks();
         (new StatusController($modules, $states, $checks, $risks, $incidents, $controls, $findings))->registerHooks();
 
         do_action('spcrc/booted', $this);
