@@ -2,7 +2,7 @@
 
 File 24 is the central security-governance and assurance layer for the Sabri Social Homeopathy Platform.
 
-## Foundation scope (0.25.1)
+## Foundation scope (0.25.2)
 
 This corrective foundation establishes:
 
@@ -15,8 +15,11 @@ This corrective foundation establishes:
 - verified, non-destructive schema and capability repair;
 - expiring advisory security-state requests for File 20/native modules;
 - durable, replay-resistant privacy-request orchestration that records metadata before native-module processing;
-- truthful privacy aggregation that distinguishes queued or pending work from completed work;
-- a private Privacy Requests dashboard for verified-subject dispatch and recent metadata review;
+- per-module privacy-result evidence with optimistic request locking;
+- truthful native-module completion callbacks and request-level closure;
+- bounded retries that never replay completed or pending module work;
+- stale-dispatch detection with an hourly recovery scan;
+- a private Privacy Requests dashboard for verified-subject dispatch, retry and recent metadata review;
 - real File 00 and File 20 detection adapters;
 - sanitized private status and public Trust Center REST payloads;
 - system checks for WordPress/PHP/HTTPS/schema/debug exposure, public-browsing compatibility, identity, shell, external logs, backup/restore evidence and upgrade errors;
@@ -24,6 +27,12 @@ This corrective foundation establishes:
 - contract tests, reproducible package tooling, checksums and CI gates.
 
 File 24 does **not** replace File 00 identity, native-module authorization, File 20 shell enforcement, hosting security, a WAF, a SIEM, legal counsel, immutable off-site backup or independent penetration testing.
+
+## Privacy workflow contracts
+
+Native modules report asynchronous completion through the `spcrc/privacy_request_module_result` filter. File 24 accepts only bounded `completed`, `pending` or `failed` callback states and recalculates the canonical request status without storing exported personal data.
+
+Manual retries are limited to failed, partial or recovery-required requests. Completed and pending module operations are never replayed.
 
 ## Repository safety
 
@@ -42,6 +51,7 @@ php tests/upgrade.php
 php tests/findings.php
 php tests/runtime.php
 php tests/privacy.php
+php tests/privacy-recovery.php
 php tests/admin-assets.php
 ./tools/build-release.sh
 ```
