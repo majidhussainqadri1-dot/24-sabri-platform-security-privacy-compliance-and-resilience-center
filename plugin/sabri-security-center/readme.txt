@@ -4,14 +4,14 @@ Tags: security, privacy, compliance, resilience, audit
 Requires at least: 6.5
 Tested up to: 7.0
 Requires PHP: 8.0
-Stable tag: 0.25.2
+Stable tag: 0.25.3
 License: GPLv2 or later
 
 Central governance and assurance control plane for the Sabri Social Homeopathy Platform.
 
 == Description ==
 
-Foundation 0.25.2 provides a private Security Center dashboard, bounded module manifests and audit events, risk/incident/control foundations, a private security-findings triage interface, durable and replay-resistant privacy-request orchestration, private privacy operations, advisory security-state requests, system checks, non-destructive repair, and sanitized REST status/Trust Center payloads.
+Foundation 0.25.3 provides a private Security Center dashboard, bounded module manifests and audit events, risk/incident/control foundations, a private security-findings triage interface, durable and replay-resistant privacy-request orchestration, bounded retry policy and reconciliation operations, private privacy operations, advisory security-state requests, system checks, non-destructive repair, and sanitized REST status/Trust Center payloads.
 
 It does not replace native-module authorization, File 00 identity, File 20 enforcement, hosting security, legal counsel, backups, or independent security testing.
 
@@ -27,6 +27,14 @@ It does not replace native-module authorization, File 00 identity, File 20 enfor
 8. Run Security Center checks and the non-destructive repair only when needed.
 
 == Changelog ==
+
+= 0.25.3 =
+* Added a dedicated privacy-policy layer while preserving the canonical repository as the storage owner.
+* Enforced retry backoff and bounded attempt limits in backend processing.
+* Restricted retry to explicitly retry-safe native failures; unsafe or mixed outcomes require manual reconciliation.
+* Rejected completion callbacks before module claim and preserved closed-request replay protection.
+* Added bounded request-detail and per-module reconciliation evidence to the private Privacy Requests dashboard.
+* Added privacy-policy regression tests covering unsafe failures, callback integrity, retry timing, attempt limits and stale operations.
 
 = 0.25.2 =
 * Added durable per-module privacy result evidence and optimistic request locking.
