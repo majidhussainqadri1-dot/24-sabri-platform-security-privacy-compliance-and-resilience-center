@@ -11,7 +11,7 @@ Central governance and assurance control plane for the Sabri Social Homeopathy P
 
 == Description ==
 
-Foundation 0.25.1 provides a private Security Center dashboard, bounded module manifests and audit events, risk/incident/control foundations, a private security-findings triage interface, privacy-request orchestration, advisory security-state requests, system checks, non-destructive repair, and sanitized REST status/Trust Center payloads.
+Foundation 0.25.1 provides a private Security Center dashboard, bounded module manifests and audit events, risk/incident/control foundations, a private security-findings triage interface, durable and replay-resistant privacy-request orchestration, private privacy operations, advisory security-state requests, system checks, non-destructive repair, and sanitized REST status/Trust Center payloads.
 
 It does not replace native-module authorization, File 00 identity, File 20 enforcement, hosting security, legal counsel, backups, or independent security testing.
 
@@ -29,6 +29,9 @@ It does not replace native-module authorization, File 00 identity, File 20 enfor
 == Changelog ==
 
 = 0.25.1 =
+* Hardened privacy dispatch with durable pre-operation records, replay resistance, truthful pending/completed aggregation and recovery-required evidence.
+* Added a private Privacy Requests dashboard with verified-subject dispatch and deletion confirmation.
+* Corrected findings-page stylesheet loading and accountability-note persistence.
 * Removed automatic Founder security-administrator escalation.
 * Added bounded manifest, audit and state persistence with truthful failure handling.
 * Added real File 00/File 20 adapters and public-browsing compatibility detection.
