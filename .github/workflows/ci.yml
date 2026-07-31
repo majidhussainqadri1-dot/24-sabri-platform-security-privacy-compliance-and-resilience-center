@@ -24,6 +24,8 @@ jobs:
           php tests/upgrade.php
           php tests/findings.php
           php tests/runtime.php
+          php tests/privacy.php
+          php tests/admin-assets.php
 
       - name: Reject common secret material
         shell: bash
