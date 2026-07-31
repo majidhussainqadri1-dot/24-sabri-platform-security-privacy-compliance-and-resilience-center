@@ -34,7 +34,8 @@ namespace Sabri\Platform\Security\Retention {
     final class RetentionManager
     {
         public static int $scheduleCalls = 0;
-        public static function ensureScheduled(): bool { ++self::$scheduleCalls; return true; }
+        public static bool $result = true;
+        public static function ensureScheduled(): bool { ++self::$scheduleCalls; return self::$result; }
     }
 }
 
@@ -59,7 +60,8 @@ namespace Sabri\Platform\Security {
     }
 
     Schema::$result = new \WP_Error('spcrc_schema_install_failed', 'Required table missing.');
-    UpgradeManager::maybeUpgrade();
+    $failed = UpgradeManager::maybeUpgrade();
+    expectUpgrade(is_wp_error($failed) && $failed->get_error_code() === 'spcrc_schema_install_failed', 'Failed schema install must return a boot-blocking error.');
     expectUpgrade(get_option('spcrc_version', '') === '', 'Failed schema install must not advance plugin version.');
     expectUpgrade(get_option('spcrc_schema_version', '') === '', 'Failed schema install must not advance schema version.');
     $failure = get_option('spcrc_last_upgrade_error', []);
@@ -67,7 +69,8 @@ namespace Sabri\Platform\Security {
     expectUpgrade(Capabilities::$installCalls === 0 && RetentionManager::$scheduleCalls === 0, 'Failed upgrade must not apply capabilities or schedules.');
 
     Schema::$result = true;
-    UpgradeManager::maybeUpgrade();
+    $installed = UpgradeManager::maybeUpgrade();
+    expectUpgrade($installed === true, 'Successful upgrade must return an explicit success contract.');
     expectUpgrade(get_option('spcrc_version', '') === SPCRC_VERSION, 'Successful upgrade must store plugin version.');
     expectUpgrade(get_option('spcrc_schema_version', '') === Schema::VERSION, 'Successful upgrade must store schema version.');
     expectUpgrade(Capabilities::$installCalls === 1 && RetentionManager::$scheduleCalls === 1, 'Successful upgrade must apply capabilities and retention schedule.');
@@ -77,10 +80,19 @@ namespace Sabri\Platform\Security {
     $GLOBALS['options']['spcrc_schema_version'] = '0.25.2';
     Capabilities::$installCalls = 0;
     RetentionManager::$scheduleCalls = 0;
-    UpgradeManager::maybeUpgrade();
+    $migrated = UpgradeManager::maybeUpgrade();
+    expectUpgrade($migrated === true, 'Verified-privacy migration must return explicit success.');
     expectUpgrade(get_option('spcrc_version', '') === '0.25.4', 'Corrective release must advance the plugin version.');
     expectUpgrade(get_option('spcrc_schema_version', '') === '0.25.3', 'Verification-evidence migration must advance the schema version.');
     expectUpgrade(Capabilities::$installCalls === 1 && RetentionManager::$scheduleCalls === 1, 'Migration must reapply capabilities and schedules after integrity verification.');
 
-    echo "PASS: upgrade failure integrity and verified-privacy schema migration\n";
+    RetentionManager::$result = false;
+    Capabilities::$installCalls = 0;
+    RetentionManager::$scheduleCalls = 0;
+    $scheduleFailure = UpgradeManager::maybeUpgrade();
+    expectUpgrade(is_wp_error($scheduleFailure) && $scheduleFailure->get_error_code() === 'spcrc_retention_schedule_failed', 'Retention schedule failure must block normal runtime boot.');
+    expectUpgrade(Capabilities::$installCalls === 1 && RetentionManager::$scheduleCalls === 1, 'Same-version integrity verification must check capabilities and retention schedule exactly once.');
+    expectUpgrade((get_option('spcrc_last_upgrade_error', [])['error_code'] ?? '') === 'spcrc_retention_schedule_failed', 'Retention schedule failure evidence must be durable.');
+
+    echo "PASS: upgrade failure integrity, runtime blocking and verified-privacy schema migration\n";
 }
