@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 const ARRAY_A = 'ARRAY_A';
 $GLOBALS['filters'] = [];
-$GLOBALS['users'] = [7 => true];
+$GLOBALS['users'] = [7 => true, 99 => true];
 $GLOBALS['current_user_id'] = 99;
 
 final class WP_Error
@@ -118,6 +118,22 @@ function expectPolicy(bool $condition, string $message): void
     if (! $condition) { fwrite(STDERR, "FAIL: {$message}\n"); exit(1); }
 }
 
+/** @param array<string,mixed> $request
+ *  @return array<string,mixed>
+ */
+function verifiedPolicyRequest(array $request): array
+{
+    return $request + [
+        'assigned_user_id' => 99,
+        'verification_method' => 'manual-document-review',
+        'authority_basis' => 'self',
+        'verification_reference' => 'case:policy-test',
+        'verified_by_user_id' => 99,
+        'verified_at' => gmdate('c'),
+        'verification_attested' => true,
+    ];
+}
+
 $modules = new ModuleRegistry();
 expectPolicy($modules->register([
     'module_key' => 'policy-module',
@@ -128,19 +144,72 @@ expectPolicy($modules->register([
     'data_classes' => ['C2'],
     'public_routes' => [],
     'private_routes' => [],
-    'privacy_operations' => ['access'],
+    'privacy_operations' => ['access', 'deletion'],
 ]), 'Policy module must register.');
+expectPolicy($modules->register([
+    'module_key' => 'access-only-module',
+    'name' => 'Access Only',
+    'version' => '1.0.0',
+    'owner' => 'Test',
+    'posture' => 'foundation',
+    'data_classes' => ['C2'],
+    'public_routes' => [],
+    'private_routes' => [],
+    'privacy_operations' => ['access'],
+]), 'Access-only module must register.');
 
 $repository = new PrivacyRequestRepository();
 $policy = new PrivacyRequestPolicy($repository);
 $dispatcher = new RequestDispatcher(new AuditLogger(), $modules, $policy);
 
-$missingUuid = '60000000-0000-4000-8000-000000000101';
-$missing = $dispatcher->dispatch([
-    'request_uuid' => $missingUuid,
+$preflightUnknown = $dispatcher->dispatch(verifiedPolicyRequest([
+    'request_uuid' => '60000000-0000-4000-8000-000000000100',
+    'request_type' => 'access',
+    'requester_user_id' => 7,
+]), ['unknown-module']);
+expectPolicy(($preflightUnknown['error'] ?? '') === 'spcrc_privacy_module_unknown', 'Unknown modules must fail before durable request creation.');
+expectPolicy($repository->get('60000000-0000-4000-8000-000000000100') === null, 'Unknown-module preflight must not pollute privacy storage.');
+
+$preflightOperation = $dispatcher->dispatch(verifiedPolicyRequest([
+    'request_uuid' => '60000000-0000-4000-8000-000000000105',
+    'request_type' => 'deletion',
+    'requester_user_id' => 7,
+]), ['access-only-module']);
+expectPolicy(($preflightOperation['error'] ?? '') === 'spcrc_privacy_operation_not_declared', 'Undeclared operations must fail before dispatch.');
+expectPolicy($repository->get('60000000-0000-4000-8000-000000000105') === null, 'Operation preflight failure must not create a request record.');
+
+$missingVerification = $dispatcher->dispatch([
+    'request_uuid' => '60000000-0000-4000-8000-000000000106',
     'request_type' => 'access',
     'requester_user_id' => 7,
 ], ['policy-module']);
+expectPolicy(($missingVerification['error'] ?? '') === 'spcrc_privacy_verification_attestation_required', 'Identity verification must be explicit, not inferred from account existence.');
+
+$mismatch = verifiedPolicyRequest([
+    'request_uuid' => '60000000-0000-4000-8000-000000000108',
+    'request_type' => 'access',
+    'requester_user_id' => 7,
+]);
+$mismatch['verification_method'] = 'guardian-verified';
+$mismatch['authority_basis'] = 'self';
+$mismatchResult = $dispatcher->dispatch($mismatch, ['policy-module']);
+expectPolicy(($mismatchResult['error'] ?? '') === 'spcrc_privacy_verification_authority_mismatch', 'Verification method and authority basis must be semantically compatible.');
+
+$future = verifiedPolicyRequest([
+    'request_uuid' => '60000000-0000-4000-8000-000000000109',
+    'request_type' => 'access',
+    'requester_user_id' => 7,
+]);
+$future['verified_at'] = gmdate('c', time() + 3600);
+$futureResult = $dispatcher->dispatch($future, ['policy-module']);
+expectPolicy(($futureResult['error'] ?? '') === 'spcrc_privacy_verified_at_invalid', 'Future verification evidence must fail closed.');
+
+$missingUuid = '60000000-0000-4000-8000-000000000101';
+$missing = $dispatcher->dispatch(verifiedPolicyRequest([
+    'request_uuid' => $missingUuid,
+    'request_type' => 'access',
+    'requester_user_id' => 7,
+]), ['policy-module']);
 expectPolicy($missing['status'] === 'failed', 'Missing handler must produce a terminal failed request.');
 $missingResult = $repository->moduleResults($missingUuid)['policy-module'] ?? [];
 expectPolicy(! str_starts_with((string) ($missingResult['code'] ?? ''), 'retry-safe-'), 'Missing handler must never be marked retry-safe.');
@@ -149,12 +218,12 @@ $missingRetry = $dispatcher->retry($missingUuid, 99);
 expectPolicy(($missingRetry['error'] ?? '') === 'spcrc_privacy_retry_modules_missing', 'Missing handler must not be replayed indefinitely.');
 
 $callbackUuid = '60000000-0000-4000-8000-000000000102';
-$begin = $repository->begin([
+$begin = $policy->begin(verifiedPolicyRequest([
     'request_uuid' => $callbackUuid,
     'request_type' => 'access',
     'requester_user_id' => 7,
     'module_keys' => ['policy-module'],
-]);
+]));
 expectPolicy(! is_wp_error($begin), 'Pre-dispatch request must be created.');
 $early = $dispatcher->completeModule($callbackUuid, 'policy-module', ['ok' => true, 'status' => 'completed']);
 expectPolicy(($early['error'] ?? '') === 'spcrc_privacy_callback_module_unclaimed', 'Callback cannot fabricate completion before a module dispatch claim.');
@@ -176,27 +245,50 @@ add_filter('spcrc/privacy_request/policy-module', static function ($current, $ty
     return ['ok' => false, 'status' => 'failed', 'code' => 'temporary', 'retry_safe' => true];
 }, 10, 3);
 $safeUuid = '60000000-0000-4000-8000-000000000103';
-$safe = $dispatcher->dispatch([
+$safe = $dispatcher->dispatch(verifiedPolicyRequest([
     'request_uuid' => $safeUuid,
     'request_type' => 'access',
     'requester_user_id' => 7,
-], ['policy-module']);
+]), ['policy-module']);
 expectPolicy($safe['status'] === 'failed', 'Explicit retry-safe failure must remain retryable.');
 $GLOBALS['wpdb']->privacy[$safeUuid]['next_retry_at'] = gmdate('Y-m-d H:i:s', time() + 3600);
 $tooSoon = $dispatcher->retry($safeUuid, 99);
 expectPolicy(($tooSoon['error'] ?? '') === 'spcrc_privacy_retry_not_due', 'Backend must enforce retry timing, not only the UI.');
+$GLOBALS['wpdb']->privacy[$safeUuid]['next_retry_at'] = 'not-a-time';
+$invalidTime = $dispatcher->retry($safeUuid, 99);
+expectPolicy(($invalidTime['error'] ?? '') === 'spcrc_privacy_retry_time_invalid', 'Malformed retry schedules must fail closed.');
 $GLOBALS['wpdb']->privacy[$safeUuid]['next_retry_at'] = gmdate('Y-m-d H:i:s', time() - 1);
 $GLOBALS['wpdb']->privacy[$safeUuid]['dispatch_attempts'] = 5;
 $exhausted = $dispatcher->retry($safeUuid, 99);
 expectPolicy(($exhausted['error'] ?? '') === 'spcrc_privacy_retry_attempt_limit', 'Bounded attempt limit must stop retry storms.');
 
+$GLOBALS['wpdb']->privacy[$safeUuid]['dispatch_attempts'] = 1;
+$GLOBALS['wpdb']->privacy[$safeUuid]['verification_method'] = '';
+$legacyBlocked = $dispatcher->retry($safeUuid, 99);
+expectPolicy(($legacyBlocked['error'] ?? '') === 'spcrc_privacy_retry_verification_missing', 'Legacy requests without verification evidence must not become automatically retryable after migration.');
+$GLOBALS['wpdb']->privacy[$safeUuid]['verification_method'] = 'manual-document-review';
+
+$deletionUuid = '60000000-0000-4000-8000-000000000107';
+$deletion = $dispatcher->dispatch(verifiedPolicyRequest([
+    'request_uuid' => $deletionUuid,
+    'request_type' => 'deletion',
+    'requester_user_id' => 7,
+]), ['policy-module']);
+expectPolicy($deletion['status'] === 'failed', 'Deletion test must produce a retry-safe failure.');
+$GLOBALS['wpdb']->privacy[$deletionUuid]['next_retry_at'] = gmdate('Y-m-d H:i:s', time() - 1);
+$deletionBlocked = $dispatcher->retry($deletionUuid, 99);
+expectPolicy(($deletionBlocked['error'] ?? '') === 'spcrc_privacy_deletion_retry_confirmation_required', 'Deletion retry must require a fresh destructive confirmation.');
+$beforeDeletionRetry = $safeCalls;
+$deletionRetried = $dispatcher->retry($deletionUuid, 99, ['deletion_confirmation' => 'RETRY DELETION ' . $deletionUuid]);
+expectPolicy(! isset($deletionRetried['error']) && ($deletionRetried['status'] ?? '') === 'failed' && $safeCalls === $beforeDeletionRetry + 1, 'Confirmed deletion retry must reach only the policy-approved native module exactly once.');
+
 $staleUuid = '60000000-0000-4000-8000-000000000104';
-$staleBegin = $repository->begin([
+$staleBegin = $policy->begin(verifiedPolicyRequest([
     'request_uuid' => $staleUuid,
     'request_type' => 'access',
     'requester_user_id' => 7,
     'module_keys' => ['policy-module'],
-]);
+]));
 expectPolicy(! is_wp_error($staleBegin), 'Stale test request must begin.');
 expectPolicy($repository->claimModule($staleUuid, 'policy-module') === true, 'Stale module must be claimed.');
 $GLOBALS['wpdb']->privacy[$staleUuid]['updated_at'] = '2000-01-01 00:00:00';
@@ -206,4 +298,4 @@ expectPolicy(($staleResult['status'] ?? '') === 'dispatching', 'Stale in-flight 
 $staleRetry = $dispatcher->retry($staleUuid, 99);
 expectPolicy(($staleRetry['error'] ?? '') === 'spcrc_privacy_retry_modules_missing', 'Stale uncertain operation must require manual reconciliation instead of replay.');
 
-echo "PASS: privacy retry policy, callback integrity and stale reconciliation controls\n";
+echo "PASS: privacy verification, preflight, destructive retry and reconciliation controls\n";
