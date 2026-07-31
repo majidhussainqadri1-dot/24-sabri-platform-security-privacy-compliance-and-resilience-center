@@ -14,7 +14,7 @@ e8ad1f36ac614d849190d0a20e9bd396486cb46a95a2c544248ea5791066e603  ./docs/ROLLBAC
 995ecfaa880b4f97d01888a69eb4e5fa93f97f54b73b94cdc187e377c6b064dd  ./plugin/sabri-security-center/src/Activation.php
 44a49f7824b2c79faee61a262bdaf1d8c46bf84e3c6441d43bb46703fb968f0e  ./plugin/sabri-security-center/src/Admin/Dashboard.php
 5399b8def1c7ef5fe661c9913ef5ca135b8983b5a3a112e37fed7fdf745b1606  ./plugin/sabri-security-center/src/Capabilities.php
-3bb0e53a41793426ea1901bbc13e58af39ad8dbabd06a4140bd8e214f9078e94  ./plugin/sabri-security-center/src/Deactivation.php
+b9046e3a112ca12147c8128ea5e64683124b1023ffd78ee629c56224fc43ae19  ./plugin/sabri-security-center/src/Deactivation.php
 b0064a0069947e9e3a7bf0b1bee0b525208e3eb8273cf75f8c3b723680f2d78a  ./plugin/sabri-security-center/src/Integration/File00Adapter.php
 5a71f895fe87f4e0708dc7fca0ae2c81a06c0b3221c0eac7e021b5ced39d34a8  ./plugin/sabri-security-center/src/Integration/File20Adapter.php
 d60ce936cffaba6dab61951f67e048178b8ba7962bebb2fbfa04d7bb376b5c0f  ./plugin/sabri-security-center/src/Plugin.php
