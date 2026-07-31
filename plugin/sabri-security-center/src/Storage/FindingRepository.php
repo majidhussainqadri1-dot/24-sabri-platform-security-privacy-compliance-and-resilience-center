@@ -118,7 +118,7 @@ final class FindingRepository
         $findingUuid = Sanitizer::uuid($findingUuid);
         $status = Sanitizer::key($status, 40);
         $expectedStatus = Sanitizer::key($context['expected_status'] ?? '', 40);
-        $note = Sanitizer::text($context['note'] ?? '', 1000);
+        $note = Sanitizer::text($context['note'] ?? '', 500);
 
         if ($findingUuid === '' || ! in_array($status, self::STATUSES, true)) {
             return new \WP_Error('spcrc_finding_status_invalid', 'Finding UUID or status is invalid.');
@@ -177,6 +177,7 @@ final class FindingRepository
                 'finding_uuid' => $findingUuid,
                 'previous_status' => $currentStatus,
                 'new_status' => $status,
+                'accountability_note' => $note,
                 'accountability_note_hash' => hash('sha256', $note),
             ]
         );
