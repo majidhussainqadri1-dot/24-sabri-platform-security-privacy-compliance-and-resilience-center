@@ -6,12 +6,12 @@ namespace Sabri\Platform\Security\Admin;
 
 use Sabri\Platform\Security\Privacy\RequestDispatcher;
 use Sabri\Platform\Security\Registry\ModuleRegistry;
-use Sabri\Platform\Security\Storage\PrivacyRequestRepository;
+use Sabri\Platform\Security\Privacy\PrivacyRequestPolicy;
 
 final class PrivacyAdmin
 {
     public function __construct(
-        private PrivacyRequestRepository $requests,
+        private PrivacyRequestPolicy $requests,
         private RequestDispatcher $dispatcher,
         private ModuleRegistry $modules
     ) {
@@ -94,6 +94,11 @@ final class PrivacyAdmin
 
         $manifests = $this->modules->all();
         $rows = $this->requests->recent(50);
+        $detailUuid = isset($_GET['request_uuid'])
+            ? sanitize_text_field((string) wp_unslash($_GET['request_uuid']))
+            : '';
+        $detail = $detailUuid !== '' ? $this->requests->get($detailUuid) : null;
+        $detailResults = $detail !== null ? $this->requests->moduleResults($detailUuid) : [];
         ?>
         <div class="wrap spcrc-wrap">
             <h1><?php esc_html_e('Privacy Requests', 'sabri-security-center'); ?></h1>
@@ -111,7 +116,7 @@ final class PrivacyAdmin
                     <?php wp_nonce_field('spcrc_dispatch_privacy_request'); ?>
                     <p><label><?php esc_html_e('WordPress user ID', 'sabri-security-center'); ?><input required min="1" name="requester_user_id" type="number"></label></p>
                     <p><label><?php esc_html_e('Request type', 'sabri-security-center'); ?><select required name="request_type">
-                        <?php foreach (PrivacyRequestRepository::types() as $type) : ?>
+                        <?php foreach (PrivacyRequestPolicy::types() as $type) : ?>
                             <option value="<?php echo esc_attr($type); ?>"><?php echo esc_html(ucwords(str_replace('-', ' ', $type))); ?></option>
                         <?php endforeach; ?>
                     </select></label></p>
@@ -137,6 +142,45 @@ final class PrivacyAdmin
                 </form>
             </section>
 
+            <?php if ($detailUuid !== '') : ?>
+                <section class="spcrc-panel" aria-labelledby="spcrc-privacy-detail-heading">
+                    <h2 id="spcrc-privacy-detail-heading"><?php esc_html_e('Request detail and reconciliation evidence', 'sabri-security-center'); ?></h2>
+                    <?php if ($detail === null) : ?>
+                        <p><?php esc_html_e('The requested privacy record was not found.', 'sabri-security-center'); ?></p>
+                    <?php else : ?>
+                        <p>
+                            <strong><?php esc_html_e('Request:', 'sabri-security-center'); ?></strong>
+                            <code><?php echo esc_html((string) ($detail['request_uuid'] ?? '')); ?></code>
+                            · <strong><?php esc_html_e('Status:', 'sabri-security-center'); ?></strong>
+                            <?php echo esc_html((string) ($detail['status'] ?? '')); ?>
+                            · <strong><?php esc_html_e('Attempts:', 'sabri-security-center'); ?></strong>
+                            <?php echo esc_html((string) ($detail['dispatch_attempts'] ?? '0')); ?>
+                        </p>
+                        <p><?php esc_html_e('This view contains bounded orchestration evidence only. It must not contain exported personal data, identity documents, credentials or clinical records.', 'sabri-security-center'); ?></p>
+                        <div class="spcrc-table-scroll">
+                            <table class="widefat striped spcrc-data-table">
+                                <caption class="screen-reader-text"><?php esc_html_e('Native module privacy-operation evidence', 'sabri-security-center'); ?></caption>
+                                <thead><tr><th scope="col"><?php esc_html_e('Module', 'sabri-security-center'); ?></th><th scope="col"><?php esc_html_e('Status', 'sabri-security-center'); ?></th><th scope="col"><?php esc_html_e('Code', 'sabri-security-center'); ?></th><th scope="col"><?php esc_html_e('Retry safe', 'sabri-security-center'); ?></th><th scope="col"><?php esc_html_e('Reference', 'sabri-security-center'); ?></th><th scope="col"><?php esc_html_e('Message', 'sabri-security-center'); ?></th></tr></thead>
+                                <tbody>
+                                <?php if ($detailResults === []) : ?>
+                                    <tr><td colspan="6"><?php esc_html_e('No native module evidence is available.', 'sabri-security-center'); ?></td></tr>
+                                <?php else : foreach ($detailResults as $moduleKey => $moduleResult) : ?>
+                                    <tr>
+                                        <td><code><?php echo esc_html((string) $moduleKey); ?></code></td>
+                                        <td><?php echo esc_html((string) ($moduleResult['status'] ?? '')); ?></td>
+                                        <td><?php echo esc_html((string) ($moduleResult['code'] ?? '')); ?></td>
+                                        <td><?php echo str_starts_with((string) ($moduleResult['code'] ?? ''), 'retry-safe-') ? esc_html__('Yes', 'sabri-security-center') : esc_html__('No', 'sabri-security-center'); ?></td>
+                                        <td><?php echo esc_html((string) ($moduleResult['reference'] ?? '')); ?></td>
+                                        <td><?php echo esc_html((string) ($moduleResult['message'] ?? '')); ?></td>
+                                    </tr>
+                                <?php endforeach; endif; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    <?php endif; ?>
+                </section>
+            <?php endif; ?>
+
             <section class="spcrc-panel" aria-labelledby="spcrc-privacy-history-heading">
                 <h2 id="spcrc-privacy-history-heading"><?php esc_html_e('Recent request metadata', 'sabri-security-center'); ?></h2>
                 <p><?php echo esc_html(sprintf(__('Active or unresolved requests: %d', 'sabri-security-center'), $this->requests->activeCount())); ?></p>
@@ -149,7 +193,7 @@ final class PrivacyAdmin
                             <tr><td colspan="10"><?php esc_html_e('No privacy requests have been dispatched.', 'sabri-security-center'); ?></td></tr>
                         <?php else : foreach ($rows as $row) : ?>
                             <tr>
-                                <td><code><?php echo esc_html((string) ($row['request_uuid'] ?? '')); ?></code></td>
+                                <td><a href="<?php echo esc_url(add_query_arg(['page' => 'sabri-security-privacy-requests', 'request_uuid' => (string) ($row['request_uuid'] ?? '')], admin_url('admin.php'))); ?>"><code><?php echo esc_html((string) ($row['request_uuid'] ?? '')); ?></code></a></td>
                                 <td><?php echo esc_html((string) ($row['requester_user_id'] ?? '')); ?></td>
                                 <td><?php echo esc_html((string) ($row['request_type'] ?? '')); ?></td>
                                 <td><?php echo esc_html((string) ($row['status'] ?? '')); ?></td>
@@ -159,14 +203,20 @@ final class PrivacyAdmin
                                 <td><?php echo esc_html((string) ($row['due_at'] ?? '')); ?></td>
                                 <td><?php echo esc_html((string) ($row['updated_at'] ?? '')); ?></td>
                                 <td>
-                                    <?php $rowStatus = (string) ($row['status'] ?? ''); ?>
-                                    <?php if (in_array($rowStatus, PrivacyRequestRepository::retryableStatuses(), true)) : ?>
+                                    <?php $eligibility = $this->requests->retryEligibility($row); ?>
+                                    <?php if (! empty($eligibility['eligible'])) : ?>
                                         <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
                                             <input type="hidden" name="action" value="spcrc_retry_privacy_request">
                                             <input type="hidden" name="request_uuid" value="<?php echo esc_attr((string) ($row['request_uuid'] ?? '')); ?>">
                                             <?php wp_nonce_field('spcrc_retry_privacy_request_' . (string) ($row['request_uuid'] ?? '')); ?>
-                                            <?php submit_button(__('Retry failed modules', 'sabri-security-center'), 'secondary small', 'submit', false); ?>
+                                            <?php submit_button(sprintf(__('Retry %d safe module(s)', 'sabri-security-center'), (int) ($eligibility['retry_modules'] ?? 0)), 'secondary small', 'submit', false); ?>
                                         </form>
+                                    <?php elseif (($eligibility['code'] ?? '') === 'not-due') : ?>
+                                        <span><?php echo esc_html(sprintf(__('Retry available after %s UTC', 'sabri-security-center'), (string) ($eligibility['retry_at'] ?? ''))); ?></span>
+                                    <?php elseif (($eligibility['code'] ?? '') === 'attempt-limit') : ?>
+                                        <strong><?php esc_html_e('Attempt limit reached; manual reconciliation required.', 'sabri-security-center'); ?></strong>
+                                    <?php elseif (($eligibility['code'] ?? '') === 'manual-reconciliation') : ?>
+                                        <strong><?php esc_html_e('Automatic retry blocked; reconcile native evidence manually.', 'sabri-security-center'); ?></strong>
                                     <?php else : ?>
                                         <span aria-hidden="true">—</span><span class="screen-reader-text"><?php esc_html_e('No retry action available', 'sabri-security-center'); ?></span>
                                     <?php endif; ?>
