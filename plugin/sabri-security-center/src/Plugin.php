@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Sabri\Platform\Security;
 
 use Sabri\Platform\Security\Admin\Dashboard;
+use Sabri\Platform\Security\Admin\FindingAdmin;
 use Sabri\Platform\Security\Integration\File00Adapter;
 use Sabri\Platform\Security\Integration\File20Adapter;
 use Sabri\Platform\Security\Privacy\RequestDispatcher;
@@ -63,6 +64,7 @@ final class Plugin
         $privacy->registerHooks();
         $repair->registerHooks();
         (new Dashboard($modules, $states, $checks, $audit, $risks, $incidents, $controls, $repair))->registerHooks();
+        (new FindingAdmin($findings))->registerHooks();
         (new StatusController($modules, $states, $checks, $risks, $incidents, $controls, $findings))->registerHooks();
 
         do_action('spcrc/booted', $this);
