@@ -23,6 +23,7 @@ jobs:
           php tests/retention.php
           php tests/upgrade.php
           php tests/findings.php
+          php tests/runtime.php
 
       - name: Reject common secret material
         shell: bash
