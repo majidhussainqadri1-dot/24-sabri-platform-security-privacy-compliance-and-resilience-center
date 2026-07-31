@@ -8,6 +8,8 @@ use Sabri\Platform\Security\Storage\FindingRepository;
 
 final class FindingAdmin
 {
+    private string $pageHook = '';
+
     public function __construct(private FindingRepository $findings)
     {
     }
@@ -15,13 +17,14 @@ final class FindingAdmin
     public function registerHooks(): void
     {
         add_action('admin_menu', [$this, 'menu']);
+        add_action('admin_enqueue_scripts', [$this, 'assets']);
         add_action('admin_post_spcrc_create_finding', [$this, 'handleCreate']);
         add_action('admin_post_spcrc_update_finding', [$this, 'handleStatus']);
     }
 
     public function menu(): void
     {
-        add_submenu_page(
+        $this->pageHook = (string) add_submenu_page(
             'sabri-security-center',
             __('Security Findings', 'sabri-security-center'),
             __('Findings', 'sabri-security-center'),
@@ -29,6 +32,15 @@ final class FindingAdmin
             'sabri-security-findings',
             [$this, 'render']
         );
+    }
+
+    public function assets(string $hook): void
+    {
+        if ($this->pageHook === '' || $hook !== $this->pageHook) {
+            return;
+        }
+
+        wp_enqueue_style('spcrc-admin', SPCRC_PLUGIN_URL . 'assets/admin.css', [], SPCRC_VERSION);
     }
 
     public function handleCreate(): void
