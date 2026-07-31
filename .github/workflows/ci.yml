@@ -54,8 +54,10 @@ jobs:
             exit 1
           fi
 
-      - name: Report corrected foundation test hash
-        run: sha256sum tests/run.php
+      - name: Report corrected cycle 4 hashes
+        run: |
+          sha256sum tests/run.php
+          sha256sum plugin/sabri-security-center/src/Integration/File00Adapter.php
 
       - name: Verify source checksums except workflow self-hash
         shell: bash
