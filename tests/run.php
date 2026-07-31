@@ -49,7 +49,7 @@ function expect(bool $condition, string $message): void
 
 expect(Sanitizer::boolean('false') === false, 'Boolean sanitizer must not cast string false to true.');
 expect(Sanitizer::uuid('bad') === '', 'Invalid UUID must be rejected.');
-expect(Schema::VERSION === '0.25.1' && count(Schema::tables()) === 7, 'Corrective schema must expose seven owned tables.');
+expect(Schema::VERSION === '0.25.2' && count(Schema::tables()) === 7, 'Corrective schema must expose seven owned tables.');
 
 $registry = new ModuleRegistry();
 $manifest = [
@@ -141,7 +141,7 @@ expect($controls->count() === 1 && ($controls->recent(1)[0]['status'] ?? '') ===
 
 $repair = new Repair();
 $repairResult = $repair->run();
-expect(is_array($repairResult) && get_option('spcrc_schema_version') === '0.25.1', 'Non-destructive repair must verify schema and record version.');
+expect(is_array($repairResult) && get_option('spcrc_schema_version') === '0.25.2', 'Non-destructive repair must verify schema and record version.');
 expect(! empty($GLOBALS['administrator_role']->caps['spcrc_manage_risks']), 'Repair must reapply administrator capabilities.');
 
 add_filter('spcrc/public_browsing_compatible', '__return_false');
