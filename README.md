@@ -9,6 +9,7 @@ This corrective foundation establishes:
 - a versioned, bounded module-security manifest registry;
 - a private role-aware Security Center dashboard;
 - bounded security-event storage with recursive redaction and external-event hooks;
+- operational security-finding intake and status lifecycle contracts;
 - risk, incident and control-catalog foundation workflows;
 - verified, non-destructive schema and capability repair;
 - expiring advisory security-state requests for File 20/native modules;
@@ -16,6 +17,7 @@ This corrective foundation establishes:
 - real File 00 and File 20 detection adapters;
 - sanitized private status and public Trust Center REST payloads;
 - system checks for WordPress/PHP/HTTPS/schema/debug exposure, public-browsing compatibility, identity, shell, external logs, backup/restore evidence and upgrade errors;
+- bounded retention with locks, hold support and failure evidence;
 - contract tests, reproducible package tooling, checksums and CI gates.
 
 File 24 does **not** replace File 00 identity, native-module authorization, File 20 shell enforcement, hosting security, a WAF, a SIEM, legal counsel, immutable off-site backup or independent penetration testing.
@@ -32,6 +34,9 @@ The implementation remains on Draft PR #1 and is not production-ready. Local and
 
 ```bash
 php tests/run.php
+php tests/retention.php
+php tests/upgrade.php
+php tests/findings.php
 ./tools/build-release.sh
 ```
 
