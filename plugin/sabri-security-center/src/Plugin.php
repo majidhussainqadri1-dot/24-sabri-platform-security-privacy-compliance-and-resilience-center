@@ -51,7 +51,7 @@ final class Plugin
 
         (new File00Adapter())->registerHooks();
         (new File20Adapter())->registerHooks();
-        (new RetentionManager())->registerHooks();
+        (new RetentionManager($audit))->registerHooks();
         $modules->registerHooks();
         $states->registerHooks();
         $risks->registerHooks();
