@@ -25,3 +25,6 @@
 .spcrc-data-table { margin-top: 14px; }
 @media (max-width: 900px) { .spcrc-form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 600px) { .spcrc-form-grid { grid-template-columns: 1fr; } .spcrc-form-wide { grid-column: auto; } }
+.spcrc-table-scroll { max-width: 100%; overflow-x: auto; }
+.spcrc-data-table td form { min-width: 220px; }
+.spcrc-data-table td textarea { width: 100%; box-sizing: border-box; margin-top: 6px; }
