@@ -11,7 +11,7 @@ Central governance and assurance control plane for the Sabri Social Homeopathy P
 
 == Description ==
 
-Foundation 0.25.4 provides a private Security Center dashboard, bounded module manifests and audit events, risk/incident/control foundations, a private security-findings triage interface, durable and replay-resistant privacy-request orchestration, bounded retry policy and reconciliation operations, verified privacy intake, advisory security-state requests, system checks, non-destructive repair, and sanitized REST status/Trust Center payloads.
+Foundation 0.25.4 provides a private Security Center dashboard, bounded module manifests and audit events, risk/incident/control foundations, a private security-findings triage interface, durable and replay-resistant privacy-request orchestration, bounded retry policy and reconciliation operations, verified privacy intake, fail-closed upgrade integrity, advisory security-state requests, system checks, non-destructive repair, and sanitized REST status/Trust Center payloads.
 
 It does not replace native-module authorization, File 00 identity, File 20 enforcement, hosting security, legal counsel, backups, or independent security testing.
 
@@ -31,10 +31,15 @@ It does not replace native-module authorization, File 00 identity, File 20 enfor
 = 0.25.4 =
 * Added explicit identity-and-authority verification evidence before privacy dispatch.
 * Added bounded verification method, authority basis, operator, timestamp and opaque reference storage.
+* Rejected free-form personal text in verification references and required namespaced opaque case identifiers.
+* Required authenticated-session evidence to belong to the current privacy subject.
+* Required native confirmation adapters for email, guardian and authorized-agent verification methods.
 * Added pre-dispatch module-operation validation so invalid selections cannot create false native failures.
 * Added fresh destructive confirmation for every deletion retry.
 * Hardened retry decisions against malformed schedules, invalid assignees and legacy records without verification evidence.
+* Blocked all normal File 24 runtime services when schema or required retention integrity checks fail.
 * Corrected File 00 adapter wording and state so exporter/eraser availability is not falsely described as a queued native workflow.
+* Removed the superseded unverified privacy administration implementation.
 
 = 0.25.3 =
 * Added a dedicated privacy-policy layer while preserving the canonical repository as the storage owner.
