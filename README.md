@@ -9,11 +9,14 @@ This corrective foundation establishes:
 - a versioned, bounded module-security manifest registry;
 - a private role-aware Security Center dashboard;
 - bounded security-event storage with recursive redaction and external-event hooks;
-- operational security-finding intake and status lifecycle contracts;
+- operational security-finding intake and controlled status lifecycle contracts;
+- a private findings workflow with concurrency protection, explicit risk-acceptance authority and bounded accountability evidence;
 - risk, incident and control-catalog foundation workflows;
 - verified, non-destructive schema and capability repair;
 - expiring advisory security-state requests for File 20/native modules;
-- privacy-request orchestration with persisted status metadata;
+- durable, replay-resistant privacy-request orchestration that records metadata before native-module processing;
+- truthful privacy aggregation that distinguishes queued or pending work from completed work;
+- a private Privacy Requests dashboard for verified-subject dispatch and recent metadata review;
 - real File 00 and File 20 detection adapters;
 - sanitized private status and public Trust Center REST payloads;
 - system checks for WordPress/PHP/HTTPS/schema/debug exposure, public-browsing compatibility, identity, shell, external logs, backup/restore evidence and upgrade errors;
@@ -37,6 +40,9 @@ php tests/run.php
 php tests/retention.php
 php tests/upgrade.php
 php tests/findings.php
+php tests/runtime.php
+php tests/privacy.php
+php tests/admin-assets.php
 ./tools/build-release.sh
 ```
 
