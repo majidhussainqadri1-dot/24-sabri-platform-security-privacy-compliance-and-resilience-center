@@ -11,6 +11,15 @@ final class FindingRepository
     private const SEVERITIES = ['informational', 'low', 'medium', 'high', 'critical'];
     private const STATUSES = ['open', 'triaged', 'in-progress', 'resolved', 'accepted-risk', 'false-positive'];
     private const OPEN_STATUSES = ['open', 'triaged', 'in-progress'];
+    private const TERMINAL_STATUSES = ['resolved', 'accepted-risk', 'false-positive'];
+    private const TRANSITIONS = [
+        'open' => ['triaged', 'in-progress', 'resolved', 'false-positive'],
+        'triaged' => ['in-progress', 'resolved', 'accepted-risk', 'false-positive'],
+        'in-progress' => ['triaged', 'resolved', 'accepted-risk', 'false-positive'],
+        'resolved' => ['triaged'],
+        'accepted-risk' => ['triaged'],
+        'false-positive' => ['triaged'],
+    ];
 
     public function __construct(private ?AuditLogger $audit = null)
     {
@@ -19,7 +28,7 @@ final class FindingRepository
     public function registerHooks(): void
     {
         add_filter('spcrc/security_finding_create', [$this, 'filterCreate'], 10, 2);
-        add_filter('spcrc/security_finding_status', [$this, 'filterStatus'], 10, 3);
+        add_filter('spcrc/security_finding_status', [$this, 'filterStatus'], 10, 4);
     }
 
     /** @param array<string,mixed> $data */
@@ -28,9 +37,23 @@ final class FindingRepository
         return $current !== null ? $current : $this->create($data);
     }
 
-    public function filterStatus(mixed $current, string $findingUuid, string $status): mixed
+    /** @param array<string,mixed> $context */
+    public function filterStatus(mixed $current, string $findingUuid, string $status, array $context = []): mixed
     {
-        return $current !== null ? $current : $this->setStatus($findingUuid, $status);
+        return $current !== null ? $current : $this->setStatus($findingUuid, $status, $context);
+    }
+
+    /** @return string[] */
+    public static function severities(): array
+    {
+        return self::SEVERITIES;
+    }
+
+    /** @return string[] */
+    public static function allowedNextStatuses(string $currentStatus): array
+    {
+        $currentStatus = Sanitizer::key($currentStatus, 40);
+        return self::TRANSITIONS[$currentStatus] ?? [];
     }
 
     /** @param array<string,mixed> $data
@@ -52,6 +75,7 @@ final class FindingRepository
 
         $uuid = wp_generate_uuid4();
         $now = current_time('mysql', true);
+        $actor = absint($data['owner_user_id'] ?? get_current_user_id()) ?: null;
         $inserted = $wpdb->insert(
             $wpdb->prefix . 'spcrc_findings',
             [
@@ -60,7 +84,7 @@ final class FindingRepository
                 'title' => $title,
                 'severity' => $severity,
                 'status' => 'open',
-                'owner_user_id' => absint($data['owner_user_id'] ?? get_current_user_id()) ?: null,
+                'owner_user_id' => $actor,
                 'due_at' => $this->mysqlTime($data['due_at'] ?? ''),
                 'evidence_ref' => Sanitizer::text($data['evidence_ref'] ?? '', 255),
                 'created_at' => $now,
@@ -77,7 +101,7 @@ final class FindingRepository
             'security_finding_created',
             $moduleKey,
             'created',
-            in_array($severity, ['high', 'critical'], true) ? 'high' : 'medium',
+            $severity,
             ['finding_uuid' => $uuid, 'severity' => $severity]
         );
 
@@ -85,48 +109,83 @@ final class FindingRepository
         return $uuid;
     }
 
-    /** @return true|\WP_Error */
-    public function setStatus(string $findingUuid, string $status): true|\WP_Error
+    /** @param array<string,mixed> $context
+     *  @return true|\WP_Error
+     */
+    public function setStatus(string $findingUuid, string $status, array $context = []): true|\WP_Error
     {
         global $wpdb;
 
         $findingUuid = Sanitizer::uuid($findingUuid);
         $status = Sanitizer::key($status, 40);
+        $expectedStatus = Sanitizer::key($context['expected_status'] ?? '', 40);
+        $note = Sanitizer::text($context['note'] ?? '', 1000);
+
         if ($findingUuid === '' || ! in_array($status, self::STATUSES, true)) {
             return new \WP_Error('spcrc_finding_status_invalid', 'Finding UUID or status is invalid.');
         }
 
         $table = $wpdb->prefix . 'spcrc_findings';
-        $existingStatus = $wpdb->get_var($wpdb->prepare(
-            "SELECT status FROM {$table} WHERE finding_uuid = %s",
+        $existing = $wpdb->get_row($wpdb->prepare(
+            "SELECT status, module_key, severity FROM {$table} WHERE finding_uuid = %s",
             $findingUuid
-        ));
-        if (! is_string($existingStatus) || $existingStatus === '') {
+        ), ARRAY_A);
+        if (! is_array($existing) || ($existing['status'] ?? '') === '') {
             return new \WP_Error('spcrc_finding_not_found', 'Finding could not be found.');
         }
-        if ($existingStatus === $status) {
+
+        $currentStatus = Sanitizer::key($existing['status'] ?? '', 40);
+        $moduleKey = Sanitizer::key($existing['module_key'] ?? 'file-24-security-center', 120);
+        $severity = Sanitizer::key($existing['severity'] ?? 'medium', 20);
+
+        if ($expectedStatus !== '' && $expectedStatus !== $currentStatus) {
+            return new \WP_Error('spcrc_finding_stale_status', 'Finding status changed before this update. Refresh and try again.');
+        }
+        if ($currentStatus === $status) {
             return true;
         }
+        if (! in_array($status, self::TRANSITIONS[$currentStatus] ?? [], true)) {
+            return new \WP_Error('spcrc_finding_transition_invalid', 'This finding status transition is not allowed.');
+        }
+        if (in_array($status, self::TERMINAL_STATUSES, true) && $note === '') {
+            return new \WP_Error('spcrc_finding_note_required', 'A sanitized disposition note is required for a terminal status.');
+        }
+        if ($status === 'accepted-risk' && (! function_exists('current_user_can') || ! current_user_can('spcrc_accept_critical_risk'))) {
+            return new \WP_Error('spcrc_finding_risk_acceptance_forbidden', 'You are not allowed to accept security risk.');
+        }
 
+        $now = current_time('mysql', true);
+        $data = [
+            'status' => $status,
+            'updated_at' => $now,
+        ];
         $updated = $wpdb->update(
             $table,
-            ['status' => $status, 'updated_at' => current_time('mysql', true)],
-            ['finding_uuid' => $findingUuid],
+            $data,
+            ['finding_uuid' => $findingUuid, 'status' => $currentStatus],
             ['%s', '%s'],
-            ['%s']
+            ['%s', '%s']
         );
         if ($updated === false) {
             return new \WP_Error('spcrc_finding_status_write_failed', 'Finding status could not be stored.');
         }
+        if ($updated !== 1) {
+            return new \WP_Error('spcrc_finding_concurrent_change', 'Finding changed concurrently. Refresh and try again.');
+        }
 
         $this->audit?->record(
             'security_finding_status_changed',
-            'file-24-security-center',
+            $moduleKey !== '' ? $moduleKey : 'file-24-security-center',
             $status,
-            'medium',
-            ['finding_uuid' => $findingUuid, 'status' => $status]
+            in_array($severity, self::SEVERITIES, true) ? $severity : 'medium',
+            [
+                'finding_uuid' => $findingUuid,
+                'previous_status' => $currentStatus,
+                'new_status' => $status,
+                'disposition_note_hash' => $note === '' ? '' : hash('sha256', $note),
+            ]
         );
-        do_action('spcrc/security_finding_status_changed', $findingUuid, $status);
+        do_action('spcrc/security_finding_status_changed', $findingUuid, $currentStatus, $status);
 
         return true;
     }
@@ -139,12 +198,12 @@ final class FindingRepository
     }
 
     /** @return array<int,array<string,mixed>> */
-    public function recent(int $limit = 10): array
+    public function recent(int $limit = 20): array
     {
         global $wpdb;
-        $limit = max(1, min(50, $limit));
+        $limit = max(1, min(100, $limit));
         $rows = $wpdb->get_results(
-            $wpdb->prepare("SELECT finding_uuid, module_key, title, severity, status, due_at, evidence_ref, created_at, updated_at FROM {$wpdb->prefix}spcrc_findings ORDER BY updated_at DESC LIMIT %d", $limit),
+            $wpdb->prepare("SELECT finding_uuid, module_key, title, severity, status, owner_user_id, due_at, evidence_ref, created_at, updated_at FROM {$wpdb->prefix}spcrc_findings ORDER BY updated_at DESC LIMIT %d", $limit),
             ARRAY_A
         );
         return is_array($rows) ? $rows : [];
