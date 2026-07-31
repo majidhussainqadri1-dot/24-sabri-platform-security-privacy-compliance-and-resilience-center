@@ -12,8 +12,8 @@ dbd29669818ba2b5c5074c642620a42b4c269a1004310502c6ecd21e9e78f132  ./docs/REVIEW-
 d9dc73dd7a941bfcc068fa2bf86491a0b4a2b13ac5449663c28c1a04f68fd0ff  ./docs/REVIEW-AND-CORRECTION-0.25.2-CYCLE-5.md
 0e90d9fb369d4507c79be5629643a532e8a220b95002f86c9c63ee307c95d9f5  ./docs/ROLLBACK.md
 2d5c831500cf03bd5d28a007e04303b92b9860d10319e5181d2f399cb856fdc1  ./plugin/sabri-security-center/assets/admin.css
-96f79d9e41aa67c07446e8e0cb5faaacc65c73a3c99869b64cd8abb33ef9c753  ./plugin/sabri-security-center/readme.txt
-0300915a32ab06cf651d7b8b021bc7a47a18a2301359a61e4bdacb365809bba2  ./plugin/sabri-security-center/sabri-security-center.php
+ead5e4d4f363e1859b6a41c0092a516cd0947806110778beeb8d4c059f9ee00b  ./plugin/sabri-security-center/readme.txt
+a868acb7589104b9387db2db1be3623e3d92f8408df3318b745010ee4fde965f  ./plugin/sabri-security-center/sabri-security-center.php
 995ecfaa880b4f97d01888a69eb4e5fa93f97f54b73b94cdc187e377c6b064dd  ./plugin/sabri-security-center/src/Activation.php
 4cbbf1aca2d16b8ee81e3e76413e9a3f927c3e1310e9d15a8a6d3060ff37c88c  ./plugin/sabri-security-center/src/Admin/AssetLoader.php
 44a49f7824b2c79faee61a262bdaf1d8c46bf84e3c6441d43bb46703fb968f0e  ./plugin/sabri-security-center/src/Admin/Dashboard.php
@@ -52,5 +52,5 @@ e6f95c4794339edd75c8e4e03b0255919c930101e971e1406c90b9ae9a97eb8e  ./tests/privac
 0400ed15cdc946361cdeaa95199995bf142ac7dedfa6e14c3cc1f211c95b2b5d  ./tests/run.php
 6d918a1cb7ec8836146df780cfe60b5d4721359dadd4e5add4cb511778cfd942  ./tests/retention.php
 31be723f85c9a3795d04b01110c0605bbcbedb6096e37fd79df181eccbd27a4b  ./tests/runtime.php
-8912a995a713d18290a32f5bd95ad9c54d5dcd474c003024e0ce77429813bbdf  ./tests/upgrade.php
+676d6ab663c94cb2e038729d926c250c2f1f724afb04baeaa94681a47d6dd778  ./tests/upgrade.php
 f2bc3bced79b8933c752b908d14d7a24fe6efb70904965c7f1a6bb5f7e1d3519  ./tools/build-release.sh
