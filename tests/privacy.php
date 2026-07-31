@@ -231,6 +231,7 @@ $firstFailure = $dispatcher->dispatch([
     'requester_user_id' => 7,
 ], ['retry-module']);
 expectPrivacy($firstFailure['status'] === 'failed' && $retryCalls === 1, 'Explicitly retry-safe native failure must produce a durable failed request.');
+$GLOBALS['wpdb']->privacy[$retryUuid]['next_retry_at'] = gmdate('Y-m-d H:i:s', time() - 1);
 $retrySuccess = $dispatcher->retry($retryUuid, 99);
 expectPrivacy($retrySuccess['ok'] === true && $retrySuccess['status'] === 'completed', 'Only the explicitly retry-safe failed module must be retried.');
 expectPrivacy($retryCalls === 2, 'Retry must execute the safe failed module exactly once more.');
