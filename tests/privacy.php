@@ -82,7 +82,7 @@ final class PrivacyWpdb
     public function get_results(mixed $prepared, mixed $output = null): array
     {
         $query = is_array($prepared) ? (string) ($prepared['query'] ?? '') : '';
-        if (str_contains($query, "status = %s") && str_contains($query, 'updated_at < %s')) {
+        if (str_contains($query, 'status = %s') && str_contains($query, 'updated_at < %s')) {
             $status = (string) ($prepared['args'][0] ?? 'dispatching');
             $cutoff = strtotime((string) ($prepared['args'][1] ?? 'now') . ' UTC');
             $limit = max(1, (int) ($prepared['args'][2] ?? 100));
@@ -107,7 +107,7 @@ final class PrivacyWpdb
     public function update(string $table, array $data, array $where, array $formats = [], array $whereFormats = []): int|false
     {
         if (! str_contains($table, 'spcrc_privacy_requests')) return 1;
-        if ($this->failFinalize && isset($data['module_results_json']) && ($data['status'] ?? '') !== 'dispatching') return false;
+        if ($this->failFinalize && isset($data['status']) && ($data['status'] ?? '') !== 'dispatching') return false;
         $uuid = (string) ($where['request_uuid'] ?? '');
         if (! isset($this->privacy[$uuid])) return 0;
         if (isset($where['status']) && ($this->privacy[$uuid]['status'] ?? '') !== $where['status']) return 0;
@@ -221,7 +221,7 @@ $retryCalls = 0;
 add_filter('spcrc/privacy_request/retry-module', static function ($result, $type, $request) use (&$retryCalls) {
     ++$retryCalls;
     return $retryCalls === 1
-        ? new WP_Error('temporary_failure', 'Temporary failure.')
+        ? ['ok' => false, 'status' => 'failed', 'code' => 'temporary_failure', 'message' => 'Temporary failure.', 'retry_safe' => true]
         : ['ok' => true, 'status' => 'completed', 'reference' => 'retry:done'];
 }, 10, 3);
 $retryUuid = '10000000-0000-4000-8000-000000000003';
@@ -230,10 +230,10 @@ $firstFailure = $dispatcher->dispatch([
     'request_type' => 'access',
     'requester_user_id' => 7,
 ], ['retry-module']);
-expectPrivacy($firstFailure['status'] === 'failed' && $retryCalls === 1, 'Failed native module must produce a durable failed request.');
+expectPrivacy($firstFailure['status'] === 'failed' && $retryCalls === 1, 'Explicitly retry-safe native failure must produce a durable failed request.');
 $retrySuccess = $dispatcher->retry($retryUuid, 99);
-expectPrivacy($retrySuccess['ok'] === true && $retrySuccess['status'] === 'completed', 'Only the failed module must be safely retryable.');
-expectPrivacy($retryCalls === 2, 'Retry must execute the failed module exactly once more.');
+expectPrivacy($retrySuccess['ok'] === true && $retrySuccess['status'] === 'completed', 'Only the explicitly retry-safe failed module must be retried.');
+expectPrivacy($retryCalls === 2, 'Retry must execute the safe failed module exactly once more.');
 expectPrivacy((int) ($GLOBALS['wpdb']->privacy[$retryUuid]['dispatch_attempts'] ?? 0) === 2, 'Retry attempts must be durably counted.');
 
 $GLOBALS['wpdb']->failFinalize = true;
@@ -251,7 +251,10 @@ $marked = $requests->markStaleDispatching(900, 10);
 expectPrivacy($marked === 1, 'Stale dispatching request must be marked for recovery.');
 expectPrivacy(($GLOBALS['wpdb']->privacy[$storageUuid]['status'] ?? '') === 'recovery-required', 'Stale request must become recovery-required.');
 expectPrivacy(($GLOBALS['wpdb']->privacy[$storageUuid]['last_error_code'] ?? '') === 'stale_dispatch', 'Stale recovery evidence must retain a bounded error code.');
+$unsafeRetry = $dispatcher->retry($storageUuid, 99);
+expectPrivacy(($unsafeRetry['error'] ?? '') === 'spcrc_privacy_retry_modules_missing', 'A stale request with already-dispatched module evidence must not replay native side effects.');
+expectPrivacy($handlerCalls === 2, 'Unsafe stale retry must not call the native module again.');
 
 expectPrivacy(count($requests->recent(10)) === 3, 'Privacy request repository must return bounded recent metadata.');
 
-echo "PASS: privacy callbacks, bounded retry, stale recovery and truthful closure\n";
+echo "PASS: privacy callbacks, safe retry, stale recovery and duplicate-side-effect prevention\n";
