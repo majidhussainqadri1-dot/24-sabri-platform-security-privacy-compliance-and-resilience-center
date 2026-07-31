@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 namespace {
-    define('SPCRC_VERSION', '0.25.3');
+    define('SPCRC_VERSION', '0.25.4');
     $GLOBALS['options'] = [];
     $GLOBALS['actions'] = [];
 
@@ -24,7 +24,7 @@ namespace {
 namespace Sabri\Platform\Security\Storage {
     final class Schema
     {
-        public const VERSION = '0.25.2';
+        public const VERSION = '0.25.3';
         public static true|\WP_Error $result = true;
         public static function install(): true|\WP_Error { return self::$result; }
     }
@@ -73,14 +73,14 @@ namespace Sabri\Platform\Security {
     expectUpgrade(Capabilities::$installCalls === 1 && RetentionManager::$scheduleCalls === 1, 'Successful upgrade must apply capabilities and retention schedule.');
     expectUpgrade(get_option('spcrc_last_upgrade_error', null) === null, 'Successful upgrade must clear prior failure evidence.');
 
-    $GLOBALS['options']['spcrc_version'] = '0.25.2';
-    $GLOBALS['options']['spcrc_schema_version'] = Schema::VERSION;
+    $GLOBALS['options']['spcrc_version'] = '0.25.3';
+    $GLOBALS['options']['spcrc_schema_version'] = '0.25.2';
     Capabilities::$installCalls = 0;
     RetentionManager::$scheduleCalls = 0;
     UpgradeManager::maybeUpgrade();
-    expectUpgrade(get_option('spcrc_version', '') === '0.25.3', 'Code-only patch must advance plugin version without inventing a schema revision.');
-    expectUpgrade(get_option('spcrc_schema_version', '') === '0.25.2', 'Code-only patch must preserve the existing schema version.');
-    expectUpgrade(Capabilities::$installCalls === 1 && RetentionManager::$scheduleCalls === 1, 'Code-only patch must reapply capabilities and schedules after integrity verification.');
+    expectUpgrade(get_option('spcrc_version', '') === '0.25.4', 'Corrective release must advance the plugin version.');
+    expectUpgrade(get_option('spcrc_schema_version', '') === '0.25.3', 'Verification-evidence migration must advance the schema version.');
+    expectUpgrade(Capabilities::$installCalls === 1 && RetentionManager::$scheduleCalls === 1, 'Migration must reapply capabilities and schedules after integrity verification.');
 
-    echo "PASS: upgrade failure integrity and code-only version separation\n";
+    echo "PASS: upgrade failure integrity and verified-privacy schema migration\n";
 }
