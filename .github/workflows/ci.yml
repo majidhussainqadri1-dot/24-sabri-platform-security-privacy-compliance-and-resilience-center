@@ -21,6 +21,7 @@ jobs:
         run: |
           php tests/run.php
           php tests/retention.php
+          php tests/upgrade.php
 
       - name: Reject common secret material
         shell: bash
@@ -45,7 +46,7 @@ jobs:
           test ! -f .github/workflows/apply-cycle2.yml
           test ! -f tools/cycle2-source.ready
           ! find tools -maxdepth 1 -type f -name 'cycle2-bundle.part-*' -print -quit | grep -q .
-          if find .github/workflows -type f ! -name 'ci.yml' -print0 | xargs -0 -r grep -InE 'git push|contents:[[:space:]]*write'; then
+          if grep -RInE --exclude='ci.yml' 'git push|contents:[[:space:]]*write' .github/workflows; then
             exit 1
           fi
 
