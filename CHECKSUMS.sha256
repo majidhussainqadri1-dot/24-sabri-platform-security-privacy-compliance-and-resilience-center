@@ -32,7 +32,7 @@ bb79ddd935ed025009c7074d28c0fb99fdc1f267ff3b6eef4b36abbd1a980d34  ./plugin/sabri
 cdcee43a3bf23cc69d84f18cc1415d9540737b330ad466b17105f964211aecf5  ./plugin/sabri-security-center/src/Registry/ModuleRegistry.php
 48e8cd37b9b42bb1fbadd77a766d87343f963c829c40723b5927a047b32afc06  ./plugin/sabri-security-center/src/Registry/SecurityStateRegistry.php
 1692cfd9605810389c38e72252a818f461d6b2b98badccfe2ed0b0bec36fbf1c  ./plugin/sabri-security-center/src/Retention/RetentionManager.php
-f8f87b7ea671d65fcc7aaf001182a2c4888d79faafaf760b51ed5da3eb914e04  ./plugin/sabri-security-center/src/Rest/StatusController.php
+f8f87b7ea671d65fcc7aaf001182a2c4888d79faaf760b51ed5da3eb914e04  ./plugin/sabri-security-center/src/Rest/StatusController.php
 c3253177a98987685e05bdea337baf155756a237a4549918c8403f486049038b  ./plugin/sabri-security-center/src/Storage/AuditLogger.php
 2985f08a2be0a4167456e7976f18fde589bb133241f5b2f1759ffea9d6e4e896  ./plugin/sabri-security-center/src/Storage/ControlRepository.php
 a60186ba4d3ea936bac3fc68dd5e7e8be74386b01f2facdff1720f2ecd56b352  ./plugin/sabri-security-center/src/Storage/FindingRepository.php
@@ -43,7 +43,7 @@ a60186ba4d3ea936bac3fc68dd5e7e8be74386b01f2facdff1720f2ecd56b352  ./plugin/sabri
 52a9e575803e1421f0cc11c534990781db754c81f5b606977f1d83fe5438b286  ./plugin/sabri-security-center/src/Support/Sanitizer.php
 562e099005ab77f2df30a9fac19ce6e16d80a85141eb67bf05466ce18ff5f260  ./plugin/sabri-security-center/src/System/Repair.php
 cb8d5620b0bc94ddde747e897b1522b641feafea913117d08d477a0b471b5153  ./plugin/sabri-security-center/src/System/SystemCheck.php
-74eeccb7ec0ee3d679097800b453b3ecf2ff8abdf2ae9548cbf957b0487b114  ./plugin/sabri-security-center/src/UpgradeManager.php
+74eeccb7ec0eeae3d679097800b453b3ecf2ff8abdf2ae9548cbf957b0487b114  ./plugin/sabri-security-center/src/UpgradeManager.php
 5c1c99ff8d8eb760a45e062ba8fbf1e31505663b618d6ff7ffd85b5500e205ac  ./plugin/sabri-security-center/uninstall.php
 f8ec73c6eb4044d3384b5eb236b0d50cd40ff702f93355463ebbaad88493d540  ./tests/bootstrap.php
 700ea5183cb6af53b86f91f1a9d36fce2031cebf2c6de0db00d0dee8f9a489ca  ./tests/admin-assets.php
