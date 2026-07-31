@@ -102,6 +102,11 @@ final class PrivacyRequestPolicy
             return new \WP_Error('spcrc_privacy_callback_invalid', 'Privacy completion callback is invalid.');
         }
 
+        $requestStatus = Sanitizer::key($record['status'] ?? '', 40);
+        if (! in_array($requestStatus, ['dispatching', 'pending', 'partial', 'recovery-required'], true)) {
+            return new \WP_Error('spcrc_privacy_callback_closed', 'Privacy request is not open for module completion.');
+        }
+
         $sourceStatus = Sanitizer::key($moduleResults[$moduleKey]['status'] ?? '', 40);
         if (! in_array($sourceStatus, self::CALLBACK_SOURCE_STATUSES, true)) {
             return new \WP_Error(
