@@ -6,7 +6,7 @@ namespace Sabri\Platform\Security\Storage;
 
 final class Schema
 {
-    public const VERSION = '0.25.2';
+    public const VERSION = '0.25.3';
 
     /** @return true|\WP_Error */
     public static function install(): true|\WP_Error
@@ -118,6 +118,11 @@ final class Schema
             assigned_user_id bigint unsigned NULL,
             jurisdiction varchar(80) NOT NULL DEFAULT '',
             due_at datetime NULL,
+            verification_method varchar(40) NOT NULL DEFAULT '',
+            authority_basis varchar(40) NOT NULL DEFAULT '',
+            verification_reference varchar(200) NOT NULL DEFAULT '',
+            verified_by_user_id bigint unsigned NULL,
+            verified_at datetime NULL,
             module_results_json longtext NULL,
             dispatch_attempts smallint unsigned NOT NULL DEFAULT 0,
             lock_version bigint unsigned NOT NULL DEFAULT 0,
@@ -131,6 +136,8 @@ final class Schema
             KEY status_due (status, due_at),
             KEY status_retry (status, next_retry_at),
             KEY requester_type (requester_user_id, request_type),
+            KEY verification_status (verification_method, status),
+            KEY verified_by (verified_by_user_id, verified_at),
             KEY updated_status (updated_at, status)
         ) {$charset};");
 
