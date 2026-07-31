@@ -27,7 +27,7 @@ final class PrivacyVerificationStore
 
         $safe = $this->sanitize($evidence);
         if ($safe === null) {
-            return new \WP_Error('spcrc_privacy_verification_evidence_invalid', 'Privacy verification evidence is invalid.');
+            return new \WP_Error('spcrc_privacy_verification_evidence_invalid', 'Privacy verification evidence is invalid or the reference is not an opaque case identifier.');
         }
 
         if ($this->hasEvidence($existing)) {
@@ -37,6 +37,10 @@ final class PrivacyVerificationStore
                 }
             }
             return true;
+        }
+
+        if (! $this->evidenceConfirmed($existing, $safe)) {
+            return new \WP_Error('spcrc_privacy_verification_proof_missing', 'The selected verification method has no confirmed native or operator evidence.');
         }
 
         $lockVersion = absint($existing['lock_version'] ?? 0);
@@ -77,7 +81,7 @@ final class PrivacyVerificationStore
 
         $row = $wpdb->get_row(
             $wpdb->prepare(
-                "SELECT request_uuid, status, lock_version, verification_method, authority_basis, verification_reference, verified_by_user_id, verified_at FROM {$wpdb->prefix}spcrc_privacy_requests WHERE request_uuid = %s",
+                "SELECT request_uuid, requester_user_id, status, lock_version, verification_method, authority_basis, verification_reference, verified_by_user_id, verified_at FROM {$wpdb->prefix}spcrc_privacy_requests WHERE request_uuid = %s",
                 $requestUuid
             ),
             ARRAY_A
@@ -117,7 +121,7 @@ final class PrivacyVerificationStore
     {
         $method = Sanitizer::key($evidence['verification_method'] ?? '', 40);
         $basis = Sanitizer::key($evidence['authority_basis'] ?? '', 40);
-        $reference = Sanitizer::text($evidence['verification_reference'] ?? '', 200);
+        $reference = $this->opaqueReference($evidence['verification_reference'] ?? '');
         $verifiedBy = absint($evidence['verified_by_user_id'] ?? 0);
         $verifiedAt = Sanitizer::isoTime($evidence['verified_at'] ?? '');
 
@@ -139,5 +143,44 @@ final class PrivacyVerificationStore
             'verified_by_user_id' => $verifiedBy,
             'verified_at' => gmdate('Y-m-d H:i:s', (int) strtotime($verifiedAt)),
         ];
+    }
+
+    private function opaqueReference(mixed $value): string
+    {
+        $reference = Sanitizer::text($value, 200);
+        return preg_match('/^[a-z][a-z0-9-]{1,30}:[A-Za-z0-9][A-Za-z0-9._\/-]{3,167}$/', $reference) === 1
+            ? $reference
+            : '';
+    }
+
+    /** @param array<string,mixed> $request
+     *  @param array<string,mixed> $evidence
+     */
+    private function evidenceConfirmed(array $request, array $evidence): bool
+    {
+        $method = (string) $evidence['verification_method'];
+        $requesterUserId = absint($request['requester_user_id'] ?? 0);
+        $verifiedBy = absint($evidence['verified_by_user_id'] ?? 0);
+
+        if ($method === 'manual-document-review') {
+            return true;
+        }
+
+        if ($method === 'authenticated-session') {
+            return $requesterUserId > 0
+                && $requesterUserId === $verifiedBy
+                && $verifiedBy === get_current_user_id();
+        }
+
+        return Sanitizer::boolean(apply_filters(
+            'spcrc/privacy_verification_confirmed',
+            false,
+            $method,
+            (string) $evidence['authority_basis'],
+            $requesterUserId,
+            (string) $evidence['verification_reference'],
+            $verifiedBy,
+            (string) $evidence['verified_at']
+        ));
     }
 }
