@@ -10,6 +10,7 @@ use Sabri\Platform\Security\Admin\FindingAdmin;
 use Sabri\Platform\Security\Admin\PrivacyAdmin;
 use Sabri\Platform\Security\Integration\File00Adapter;
 use Sabri\Platform\Security\Integration\File20Adapter;
+use Sabri\Platform\Security\Privacy\RecoveryManager;
 use Sabri\Platform\Security\Privacy\RequestDispatcher;
 use Sabri\Platform\Security\Registry\ModuleRegistry;
 use Sabri\Platform\Security\Registry\SecurityStateRegistry;
@@ -54,6 +55,7 @@ final class Plugin
         $checks = new SystemCheck($modules);
         $privacyRequests = new PrivacyRequestRepository();
         $privacy = new RequestDispatcher($audit, $modules, $privacyRequests);
+        $privacyRecovery = new RecoveryManager($privacyRequests, $audit);
         $repair = new Repair($audit, $modules);
 
         (new File00Adapter())->registerHooks();
@@ -66,6 +68,7 @@ final class Plugin
         $incidents->registerHooks();
         $controls->registerHooks();
         $privacy->registerHooks();
+        $privacyRecovery->registerHooks();
         $repair->registerHooks();
         (new AssetLoader())->registerHooks();
         (new Dashboard($modules, $states, $checks, $audit, $risks, $incidents, $controls, $repair))->registerHooks();
