@@ -52,19 +52,6 @@ jobs:
             exit 1
           fi
 
-      - name: Report current hashes for reviewed files
-        shell: bash
-        run: |
-          sha256sum \
-            docs/REVIEW-AND-CORRECTION-0.25.1-CYCLE-3.md \
-            plugin/sabri-security-center/assets/admin.css \
-            plugin/sabri-security-center/src/Admin/FindingAdmin.php \
-            plugin/sabri-security-center/src/Capabilities.php \
-            plugin/sabri-security-center/src/Plugin.php \
-            plugin/sabri-security-center/src/Storage/FindingRepository.php \
-            tests/findings.php \
-            tests/runtime.php
-
       - name: Verify source checksums except workflow self-hash
         shell: bash
         run: |
