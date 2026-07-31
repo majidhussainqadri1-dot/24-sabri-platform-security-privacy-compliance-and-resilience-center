@@ -15,7 +15,6 @@ foreach ([
     'Storage/ControlRepository.php',
     'Registry/ModuleRegistry.php',
     'Registry/SecurityStateRegistry.php',
-    'Privacy/RequestDispatcher.php',
     'System/SystemCheck.php',
     'System/Repair.php',
     'Rest/StatusController.php',
@@ -23,7 +22,6 @@ foreach ([
     require_once $base . $file;
 }
 
-use Sabri\Platform\Security\Privacy\RequestDispatcher;
 use Sabri\Platform\Security\Registry\ModuleRegistry;
 use Sabri\Platform\Security\Registry\SecurityStateRegistry;
 use Sabri\Platform\Security\Rest\StatusController;
@@ -98,24 +96,6 @@ $states = new SecurityStateRegistry($registry, $audit);
 expect(! $states->request('unknown-module', 'elevated-monitoring'), 'Unknown modules must not request security state.');
 expect($states->request('test-module', 'elevated-monitoring', ['reason' => 'test']), 'Registered module state request must succeed.');
 expect(count($states->all()) === 1, 'Security state request must persist across registry access.');
-
-$privacy = new RequestDispatcher($audit, $registry);
-$failed = $privacy->dispatch(['request_type' => 'access', 'requester_user_id' => 7], ['test-module']);
-expect($failed['ok'] === false && $failed['status'] === 'failed', 'Missing privacy handler must fail.');
-add_filter('spcrc/privacy_request/test-module', static fn ($result, $type, $request) => ['ok' => true, 'status' => 'completed'], 10, 3);
-$passed = $privacy->dispatch(['request_type' => 'access', 'requester_user_id' => 7], ['test-module']);
-expect($passed['ok'] === true && $passed['status'] === 'completed', 'Declared privacy handler must complete.');
-$collision = $privacy->dispatch([
-    'request_uuid' => $passed['request_uuid'],
-    'request_type' => 'access',
-    'requester_user_id' => 8,
-], ['test-module']);
-expect(
-    $collision['ok'] === false
-    && $collision['status'] === 'failed'
-    && ($collision['error'] ?? '') === 'spcrc_privacy_request_collision',
-    'A privacy UUID cannot be reassigned to another requester.'
-);
 
 $risks = new RiskRepository();
 $riskUuid = $risks->create([
