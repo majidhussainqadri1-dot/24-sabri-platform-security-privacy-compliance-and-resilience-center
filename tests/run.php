@@ -110,7 +110,12 @@ $collision = $privacy->dispatch([
     'request_type' => 'access',
     'requester_user_id' => 8,
 ], ['test-module']);
-expect($collision['ok'] === false && $collision['status'] === 'storage-failed', 'A privacy UUID cannot be reassigned to another requester.');
+expect(
+    $collision['ok'] === false
+    && $collision['status'] === 'failed'
+    && ($collision['error'] ?? '') === 'spcrc_privacy_request_collision',
+    'A privacy UUID cannot be reassigned to another requester.'
+);
 
 $risks = new RiskRepository();
 $riskUuid = $risks->create([
