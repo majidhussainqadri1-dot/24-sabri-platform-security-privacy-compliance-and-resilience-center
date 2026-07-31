@@ -7,6 +7,7 @@ namespace Sabri\Platform\Security\Rest;
 use Sabri\Platform\Security\Registry\ModuleRegistry;
 use Sabri\Platform\Security\Registry\SecurityStateRegistry;
 use Sabri\Platform\Security\Storage\ControlRepository;
+use Sabri\Platform\Security\Storage\FindingRepository;
 use Sabri\Platform\Security\Storage\IncidentRepository;
 use Sabri\Platform\Security\Storage\RiskRepository;
 use Sabri\Platform\Security\Support\Sanitizer;
@@ -22,7 +23,8 @@ final class StatusController
         private SystemCheck $checks,
         private ?RiskRepository $risks = null,
         private ?IncidentRepository $incidents = null,
-        private ?ControlRepository $controls = null
+        private ?ControlRepository $controls = null,
+        private ?FindingRepository $findings = null
     ) {
     }
 
@@ -50,6 +52,9 @@ final class StatusController
     public function status(): \WP_REST_Response
     {
         $counts = [];
+        if ($this->findings && current_user_can('spcrc_manage_findings')) {
+            $counts['open_findings'] = $this->findings->openCount();
+        }
         if ($this->risks && current_user_can('spcrc_manage_risks')) {
             $counts['open_risks'] = $this->risks->openCount();
         }
