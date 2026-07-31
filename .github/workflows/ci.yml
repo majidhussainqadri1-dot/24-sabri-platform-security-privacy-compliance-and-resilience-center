@@ -55,29 +55,6 @@ jobs:
             exit 1
           fi
 
-      - name: Report cycle 5 changed source hashes
-        run: |
-          sha256sum \
-            MANIFEST.md \
-            README.md \
-            docs/INTEGRATION-CONTRACTS.md \
-            docs/MIGRATION.md \
-            docs/REVIEW-AND-CORRECTION-0.25.2-CYCLE-5.md \
-            docs/ROLLBACK.md \
-            plugin/sabri-security-center/sabri-security-center.php \
-            plugin/sabri-security-center/readme.txt \
-            plugin/sabri-security-center/src/Admin/PrivacyAdmin.php \
-            plugin/sabri-security-center/src/Deactivation.php \
-            plugin/sabri-security-center/src/Plugin.php \
-            plugin/sabri-security-center/src/Privacy/RecoveryManager.php \
-            plugin/sabri-security-center/src/Privacy/RequestDispatcher.php \
-            plugin/sabri-security-center/src/Storage/PrivacyRequestRepository.php \
-            plugin/sabri-security-center/src/Storage/Schema.php \
-            tests/privacy.php \
-            tests/privacy-recovery.php \
-            tests/run.php \
-            tests/upgrade.php
-
       - name: Verify source checksums except workflow self-hash
         shell: bash
         run: |
