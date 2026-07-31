@@ -10,7 +10,7 @@ a6ca748ec4999bad8912ec71d0f578cd80b9a78cdf157d4e70110f12643a05e8  ./docs/REVIEW-
 7dae5acf45f7ea223aec927acc24fa5c9519238e5fabf199d727773417704f6d  ./docs/REVIEW-AND-CORRECTION-0.25.1-CYCLE-3.md
 e8ad1f36ac614d849190d0a20e9bd396486cb46a95a2c544248ea5791066e603  ./docs/ROLLBACK.md
 50e3993249d66523affe86f7f6c892a1a7cc702a5f65b8165234566e747a91c4  ./plugin/sabri-security-center/assets/admin.css
-2a62b02bea5f2cdc6b572d4470cdc80cccea20ad5a67f05bbc7a3b3770f793e8  ./plugin/sabri-security-center/readme.txt
+bb3f050caae41dba83c9c4190c5d559c39cf3f1b5d6ab818b5040cf5ccd2dbd5  ./plugin/sabri-security-center/readme.txt
 792c2821b3fbb2cdffcd366da66addcb25df9d7381e6a734fb55f24f94caf813  ./plugin/sabri-security-center/sabri-security-center.php
 995ecfaa880b4f97d01888a69eb4e5fa93f97f54b73b94cdc187e377c6b064dd  ./plugin/sabri-security-center/src/Activation.php
 44a49f7824b2c79faee61a262bdaf1d8c46bf84e3c6441d43bb46703fb968f0e  ./plugin/sabri-security-center/src/Admin/Dashboard.php
