@@ -49,7 +49,6 @@ final class File00Adapter
         return $priority === false;
     }
 
-
     /** @param mixed $result
      *  @param array<string,mixed> $request
      *  @return array<string,mixed>|mixed
@@ -66,11 +65,21 @@ final class File00Adapter
         }
 
         if (in_array($type, ['access', 'portability'], true) && is_callable(['SMC_Security', 'export_personal_data'])) {
-            return ['ok' => true, 'status' => 'native-exporter-available', 'reference' => 'wp-privacy-exporter:sabri-membership'];
+            return [
+                'ok' => true,
+                'status' => 'queued',
+                'reference' => 'wp-privacy-exporter:sabri-membership',
+                'message' => 'Native exporter is available; completion must be confirmed by the WordPress privacy workflow.',
+            ];
         }
 
         if ($type === 'deletion' && is_callable(['SMC_Security', 'erase_personal_data'])) {
-            return ['ok' => true, 'status' => 'native-eraser-available', 'reference' => 'wp-privacy-eraser:sabri-membership'];
+            return [
+                'ok' => true,
+                'status' => 'queued',
+                'reference' => 'wp-privacy-eraser:sabri-membership',
+                'message' => 'Native eraser is available; completion must be confirmed by the WordPress privacy workflow.',
+            ];
         }
 
         return new \WP_Error('spcrc_file00_privacy_unavailable', 'The requested File 00 privacy operation is not available.');
