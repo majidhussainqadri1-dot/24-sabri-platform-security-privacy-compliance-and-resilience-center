@@ -56,6 +56,16 @@ jobs:
             exit 1
           fi
 
+      - name: Report corrective cycle 6 source hashes
+        run: |
+          sha256sum \
+            plugin/sabri-security-center/src/Admin/PrivacyAdmin.php \
+            plugin/sabri-security-center/src/Plugin.php \
+            plugin/sabri-security-center/src/Privacy/PrivacyRequestPolicy.php \
+            plugin/sabri-security-center/src/Privacy/RequestDispatcher.php \
+            tests/privacy.php \
+            tests/privacy-policy.php
+
       - name: Verify source checksums except workflow self-hash
         shell: bash
         run: |
