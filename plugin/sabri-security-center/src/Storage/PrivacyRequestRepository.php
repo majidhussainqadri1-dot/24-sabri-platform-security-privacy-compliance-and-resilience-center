@@ -63,6 +63,7 @@ final class PrivacyRequestRepository
             $moduleResults[$moduleKey] = [
                 'ok' => false,
                 'status' => 'not-started',
+                'code' => '',
                 'reference' => '',
                 'message' => '',
             ];
@@ -170,14 +171,68 @@ final class PrivacyRequestRepository
         ];
     }
 
+    /** @return true|\WP_Error */
+    public function claimModule(string $requestUuid, string $moduleKey): true|\WP_Error
+    {
+        $requestUuid = Sanitizer::uuid($requestUuid);
+        $moduleKey = Sanitizer::key($moduleKey, 120);
+        $existing = $this->get($requestUuid);
+        if ($requestUuid === '' || $moduleKey === '' || $existing === null) {
+            return new \WP_Error('spcrc_privacy_module_claim_invalid', 'Privacy module dispatch claim is invalid.');
+        }
+        if (Sanitizer::key($existing['status'] ?? '', 40) !== 'dispatching') {
+            return new \WP_Error('spcrc_privacy_module_claim_closed', 'Privacy request is not accepting new module dispatch claims.');
+        }
+
+        $results = $this->decodeResults($existing['module_results_json'] ?? '');
+        if (! isset($results[$moduleKey])) {
+            return new \WP_Error('spcrc_privacy_module_claim_unknown', 'Module is not part of this privacy request.');
+        }
+        if (Sanitizer::key($results[$moduleKey]['status'] ?? '', 40) !== 'not-started') {
+            return new \WP_Error('spcrc_privacy_module_already_claimed', 'Privacy module operation has already been claimed or completed.');
+        }
+
+        $results[$moduleKey]['status'] = 'dispatching';
+        $results[$moduleKey]['ok'] = false;
+        $results[$moduleKey]['code'] = '';
+        $results[$moduleKey]['message'] = '';
+
+        return $this->writeModuleResults($existing, $results, 'spcrc_privacy_module_claim_failed');
+    }
+
+    /** @param array<string,mixed> $result
+     *  @return true|\WP_Error
+     */
+    public function storeModuleResult(string $requestUuid, string $moduleKey, array $result): true|\WP_Error
+    {
+        $requestUuid = Sanitizer::uuid($requestUuid);
+        $moduleKey = Sanitizer::key($moduleKey, 120);
+        $existing = $this->get($requestUuid);
+        if ($requestUuid === '' || $moduleKey === '' || $existing === null) {
+            return new \WP_Error('spcrc_privacy_module_result_invalid', 'Privacy module result is invalid.');
+        }
+        if (Sanitizer::key($existing['status'] ?? '', 40) !== 'dispatching') {
+            return new \WP_Error('spcrc_privacy_module_result_closed', 'Privacy request is not accepting synchronous module results.');
+        }
+
+        $results = $this->decodeResults($existing['module_results_json'] ?? '');
+        if (! isset($results[$moduleKey])) {
+            return new \WP_Error('spcrc_privacy_module_result_unknown', 'Module is not part of this privacy request.');
+        }
+        if (Sanitizer::key($results[$moduleKey]['status'] ?? '', 40) !== 'dispatching') {
+            return new \WP_Error('spcrc_privacy_module_result_unclaimed', 'Privacy module result cannot be stored without a dispatch claim.');
+        }
+
+        $results[$moduleKey] = $this->sanitizeModuleResult($result);
+        return $this->writeModuleResults($existing, $results, 'spcrc_privacy_module_result_write_failed');
+    }
+
     /**
-     * @param array<string,array<string,mixed>> $results
      * @return true|\WP_Error
      */
     public function finalize(
         string $requestUuid,
         string $status,
-        array $results = [],
         string $expectedStatus = 'dispatching',
         string $lastErrorCode = ''
     ): true|\WP_Error {
@@ -203,19 +258,12 @@ final class PrivacyRequestRepository
             return new \WP_Error('spcrc_privacy_finalize_concurrent', 'Privacy request changed before finalization.');
         }
 
-        $results = $results === [] ? $this->decodeResults($existing['module_results_json'] ?? '') : $this->sanitizeResults($results);
-        $encodedResults = $this->encodeResults($results);
-        if (is_wp_error($encodedResults)) {
-            return $encodedResults;
-        }
-
         $lockVersion = absint($existing['lock_version'] ?? 0);
         $now = current_time('mysql', true);
         $updated = $wpdb->update(
             $wpdb->prefix . 'spcrc_privacy_requests',
             [
                 'status' => $status,
-                'module_results_json' => $encodedResults,
                 'lock_version' => $lockVersion + 1,
                 'last_error_code' => Sanitizer::key($lastErrorCode, 120),
                 'next_retry_at' => in_array($status, self::RETRYABLE_REQUEST_STATUSES, true)
@@ -225,7 +273,7 @@ final class PrivacyRequestRepository
                 'updated_at' => $now,
             ],
             ['request_uuid' => $requestUuid, 'status' => $expectedStatus, 'lock_version' => $lockVersion],
-            ['%s', '%s', '%d', '%s', '%s', '%s', '%s'],
+            ['%s', '%d', '%s', '%s', '%s', '%s'],
             ['%s', '%s', '%d']
         );
         if ($updated === false) {
@@ -261,11 +309,12 @@ final class PrivacyRequestRepository
                 $retryModules[] = $moduleKey;
                 $results[$moduleKey]['ok'] = false;
                 $results[$moduleKey]['status'] = 'not-started';
+                $results[$moduleKey]['code'] = '';
                 $results[$moduleKey]['message'] = '';
             }
         }
         if ($retryModules === []) {
-            return new \WP_Error('spcrc_privacy_retry_modules_missing', 'No safely retryable module result is available. Pending or completed modules are never replayed.');
+            return new \WP_Error('spcrc_privacy_retry_modules_missing', 'No safely retryable module result is available. Pending, dispatching or completed modules are never replayed.');
         }
 
         $encodedResults = $this->encodeResults($results);
@@ -330,6 +379,9 @@ final class PrivacyRequestRepository
         $results = $this->decodeResults($existing['module_results_json'] ?? '');
         if (! array_key_exists($moduleKey, $results)) {
             return new \WP_Error('spcrc_privacy_callback_module_unknown', 'Module is not part of this privacy request.');
+        }
+        if (Sanitizer::key($results[$moduleKey]['status'] ?? '', 40) === 'completed') {
+            return new \WP_Error('spcrc_privacy_callback_module_completed', 'Completed module evidence cannot be overwritten.');
         }
 
         $normalized = $this->sanitizeModuleResult($result);
@@ -430,6 +482,13 @@ final class PrivacyRequestRepository
         return $marked;
     }
 
+    /** @return array<string,array<string,mixed>> */
+    public function moduleResults(string $requestUuid): array
+    {
+        $existing = $this->get($requestUuid);
+        return $existing === null ? [] : $this->decodeResults($existing['module_results_json'] ?? '');
+    }
+
     /** @return array<string,mixed>|null */
     public function get(string $requestUuid): ?array
     {
@@ -490,10 +549,15 @@ final class PrivacyRequestRepository
 
         $failed = 0;
         $pending = 0;
+        $uncertain = 0;
         foreach ($results as $result) {
             $ok = Sanitizer::boolean($result['ok'] ?? false);
             $status = Sanitizer::key($result['status'] ?? '', 40);
-            if (! $ok || in_array($status, ['failed', 'rejected', 'unavailable', 'recovery-required', 'not-started'], true)) {
+            if (in_array($status, ['dispatching', 'not-started', 'recovery-required'], true)) {
+                ++$uncertain;
+                continue;
+            }
+            if (! $ok || in_array($status, ['failed', 'rejected', 'unavailable'], true)) {
                 ++$failed;
                 continue;
             }
@@ -502,6 +566,9 @@ final class PrivacyRequestRepository
             }
         }
 
+        if ($uncertain > 0) {
+            return ['ok' => false, 'status' => 'recovery-required'];
+        }
         if ($failed === count($results)) {
             return ['ok' => false, 'status' => 'failed'];
         }
@@ -513,6 +580,47 @@ final class PrivacyRequestRepository
         }
 
         return ['ok' => true, 'status' => 'completed'];
+    }
+
+    /** @param array<string,mixed> $existing
+     *  @param array<string,array<string,mixed>> $results
+     *  @return true|\WP_Error
+     */
+    private function writeModuleResults(array $existing, array $results, string $errorCode): true|\WP_Error
+    {
+        global $wpdb;
+
+        $encodedResults = $this->encodeResults($results);
+        if (is_wp_error($encodedResults)) {
+            return $encodedResults;
+        }
+
+        $requestUuid = Sanitizer::uuid($existing['request_uuid'] ?? '');
+        $requestStatus = Sanitizer::key($existing['status'] ?? '', 40);
+        $lockVersion = absint($existing['lock_version'] ?? 0);
+        if ($requestUuid === '' || $requestStatus === '') {
+            return new \WP_Error($errorCode, 'Privacy module evidence is missing its canonical request identity.');
+        }
+
+        $updated = $wpdb->update(
+            $wpdb->prefix . 'spcrc_privacy_requests',
+            [
+                'module_results_json' => $encodedResults,
+                'lock_version' => $lockVersion + 1,
+                'updated_at' => current_time('mysql', true),
+            ],
+            ['request_uuid' => $requestUuid, 'status' => $requestStatus, 'lock_version' => $lockVersion],
+            ['%s', '%d', '%s'],
+            ['%s', '%s', '%d']
+        );
+        if ($updated === false) {
+            return new \WP_Error($errorCode, 'Privacy module evidence could not be stored.');
+        }
+        if ($updated !== 1) {
+            return new \WP_Error('spcrc_privacy_module_concurrent', 'Privacy request changed during module evidence storage.');
+        }
+
+        return true;
     }
 
     /** @return string[] */
