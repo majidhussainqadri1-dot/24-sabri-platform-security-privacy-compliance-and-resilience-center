@@ -56,12 +56,6 @@ jobs:
             exit 1
           fi
 
-      - name: Report 0.25.3 release hashes
-        run: |
-          sha256sum \
-            plugin/sabri-security-center/sabri-security-center.php \
-            plugin/sabri-security-center/readme.txt
-
       - name: Verify source checksums except workflow self-hash
         shell: bash
         run: |
