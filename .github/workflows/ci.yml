@@ -105,3 +105,20 @@ jobs:
             ${{ steps.package.outputs.path }}
             ${{ steps.package.outputs.path }}.sha256
           if-no-files-found: error
+
+      - name: Upload sanitized source snapshot for corrective regression work
+        uses: actions/upload-artifact@v4
+        with:
+          name: file-24-sanitized-source-snapshot
+          path: |
+            .github/workflows/ci.yml
+            .gitignore
+            CHECKSUMS.sha256
+            MANIFEST.md
+            README.md
+            SECURITY.md
+            docs
+            plugin
+            tests
+            tools
+          if-no-files-found: error
