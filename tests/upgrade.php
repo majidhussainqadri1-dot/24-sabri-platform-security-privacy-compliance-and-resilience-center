@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 namespace {
-    define('SPCRC_VERSION', '0.25.1');
+    define('SPCRC_VERSION', '0.25.2');
     $GLOBALS['options'] = [];
     $GLOBALS['actions'] = [];
 
@@ -24,7 +24,7 @@ namespace {
 namespace Sabri\Platform\Security\Storage {
     final class Schema
     {
-        public const VERSION = '0.25.1';
+        public const VERSION = '0.25.2';
         public static true|\WP_Error $result = true;
         public static function install(): true|\WP_Error { return self::$result; }
     }
