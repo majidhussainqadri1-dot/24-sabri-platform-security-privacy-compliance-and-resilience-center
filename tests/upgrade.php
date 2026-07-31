@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 namespace {
-    define('SPCRC_VERSION', '0.25.2');
+    define('SPCRC_VERSION', '0.25.3');
     $GLOBALS['options'] = [];
     $GLOBALS['actions'] = [];
 
@@ -73,5 +73,14 @@ namespace Sabri\Platform\Security {
     expectUpgrade(Capabilities::$installCalls === 1 && RetentionManager::$scheduleCalls === 1, 'Successful upgrade must apply capabilities and retention schedule.');
     expectUpgrade(get_option('spcrc_last_upgrade_error', null) === null, 'Successful upgrade must clear prior failure evidence.');
 
-    echo "PASS: upgrade failure integrity\n";
+    $GLOBALS['options']['spcrc_version'] = '0.25.2';
+    $GLOBALS['options']['spcrc_schema_version'] = Schema::VERSION;
+    Capabilities::$installCalls = 0;
+    RetentionManager::$scheduleCalls = 0;
+    UpgradeManager::maybeUpgrade();
+    expectUpgrade(get_option('spcrc_version', '') === '0.25.3', 'Code-only patch must advance plugin version without inventing a schema revision.');
+    expectUpgrade(get_option('spcrc_schema_version', '') === '0.25.2', 'Code-only patch must preserve the existing schema version.');
+    expectUpgrade(Capabilities::$installCalls === 1 && RetentionManager::$scheduleCalls === 1, 'Code-only patch must reapply capabilities and schedules after integrity verification.');
+
+    echo "PASS: upgrade failure integrity and code-only version separation\n";
 }
