@@ -187,10 +187,10 @@ final class ModuleRegistry
             'posture' => 'foundation',
             'data_classes' => ['C1 Internal', 'C2 Personal Metadata', 'C5 Security Evidence References'],
             'public_routes' => ['/wp-json/sabri-security/v1/trust'],
-            'private_routes' => ['/wp-admin/admin.php?page=sabri-security-center', '/wp-json/sabri-security/v1/status'],
+            'private_routes' => ['/wp-admin/admin.php?page=sabri-security-center', '/wp-admin/admin.php?page=sabri-security-findings', '/wp-admin/admin.php?page=sabri-security-privacy-requests', '/wp-json/sabri-security/v1/status'],
             'capabilities' => Capabilities::all(),
             'external_vendors' => [],
-            'privacy_operations' => ['access', 'correction', 'deletion'],
+            'privacy_operations' => [],
             'last_security_test' => '',
         ];
     }
