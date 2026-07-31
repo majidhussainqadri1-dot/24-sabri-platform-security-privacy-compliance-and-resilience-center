@@ -25,6 +25,7 @@ jobs:
           php tests/findings.php
           php tests/runtime.php
           php tests/privacy.php
+          php tests/privacy-recovery.php
           php tests/admin-assets.php
 
       - name: Reject common secret material
@@ -38,10 +39,10 @@ jobs:
 
       - name: Verify plugin and schema version consistency
         run: |
-          grep -q 'Version:     0.25.1' plugin/sabri-security-center/sabri-security-center.php
-          grep -q "define('SPCRC_VERSION', '0.25.1')" plugin/sabri-security-center/sabri-security-center.php
-          grep -q "public const VERSION = '0.25.1'" plugin/sabri-security-center/src/Storage/Schema.php
-          grep -q 'Stable tag: 0.25.1' plugin/sabri-security-center/readme.txt
+          grep -q 'Version:     0.25.2' plugin/sabri-security-center/sabri-security-center.php
+          grep -q "define('SPCRC_VERSION', '0.25.2')" plugin/sabri-security-center/sabri-security-center.php
+          grep -q "public const VERSION = '0.25.2'" plugin/sabri-security-center/src/Storage/Schema.php
+          grep -q 'Stable tag: 0.25.2' plugin/sabri-security-center/readme.txt
 
       - name: Reject self-mutating source workflows and staged source bundles
         shell: bash
@@ -53,6 +54,22 @@ jobs:
           if grep -RInE --exclude='ci.yml' 'git push|contents:[[:space:]]*write' .github/workflows; then
             exit 1
           fi
+
+      - name: Report cycle 5 changed source hashes
+        run: |
+          sha256sum \
+            plugin/sabri-security-center/sabri-security-center.php \
+            plugin/sabri-security-center/readme.txt \
+            plugin/sabri-security-center/src/Admin/PrivacyAdmin.php \
+            plugin/sabri-security-center/src/Deactivation.php \
+            plugin/sabri-security-center/src/Plugin.php \
+            plugin/sabri-security-center/src/Privacy/RecoveryManager.php \
+            plugin/sabri-security-center/src/Privacy/RequestDispatcher.php \
+            plugin/sabri-security-center/src/Storage/PrivacyRequestRepository.php \
+            plugin/sabri-security-center/src/Storage/Schema.php \
+            tests/privacy.php \
+            tests/privacy-recovery.php \
+            tests/run.php
 
       - name: Verify source checksums except workflow self-hash
         shell: bash
@@ -74,7 +91,7 @@ jobs:
       - name: Upload reviewed plugin package
         uses: actions/upload-artifact@v4
         with:
-          name: file-24-security-center-0.25.1
+          name: file-24-security-center-0.25.2
           path: |
             ${{ steps.package.outputs.path }}
             ${{ steps.package.outputs.path }}.sha256
