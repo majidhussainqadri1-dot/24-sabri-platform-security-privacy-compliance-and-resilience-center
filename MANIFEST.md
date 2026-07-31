@@ -1,6 +1,6 @@
 # Source Manifest
 
-Foundation corrective candidate 0.25.1 contains only public, sanitized source and documentation.
+Foundation corrective candidate 0.25.2 contains only public, sanitized source and documentation.
 
 Sensitive operational material is intentionally excluded.
 
@@ -9,10 +9,13 @@ Sensitive operational material is intentionally excluded.
 - Private findings triage: `plugin/sabri-security-center/src/Admin/FindingAdmin.php`
 - Scoped submenu asset loader: `plugin/sabri-security-center/src/Admin/AssetLoader.php`
 - Private privacy-request operations: `plugin/sabri-security-center/src/Admin/PrivacyAdmin.php`
-- Durable privacy metadata: `plugin/sabri-security-center/src/Storage/PrivacyRequestRepository.php`
+- Durable privacy metadata and module outcomes: `plugin/sabri-security-center/src/Storage/PrivacyRequestRepository.php`
+- Privacy dispatch, callback and retry contracts: `plugin/sabri-security-center/src/Privacy/RequestDispatcher.php`
+- Stale-dispatch recovery scanner: `plugin/sabri-security-center/src/Privacy/RecoveryManager.php`
 - Foundation contract tests: `tests/`
 - Runtime integration guard: `tests/runtime.php`
-- Privacy durability and replay guard: `tests/privacy.php`
+- Privacy callback, retry and stale-recovery guard: `tests/privacy.php`
+- Privacy recovery scheduling guard: `tests/privacy-recovery.php`
 - Scoped admin asset guard: `tests/admin-assets.php`
 - Reproducible package tooling: `tools/build-release.sh`
 - Continuous integration: `.github/workflows/ci.yml`
