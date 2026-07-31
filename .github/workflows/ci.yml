@@ -25,6 +25,7 @@ jobs:
           php tests/findings.php
           php tests/runtime.php
           php tests/privacy.php
+          php tests/privacy-policy.php
           php tests/privacy-recovery.php
           php tests/admin-assets.php
 
