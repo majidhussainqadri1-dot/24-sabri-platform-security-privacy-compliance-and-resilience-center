@@ -163,6 +163,29 @@ final class RequestDispatcher
      */
     public function completeModule(string $requestUuid, string $moduleKey, array $result): array
     {
+        $reportedStatus = Sanitizer::key($result['status'] ?? '', 40);
+        if ($reportedStatus === 'failed' && ! Sanitizer::boolean($result['retry_safe'] ?? false)) {
+            $error = new \WP_Error(
+                'spcrc_privacy_callback_retry_safety_required',
+                'A failed native callback must explicitly attest that retry is safe, otherwise the existing pending evidence is preserved for reconciliation.'
+            );
+            $this->audit->record(
+                'privacy_request_module_callback_rejected',
+                Sanitizer::key($moduleKey, 120),
+                'recovery-required',
+                'high',
+                ['request_uuid' => Sanitizer::uuid($requestUuid), 'error_code' => $error->get_error_code()]
+            );
+            return [
+                'ok' => false,
+                'request_uuid' => Sanitizer::uuid($requestUuid),
+                'module_key' => Sanitizer::key($moduleKey, 120),
+                'status' => 'recovery-required',
+                'error' => $error->get_error_code(),
+                'message' => $error->get_error_message(),
+            ];
+        }
+
         $stored = $this->requests->completeModule($requestUuid, $moduleKey, $result);
         if (is_wp_error($stored)) {
             $this->audit->record(
@@ -232,9 +255,9 @@ final class RequestDispatcher
                 } catch (\Throwable $exception) {
                     $result = [
                         'ok' => false,
-                        'status' => 'failed',
+                        'status' => 'dispatching',
                         'code' => 'handler_exception',
-                        'message' => 'Native privacy handler failed unexpectedly.',
+                        'message' => 'Native privacy handler failed after dispatch; manual reconciliation is required before retry.',
                     ];
                     do_action('spcrc/privacy_request_handler_exception', $moduleKey, $requestType, $exception);
                 }
@@ -321,9 +344,9 @@ final class RequestDispatcher
         if (is_wp_error($result)) {
             return [
                 'ok' => false,
-                'status' => 'failed',
+                'status' => 'dispatching',
                 'code' => Sanitizer::key($result->get_error_code(), 120),
-                'message' => Sanitizer::text($result->get_error_message(), 300),
+                'message' => 'Native privacy handler reported failure after dispatch; manual reconciliation is required before retry.',
             ];
         }
 
@@ -338,6 +361,9 @@ final class RequestDispatcher
             if (! in_array($status, $allowed, true)) {
                 $status = $ok ? 'accepted' : 'failed';
             }
+            if (! $ok && in_array($status, ['failed', 'rejected', 'unavailable'], true) && ! Sanitizer::boolean($result['retry_safe'] ?? false)) {
+                $status = 'dispatching';
+            }
 
             return [
                 'ok' => $ok,
@@ -349,10 +375,12 @@ final class RequestDispatcher
         }
 
         if (is_bool($result)) {
-            return ['ok' => $result, 'status' => $result ? 'accepted' : 'failed', 'code' => ''];
+            return $result
+                ? ['ok' => true, 'status' => 'accepted', 'code' => '']
+                : ['ok' => false, 'status' => 'dispatching', 'code' => 'ambiguous_native_failure', 'message' => 'Native handler returned an ambiguous failure; reconciliation is required.'];
         }
 
-        return ['ok' => false, 'status' => 'failed', 'code' => 'invalid_handler_response', 'message' => 'Privacy handler returned an invalid response.'];
+        return ['ok' => false, 'status' => 'dispatching', 'code' => 'invalid_handler_response', 'message' => 'Privacy handler returned an invalid response after dispatch; reconciliation is required.'];
     }
 
     /** @param array<string,array<string,mixed>> $results */
