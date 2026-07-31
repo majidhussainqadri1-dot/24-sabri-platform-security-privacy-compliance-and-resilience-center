@@ -7,8 +7,13 @@ Sensitive operational material is intentionally excluded.
 - Root governance: `README.md`, `SECURITY.md`, `docs/`
 - WordPress plugin: `plugin/sabri-security-center/`
 - Private findings triage: `plugin/sabri-security-center/src/Admin/FindingAdmin.php`
+- Scoped submenu asset loader: `plugin/sabri-security-center/src/Admin/AssetLoader.php`
+- Private privacy-request operations: `plugin/sabri-security-center/src/Admin/PrivacyAdmin.php`
+- Durable privacy metadata: `plugin/sabri-security-center/src/Storage/PrivacyRequestRepository.php`
 - Foundation contract tests: `tests/`
 - Runtime integration guard: `tests/runtime.php`
+- Privacy durability and replay guard: `tests/privacy.php`
+- Scoped admin asset guard: `tests/admin-assets.php`
 - Reproducible package tooling: `tools/build-release.sh`
 - Continuous integration: `.github/workflows/ci.yml`
 - Generated source checksums: `CHECKSUMS.sha256`
