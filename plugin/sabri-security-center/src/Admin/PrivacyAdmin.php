@@ -1,0 +1,175 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Sabri\Platform\Security\Admin;
+
+use Sabri\Platform\Security\Privacy\RequestDispatcher;
+use Sabri\Platform\Security\Registry\ModuleRegistry;
+use Sabri\Platform\Security\Storage\PrivacyRequestRepository;
+
+final class PrivacyAdmin
+{
+    public function __construct(
+        private PrivacyRequestRepository $requests,
+        private RequestDispatcher $dispatcher,
+        private ModuleRegistry $modules
+    ) {
+    }
+
+    public function registerHooks(): void
+    {
+        add_action('admin_menu', [$this, 'menu']);
+        add_action('admin_post_spcrc_dispatch_privacy_request', [$this, 'handleDispatch']);
+    }
+
+    public function menu(): void
+    {
+        add_submenu_page(
+            'sabri-security-center',
+            __('Privacy Requests', 'sabri-security-center'),
+            __('Privacy Requests', 'sabri-security-center'),
+            'spcrc_manage_privacy_requests',
+            'sabri-security-privacy-requests',
+            [$this, 'render']
+        );
+    }
+
+    public function handleDispatch(): void
+    {
+        $this->assertCapability('spcrc_manage_privacy_requests', 'You are not allowed to manage privacy requests.');
+        check_admin_referer('spcrc_dispatch_privacy_request');
+
+        $data = $this->postData();
+        $requestType = isset($data['request_type']) ? sanitize_key((string) $data['request_type']) : '';
+        $confirmation = isset($data['confirmation']) ? trim((string) $data['confirmation']) : '';
+        if ($requestType === 'deletion' && ! hash_equals('DISPATCH DELETION', strtoupper($confirmation))) {
+            $this->redirect('error', 'Deletion dispatch requires the exact confirmation phrase: DISPATCH DELETION.');
+        }
+
+        $moduleKeys = isset($data['module_keys']) && is_array($data['module_keys'])
+            ? array_slice($data['module_keys'], 0, 100)
+            : [];
+        $result = $this->dispatcher->dispatch([
+            'request_uuid' => $data['request_uuid'] ?? '',
+            'request_type' => $requestType,
+            'requester_user_id' => $data['requester_user_id'] ?? 0,
+            'assigned_user_id' => get_current_user_id(),
+            'jurisdiction' => $data['jurisdiction'] ?? '',
+            'due_at' => $data['due_at'] ?? '',
+        ], $moduleKeys);
+
+        $status = isset($result['status']) ? (string) $result['status'] : 'failed';
+        $ok = ! empty($result['ok']);
+        $message = $ok
+            ? sprintf('Privacy request was dispatched with status: %s.', $status)
+            : sprintf('Privacy request was not fully dispatched. Status: %s; error: %s.', $status, (string) ($result['error'] ?? 'module-or-storage-failure'));
+        $this->redirect($ok ? 'success' : 'error', $message);
+    }
+
+    public function render(): void
+    {
+        $this->assertCapability('spcrc_manage_privacy_requests', 'You are not allowed to view privacy requests.');
+        $notice = get_transient('spcrc_privacy_notice_' . get_current_user_id());
+        if (is_array($notice)) {
+            delete_transient('spcrc_privacy_notice_' . get_current_user_id());
+        }
+
+        $manifests = $this->modules->all();
+        $rows = $this->requests->recent(50);
+        ?>
+        <div class="wrap spcrc-wrap">
+            <h1><?php esc_html_e('Privacy Requests', 'sabri-security-center'); ?></h1>
+            <p><?php esc_html_e('Dispatch a verified data-subject request only after identity and authority have been established. File 24 stores orchestration metadata, not exported personal data.', 'sabri-security-center'); ?></p>
+
+            <?php if (is_array($notice)) : ?>
+                <div class="notice notice-<?php echo esc_attr(($notice['type'] ?? '') === 'error' ? 'error' : 'success'); ?> is-dismissible"><p><?php echo esc_html((string) ($notice['message'] ?? '')); ?></p></div>
+            <?php endif; ?>
+
+            <section class="spcrc-panel" aria-labelledby="spcrc-privacy-dispatch-heading">
+                <h2 id="spcrc-privacy-dispatch-heading"><?php esc_html_e('Dispatch a verified request', 'sabri-security-center'); ?></h2>
+                <form class="spcrc-form-grid" method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+                    <input type="hidden" name="action" value="spcrc_dispatch_privacy_request">
+                    <input type="hidden" name="request_uuid" value="<?php echo esc_attr(wp_generate_uuid4()); ?>">
+                    <?php wp_nonce_field('spcrc_dispatch_privacy_request'); ?>
+                    <p><label><?php esc_html_e('WordPress user ID', 'sabri-security-center'); ?><input required min="1" name="requester_user_id" type="number"></label></p>
+                    <p><label><?php esc_html_e('Request type', 'sabri-security-center'); ?><select required name="request_type">
+                        <?php foreach (PrivacyRequestRepository::types() as $type) : ?>
+                            <option value="<?php echo esc_attr($type); ?>"><?php echo esc_html(ucwords(str_replace('-', ' ', $type))); ?></option>
+                        <?php endforeach; ?>
+                    </select></label></p>
+                    <p><label><?php esc_html_e('Jurisdiction', 'sabri-security-center'); ?><input maxlength="80" name="jurisdiction" type="text" placeholder="Pakistan"></label></p>
+                    <p><label><?php esc_html_e('Due date', 'sabri-security-center'); ?><input name="due_at" type="date"></label></p>
+                    <p class="spcrc-form-wide"><label><?php esc_html_e('Deletion confirmation', 'sabri-security-center'); ?><input autocomplete="off" maxlength="40" name="confirmation" type="text" placeholder="DISPATCH DELETION"><small><?php esc_html_e('Required only for deletion requests. This prevents accidental destructive dispatch.', 'sabri-security-center'); ?></small></label></p>
+                    <fieldset class="spcrc-form-wide">
+                        <legend><?php esc_html_e('Native modules to dispatch', 'sabri-security-center'); ?></legend>
+                        <div class="spcrc-checkbox-grid">
+                        <?php $available = 0; foreach ($manifests as $manifest) : ?>
+                            <?php $operations = (array) ($manifest['privacy_operations'] ?? []); if ($operations === []) { continue; } ++$available; ?>
+                            <label>
+                                <input type="checkbox" name="module_keys[]" value="<?php echo esc_attr((string) ($manifest['module_key'] ?? '')); ?>">
+                                <span><strong><?php echo esc_html((string) ($manifest['name'] ?? '')); ?></strong><br><small><?php echo esc_html(implode(', ', array_map('strval', $operations))); ?></small></span>
+                            </label>
+                        <?php endforeach; ?>
+                        <?php if ($available === 0) : ?>
+                            <p><?php esc_html_e('No registered module currently declares privacy operations.', 'sabri-security-center'); ?></p>
+                        <?php endif; ?>
+                        </div>
+                    </fieldset>
+                    <p class="spcrc-form-actions"><?php submit_button(__('Dispatch request', 'sabri-security-center'), 'primary', 'submit', false, ['disabled' => $available === 0]); ?></p>
+                </form>
+            </section>
+
+            <section class="spcrc-panel" aria-labelledby="spcrc-privacy-history-heading">
+                <h2 id="spcrc-privacy-history-heading"><?php esc_html_e('Recent request metadata', 'sabri-security-center'); ?></h2>
+                <p><?php echo esc_html(sprintf(__('Active or unresolved requests: %d', 'sabri-security-center'), $this->requests->activeCount())); ?></p>
+                <div class="spcrc-table-scroll">
+                    <table class="widefat striped spcrc-data-table">
+                        <caption class="screen-reader-text"><?php esc_html_e('Recent privacy-request orchestration metadata', 'sabri-security-center'); ?></caption>
+                        <thead><tr><th scope="col"><?php esc_html_e('Request', 'sabri-security-center'); ?></th><th scope="col"><?php esc_html_e('Subject', 'sabri-security-center'); ?></th><th scope="col"><?php esc_html_e('Type', 'sabri-security-center'); ?></th><th scope="col"><?php esc_html_e('Status', 'sabri-security-center'); ?></th><th scope="col"><?php esc_html_e('Jurisdiction', 'sabri-security-center'); ?></th><th scope="col"><?php esc_html_e('Due', 'sabri-security-center'); ?></th><th scope="col"><?php esc_html_e('Updated', 'sabri-security-center'); ?></th></tr></thead>
+                        <tbody>
+                        <?php if ($rows === []) : ?>
+                            <tr><td colspan="7"><?php esc_html_e('No privacy requests have been dispatched.', 'sabri-security-center'); ?></td></tr>
+                        <?php else : foreach ($rows as $row) : ?>
+                            <tr>
+                                <td><code><?php echo esc_html((string) ($row['request_uuid'] ?? '')); ?></code></td>
+                                <td><?php echo esc_html((string) ($row['requester_user_id'] ?? '')); ?></td>
+                                <td><?php echo esc_html((string) ($row['request_type'] ?? '')); ?></td>
+                                <td><?php echo esc_html((string) ($row['status'] ?? '')); ?></td>
+                                <td><?php echo esc_html((string) ($row['jurisdiction'] ?? '')); ?></td>
+                                <td><?php echo esc_html((string) ($row['due_at'] ?? '')); ?></td>
+                                <td><?php echo esc_html((string) ($row['updated_at'] ?? '')); ?></td>
+                            </tr>
+                        <?php endforeach; endif; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+        <?php
+    }
+
+    private function assertCapability(string $capability, string $message): void
+    {
+        if (! current_user_can($capability)) {
+            wp_die(esc_html__($message, 'sabri-security-center'));
+        }
+    }
+
+    /** @return array<string,mixed> */
+    private function postData(): array
+    {
+        return is_array($_POST) ? wp_unslash($_POST) : [];
+    }
+
+    private function redirect(string $type, string $message): void
+    {
+        set_transient(
+            'spcrc_privacy_notice_' . get_current_user_id(),
+            ['type' => $type === 'error' ? 'error' : 'success', 'message' => $message],
+            5 * MINUTE_IN_SECONDS
+        );
+        wp_safe_redirect(add_query_arg(['page' => 'sabri-security-privacy-requests'], admin_url('admin.php')));
+        exit;
+    }
+}
