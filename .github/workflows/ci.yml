@@ -22,10 +22,12 @@ jobs:
           php tests/run.php
           php tests/retention.php
           php tests/upgrade.php
+          php tests/boot-failure.php
           php tests/findings.php
           php tests/runtime.php
           php tests/privacy.php
           php tests/privacy-policy.php
+          php tests/privacy-verification.php
           php tests/privacy-recovery.php
           php tests/admin-assets.php
 
@@ -59,6 +61,8 @@ jobs:
       - name: Report cycle 7 source hashes
         run: |
           sha256sum \
+            MANIFEST.md \
+            docs/REVIEW-AND-CORRECTION-0.25.4-CYCLE-7.md \
             plugin/sabri-security-center/readme.txt \
             plugin/sabri-security-center/sabri-security-center.php \
             plugin/sabri-security-center/src/Admin/VerifiedPrivacyAdmin.php \
@@ -68,8 +72,11 @@ jobs:
             plugin/sabri-security-center/src/Privacy/PrivacyVerificationStore.php \
             plugin/sabri-security-center/src/Privacy/RequestDispatcher.php \
             plugin/sabri-security-center/src/Storage/Schema.php \
+            plugin/sabri-security-center/src/UpgradeManager.php \
+            tests/boot-failure.php \
             tests/privacy.php \
             tests/privacy-policy.php \
+            tests/privacy-verification.php \
             tests/run.php \
             tests/upgrade.php
 
