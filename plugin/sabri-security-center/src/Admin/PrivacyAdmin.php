@@ -21,6 +21,7 @@ final class PrivacyAdmin
     {
         add_action('admin_menu', [$this, 'menu']);
         add_action('admin_post_spcrc_dispatch_privacy_request', [$this, 'handleDispatch']);
+        add_action('admin_post_spcrc_retry_privacy_request', [$this, 'handleRetry']);
     }
 
     public function menu(): void
@@ -43,7 +44,7 @@ final class PrivacyAdmin
         $data = $this->postData();
         $requestType = isset($data['request_type']) ? sanitize_key((string) $data['request_type']) : '';
         $confirmation = isset($data['confirmation']) ? trim((string) $data['confirmation']) : '';
-        if ($requestType === 'deletion' && ! hash_equals('DISPATCH DELETION', strtoupper($confirmation))) {
+        if ($requestType === 'deletion' && ! hash_equals('DISPATCH DELETION', $confirmation)) {
             $this->redirect('error', 'Deletion dispatch requires the exact confirmation phrase: DISPATCH DELETION.');
         }
 
@@ -64,6 +65,22 @@ final class PrivacyAdmin
         $message = $ok
             ? sprintf('Privacy request was dispatched with status: %s.', $status)
             : sprintf('Privacy request was not fully dispatched. Status: %s; error: %s.', $status, (string) ($result['error'] ?? 'module-or-storage-failure'));
+        $this->redirect($ok ? 'success' : 'error', $message);
+    }
+
+    public function handleRetry(): void
+    {
+        $this->assertCapability('spcrc_manage_privacy_requests', 'You are not allowed to retry privacy requests.');
+        $data = $this->postData();
+        $requestUuid = isset($data['request_uuid']) ? sanitize_text_field((string) $data['request_uuid']) : '';
+        check_admin_referer('spcrc_retry_privacy_request_' . $requestUuid);
+
+        $result = $this->dispatcher->retry($requestUuid, get_current_user_id());
+        $status = isset($result['status']) ? (string) $result['status'] : 'failed';
+        $ok = ! empty($result['ok']);
+        $message = $ok
+            ? sprintf('Privacy request retry completed with status: %s.', $status)
+            : sprintf('Privacy request retry was not completed. Status: %s; error: %s.', $status, (string) ($result['error'] ?? 'module-or-storage-failure'));
         $this->redirect($ok ? 'success' : 'error', $message);
     }
 
@@ -126,19 +143,34 @@ final class PrivacyAdmin
                 <div class="spcrc-table-scroll">
                     <table class="widefat striped spcrc-data-table">
                         <caption class="screen-reader-text"><?php esc_html_e('Recent privacy-request orchestration metadata', 'sabri-security-center'); ?></caption>
-                        <thead><tr><th scope="col"><?php esc_html_e('Request', 'sabri-security-center'); ?></th><th scope="col"><?php esc_html_e('Subject', 'sabri-security-center'); ?></th><th scope="col"><?php esc_html_e('Type', 'sabri-security-center'); ?></th><th scope="col"><?php esc_html_e('Status', 'sabri-security-center'); ?></th><th scope="col"><?php esc_html_e('Jurisdiction', 'sabri-security-center'); ?></th><th scope="col"><?php esc_html_e('Due', 'sabri-security-center'); ?></th><th scope="col"><?php esc_html_e('Updated', 'sabri-security-center'); ?></th></tr></thead>
+                        <thead><tr><th scope="col"><?php esc_html_e('Request', 'sabri-security-center'); ?></th><th scope="col"><?php esc_html_e('Subject', 'sabri-security-center'); ?></th><th scope="col"><?php esc_html_e('Type', 'sabri-security-center'); ?></th><th scope="col"><?php esc_html_e('Status', 'sabri-security-center'); ?></th><th scope="col"><?php esc_html_e('Attempts', 'sabri-security-center'); ?></th><th scope="col"><?php esc_html_e('Last error', 'sabri-security-center'); ?></th><th scope="col"><?php esc_html_e('Next retry', 'sabri-security-center'); ?></th><th scope="col"><?php esc_html_e('Due', 'sabri-security-center'); ?></th><th scope="col"><?php esc_html_e('Updated', 'sabri-security-center'); ?></th><th scope="col"><?php esc_html_e('Action', 'sabri-security-center'); ?></th></tr></thead>
                         <tbody>
                         <?php if ($rows === []) : ?>
-                            <tr><td colspan="7"><?php esc_html_e('No privacy requests have been dispatched.', 'sabri-security-center'); ?></td></tr>
+                            <tr><td colspan="10"><?php esc_html_e('No privacy requests have been dispatched.', 'sabri-security-center'); ?></td></tr>
                         <?php else : foreach ($rows as $row) : ?>
                             <tr>
                                 <td><code><?php echo esc_html((string) ($row['request_uuid'] ?? '')); ?></code></td>
                                 <td><?php echo esc_html((string) ($row['requester_user_id'] ?? '')); ?></td>
                                 <td><?php echo esc_html((string) ($row['request_type'] ?? '')); ?></td>
                                 <td><?php echo esc_html((string) ($row['status'] ?? '')); ?></td>
-                                <td><?php echo esc_html((string) ($row['jurisdiction'] ?? '')); ?></td>
+                                <td><?php echo esc_html((string) ($row['dispatch_attempts'] ?? '0')); ?></td>
+                                <td><?php echo esc_html((string) ($row['last_error_code'] ?? '')); ?></td>
+                                <td><?php echo esc_html((string) ($row['next_retry_at'] ?? '')); ?></td>
                                 <td><?php echo esc_html((string) ($row['due_at'] ?? '')); ?></td>
                                 <td><?php echo esc_html((string) ($row['updated_at'] ?? '')); ?></td>
+                                <td>
+                                    <?php $rowStatus = (string) ($row['status'] ?? ''); ?>
+                                    <?php if (in_array($rowStatus, PrivacyRequestRepository::retryableStatuses(), true)) : ?>
+                                        <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+                                            <input type="hidden" name="action" value="spcrc_retry_privacy_request">
+                                            <input type="hidden" name="request_uuid" value="<?php echo esc_attr((string) ($row['request_uuid'] ?? '')); ?>">
+                                            <?php wp_nonce_field('spcrc_retry_privacy_request_' . (string) ($row['request_uuid'] ?? '')); ?>
+                                            <?php submit_button(__('Retry failed modules', 'sabri-security-center'), 'secondary small', 'submit', false); ?>
+                                        </form>
+                                    <?php else : ?>
+                                        <span aria-hidden="true">—</span><span class="screen-reader-text"><?php esc_html_e('No retry action available', 'sabri-security-center'); ?></span>
+                                    <?php endif; ?>
+                                </td>
                             </tr>
                         <?php endforeach; endif; ?>
                         </tbody>
