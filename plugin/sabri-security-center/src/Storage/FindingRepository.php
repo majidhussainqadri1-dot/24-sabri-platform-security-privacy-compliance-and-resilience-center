@@ -11,7 +11,6 @@ final class FindingRepository
     private const SEVERITIES = ['informational', 'low', 'medium', 'high', 'critical'];
     private const STATUSES = ['open', 'triaged', 'in-progress', 'resolved', 'accepted-risk', 'false-positive'];
     private const OPEN_STATUSES = ['open', 'triaged', 'in-progress'];
-    private const TERMINAL_STATUSES = ['resolved', 'accepted-risk', 'false-positive'];
     private const TRANSITIONS = [
         'open' => ['triaged', 'in-progress', 'resolved', 'false-positive'],
         'triaged' => ['in-progress', 'resolved', 'accepted-risk', 'false-positive'],
@@ -147,21 +146,17 @@ final class FindingRepository
         if (! in_array($status, self::TRANSITIONS[$currentStatus] ?? [], true)) {
             return new \WP_Error('spcrc_finding_transition_invalid', 'This finding status transition is not allowed.');
         }
-        if (in_array($status, self::TERMINAL_STATUSES, true) && $note === '') {
-            return new \WP_Error('spcrc_finding_note_required', 'A sanitized disposition note is required for a terminal status.');
+        if ($note === '') {
+            return new \WP_Error('spcrc_finding_note_required', 'A sanitized accountability note is required for every status transition.');
         }
         if ($status === 'accepted-risk' && (! function_exists('current_user_can') || ! current_user_can('spcrc_accept_critical_risk'))) {
             return new \WP_Error('spcrc_finding_risk_acceptance_forbidden', 'You are not allowed to accept security risk.');
         }
 
         $now = current_time('mysql', true);
-        $data = [
-            'status' => $status,
-            'updated_at' => $now,
-        ];
         $updated = $wpdb->update(
             $table,
-            $data,
+            ['status' => $status, 'updated_at' => $now],
             ['finding_uuid' => $findingUuid, 'status' => $currentStatus],
             ['%s', '%s'],
             ['%s', '%s']
@@ -182,7 +177,7 @@ final class FindingRepository
                 'finding_uuid' => $findingUuid,
                 'previous_status' => $currentStatus,
                 'new_status' => $status,
-                'disposition_note_hash' => $note === '' ? '' : hash('sha256', $note),
+                'accountability_note_hash' => hash('sha256', $note),
             ]
         );
         do_action('spcrc/security_finding_status_changed', $findingUuid, $currentStatus, $status);
