@@ -6,7 +6,7 @@ namespace Sabri\Platform\Security\Storage;
 
 final class Schema
 {
-    public const VERSION = '0.25.1';
+    public const VERSION = '0.25.2';
 
     /** @return true|\WP_Error */
     public static function install(): true|\WP_Error
@@ -118,12 +118,20 @@ final class Schema
             assigned_user_id bigint unsigned NULL,
             jurisdiction varchar(80) NOT NULL DEFAULT '',
             due_at datetime NULL,
+            module_results_json longtext NULL,
+            dispatch_attempts smallint unsigned NOT NULL DEFAULT 0,
+            lock_version bigint unsigned NOT NULL DEFAULT 0,
+            next_retry_at datetime NULL,
+            last_error_code varchar(120) NOT NULL DEFAULT '',
+            completed_at datetime NULL,
             created_at datetime NOT NULL,
             updated_at datetime NOT NULL,
             PRIMARY KEY  (id),
             UNIQUE KEY request_uuid (request_uuid),
             KEY status_due (status, due_at),
-            KEY requester_type (requester_user_id, request_type)
+            KEY status_retry (status, next_retry_at),
+            KEY requester_type (requester_user_id, request_type),
+            KEY updated_status (updated_at, status)
         ) {$charset};");
 
         dbDelta("CREATE TABLE {$tables['manifests']} (
