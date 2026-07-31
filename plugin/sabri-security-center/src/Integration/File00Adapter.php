@@ -67,18 +67,18 @@ final class File00Adapter
         if (in_array($type, ['access', 'portability'], true) && is_callable(['SMC_Security', 'export_personal_data'])) {
             return [
                 'ok' => true,
-                'status' => 'queued',
-                'reference' => 'wp-privacy-exporter:sabri-membership',
-                'message' => 'Native exporter is available; completion must be confirmed by the WordPress privacy workflow.',
+                'status' => 'pending',
+                'reference' => 'wp-privacy-exporter-available:sabri-membership',
+                'message' => 'Native exporter is available, but this adapter has not started the WordPress export workflow. An authorized operator must initiate and later confirm native completion.',
             ];
         }
 
         if ($type === 'deletion' && is_callable(['SMC_Security', 'erase_personal_data'])) {
             return [
                 'ok' => true,
-                'status' => 'queued',
-                'reference' => 'wp-privacy-eraser:sabri-membership',
-                'message' => 'Native eraser is available; completion must be confirmed by the WordPress privacy workflow.',
+                'status' => 'pending',
+                'reference' => 'wp-privacy-eraser-available:sabri-membership',
+                'message' => 'Native eraser is available, but this adapter has not started the WordPress erasure workflow. An authorized operator must initiate and later confirm native completion.',
             ];
         }
 
