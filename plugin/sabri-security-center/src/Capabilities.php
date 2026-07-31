@@ -42,6 +42,11 @@ final class Capabilities
         }
     }
 
+    public static function registerHooks(): void
+    {
+        add_action('init', [self::class, 'register'], 1);
+    }
+
     /**
      * File 24 deliberately does not auto-grant operational security capabilities
      * to the Founder or any other identity label. Delegation must be explicit,
