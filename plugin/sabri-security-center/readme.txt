@@ -4,14 +4,14 @@ Tags: security, privacy, compliance, resilience, audit
 Requires at least: 6.5
 Tested up to: 7.0
 Requires PHP: 8.0
-Stable tag: 0.25.1
+Stable tag: 0.25.2
 License: GPLv2 or later
 
 Central governance and assurance control plane for the Sabri Social Homeopathy Platform.
 
 == Description ==
 
-Foundation 0.25.1 provides a private Security Center dashboard, bounded module manifests and audit events, risk/incident/control foundations, a private security-findings triage interface, durable and replay-resistant privacy-request orchestration, private privacy operations, advisory security-state requests, system checks, non-destructive repair, and sanitized REST status/Trust Center payloads.
+Foundation 0.25.2 provides a private Security Center dashboard, bounded module manifests and audit events, risk/incident/control foundations, a private security-findings triage interface, durable and replay-resistant privacy-request orchestration, private privacy operations, advisory security-state requests, system checks, non-destructive repair, and sanitized REST status/Trust Center payloads.
 
 It does not replace native-module authorization, File 00 identity, File 20 enforcement, hosting security, legal counsel, backups, or independent security testing.
 
@@ -27,6 +27,13 @@ It does not replace native-module authorization, File 00 identity, File 20 enfor
 8. Run Security Center checks and the non-destructive repair only when needed.
 
 == Changelog ==
+
+= 0.25.2 =
+* Added durable per-module privacy result evidence and optimistic request locking.
+* Added native-module completion callbacks with truthful request-level closure.
+* Added bounded retries that never replay completed or pending module operations.
+* Added stale-dispatch detection and hourly recovery scanning.
+* Added private retry controls and exact deletion confirmation enforcement.
 
 = 0.25.1 =
 * Hardened privacy dispatch with durable pre-operation records, replay resistance, truthful pending/completed aggregation and recovery-required evidence.
