@@ -24,6 +24,12 @@ final class Capabilities
         ];
     }
 
+    /** @return string[] */
+    public static function autoGranted(): array
+    {
+        return array_values(array_diff(self::all(), ['spcrc_accept_critical_risk']));
+    }
+
     public static function install(): void
     {
         $administrator = get_role('administrator');
@@ -31,7 +37,7 @@ final class Capabilities
             return;
         }
 
-        foreach (self::all() as $capability) {
+        foreach (self::autoGranted() as $capability) {
             $administrator->add_cap($capability);
         }
     }
