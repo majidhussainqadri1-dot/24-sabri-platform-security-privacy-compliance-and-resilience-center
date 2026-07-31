@@ -54,6 +54,9 @@ jobs:
             exit 1
           fi
 
+      - name: Report corrected foundation test hash
+        run: sha256sum tests/run.php
+
       - name: Verify source checksums except workflow self-hash
         shell: bash
         run: |
