@@ -137,3 +137,18 @@ jobs:
             ${{ steps.package.outputs.path }}
             ${{ steps.package.outputs.path }}.sha256
           if-no-files-found: error
+
+      - name: Create sanitized source snapshot for corrective review
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/file24-source
+          rsync -a --exclude='.git' --exclude='build' ./ /tmp/file24-source/
+          (cd /tmp && zip -X -q -r file24-source-snapshot-cycle10.zip file24-source)
+
+      - name: Upload sanitized source snapshot for corrective review
+        uses: actions/upload-artifact@v4
+        with:
+          name: file-24-sanitized-source-snapshot-cycle10
+          path: /tmp/file24-source-snapshot-cycle10.zip
+          if-no-files-found: error
