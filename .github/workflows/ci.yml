@@ -3,21 +3,31 @@ name: Foundation Integrity
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, feature/foundation-0.25.0]
 
 permissions:
   contents: read
 
 jobs:
   foundation-integrity:
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.0', '8.3']
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
+      - name: Set up PHP ${{ matrix.php }}
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          coverage: none
+
       - name: Lint PHP files
         run: find plugin tests -type f -name '*.php' -print0 | xargs -0 -n1 php -l
 
-      - name: Run foundation and adversarial contract tests
+      - name: Run foundation, correction and fresh adversarial suites
         run: |
           php tests/run.php
           php tests/retention.php
@@ -33,6 +43,12 @@ jobs:
           php tests/admin-assets.php
           php tests/cycle9.php
           php tests/plugin-boot-cycle9.php
+          php tests/governance.php
+          php tests/cycle12-adversarial.php
+          php tests/cycle13-exhaustive.php
+          php tests/cycle14-extraordinary.php
+          php tests/cycle15-illuminative.php
+          php tests/cycle16-closure.php
 
       - name: Reject common secret material
         shell: bash
@@ -47,12 +63,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          grep -q 'Version:     0.25.6' plugin/sabri-security-center/sabri-security-center.php
-          grep -q "define('SPCRC_VERSION', '0.25.6')" plugin/sabri-security-center/sabri-security-center.php
-          grep -q "public const VERSION = '0.25.4'" plugin/sabri-security-center/src/Storage/Schema.php
-          grep -q 'Stable tag: 0.25.6' plugin/sabri-security-center/readme.txt
-          grep -q 'spcrc_assurance_records' plugin/sabri-security-center/src/Storage/Schema.php
-          grep -q 'spcrc_manage_assurance' plugin/sabri-security-center/src/Capabilities.php
+          grep -q 'Version:     0.25.7' plugin/sabri-security-center/sabri-security-center.php
+          grep -q "define('SPCRC_VERSION', '0.25.7')" plugin/sabri-security-center/sabri-security-center.php
+          grep -q "public const VERSION = '0.25.5'" plugin/sabri-security-center/src/Storage/Schema.php
+          grep -q 'Stable tag: 0.25.7' plugin/sabri-security-center/readme.txt
+          grep -q 'spcrc_governance_decisions' plugin/sabri-security-center/src/Storage/Schema.php
+          grep -q 'spcrc_approve_governance_decision' plugin/sabri-security-center/src/Capabilities.php
+          grep -q 'spcrc_accept_critical_risk' plugin/sabri-security-center/src/Capabilities.php
 
       - name: Verify corrective source contracts
         shell: bash
@@ -60,21 +77,31 @@ jobs:
           set -euo pipefail
           ! grep -F '$wpdb->replace' plugin/sabri-security-center/src/Registry/ModuleRegistry.php
           ! grep -F '$repair->registerHooks()' plugin/sabri-security-center/src/Plugin.php
-          ! grep -F '$risks->registerHooks()' plugin/sabri-security-center/src/Plugin.php
-          ! grep -F '$incidents->registerHooks()' plugin/sabri-security-center/src/Plugin.php
-          ! grep -F '$controls->registerHooks()' plugin/sabri-security-center/src/Plugin.php
           ! grep -RInE 'add_(action|filter)\(.spcrc/(upsert|write|save)_assurance' plugin/sabri-security-center/src
           grep -q 'Schema::verify()' plugin/sabri-security-center/src/UpgradeManager.php
+          grep -q "spcrc_downgrade_blocked" plugin/sabri-security-center/src/UpgradeManager.php
+          grep -q "spcrc/authorize_security_state_request" plugin/sabri-security-center/src/Registry/SecurityStateRegistry.php
+          grep -q "governance_audit_gap_reconciled" plugin/sabri-security-center/src/Storage/GovernanceRepository.php
+          grep -q 'private ?AuditLogger $audit' plugin/sabri-security-center/src/Storage/IncidentRepository.php
+          grep -q 'private ?AuditLogger $audit' plugin/sabri-security-center/src/Storage/ControlRepository.php
+          grep -q 'spcrc_assurance_audit_failed' plugin/sabri-security-center/src/Storage/AssuranceRepository.php
+          grep -q 'normalizeBackupEvidence' plugin/sabri-security-center/src/Storage/AssuranceRepository.php
+          grep -q "'audit_gaps'" plugin/sabri-security-center/src/System/SystemCheck.php
+          ! grep -RInE --include='*.php' ':[[:space:]]*never\b' plugin tests
+          ! grep -RInE --include='*.php' '(^|[^A-Za-z0-9_])true[[:space:]]*\|' plugin tests
+          ! grep -RIn --include='*.php' 'array_is_list(' plugin tests
 
       - name: Verify SPDX and license inventory
         run: |
-          php -r '$d=json_decode(file_get_contents("plugin/sabri-security-center/SBOM.spdx.json"), true, 512, JSON_THROW_ON_ERROR); if (($d["spdxVersion"] ?? "") !== "SPDX-2.3") { exit(1); }'
+          php -r '$d=json_decode(file_get_contents("plugin/sabri-security-center/SBOM.spdx.json"), true, 512, JSON_THROW_ON_ERROR); if (($d["spdxVersion"] ?? "") !== "SPDX-2.3" || ($d["packages"][0]["versionInfo"] ?? "") !== "0.25.7") { exit(1); }'
           grep -q 'GPL-2.0-or-later' plugin/sabri-security-center/LICENSES.md
 
-      - name: Reject self-mutating source workflows and staged source bundles
+      - name: Reject self-mutating workflows and staged source bundles
         shell: bash
         run: |
           set -euo pipefail
+          test ! -d handoff
+          test ! -f .github/workflows/materialize-file24-cycle12.yml
           test ! -f .github/workflows/apply-cycle2.yml
           test ! -f tools/cycle2-source.ready
           ! find tools -maxdepth 1 -type f -name 'cycle2-bundle.part-*' -print -quit | grep -q .
@@ -82,27 +109,46 @@ jobs:
             exit 1
           fi
 
-      - name: Report Cycle 9 source hashes
+      - name: Report Cycle 16 reviewed source hashes
         run: |
           sha256sum \
             MANIFEST.md \
-            docs/REVIEW-AND-CORRECTION-0.25.6-CYCLE-9.md \
+            docs/REVIEW-AND-CORRECTION-0.25.7-CYCLE-12.md \
+            docs/REVIEW-AND-CORRECTION-0.25.7-CYCLE-13.md \
+            docs/EXTRAORDINARY-REVIEW-AND-CORRECTION-0.25.7-CYCLE-14.md \
+            docs/ILLUMINATIVE-REVIEW-AND-CORRECTION-0.25.7-CYCLE-15.md \
+            docs/FINAL-CLOSURE-REVIEW-AND-CORRECTION-0.25.7-CYCLE-16.md \
+            docs/REQUIREMENTS-TRACEABILITY-0.25.7.md \
+            docs/RELEASE-RECEIPT-0.25.7.md \
             plugin/sabri-security-center/readme.txt \
             plugin/sabri-security-center/sabri-security-center.php \
             plugin/sabri-security-center/SBOM.spdx.json \
             plugin/sabri-security-center/LICENSES.md \
+            plugin/sabri-security-center/uninstall.php \
             plugin/sabri-security-center/src/Activation.php \
-            plugin/sabri-security-center/src/Admin/AssuranceAdmin.php \
+            plugin/sabri-security-center/src/Capabilities.php \
             plugin/sabri-security-center/src/Plugin.php \
-            plugin/sabri-security-center/src/Privacy/PrivacyRequestPolicy.php \
-            plugin/sabri-security-center/src/Registry/ModuleRegistry.php \
-            plugin/sabri-security-center/src/Storage/AssuranceRepository.php \
-            plugin/sabri-security-center/src/Storage/Schema.php \
-            plugin/sabri-security-center/src/System/Repair.php \
-            plugin/sabri-security-center/src/System/SystemCheck.php \
             plugin/sabri-security-center/src/UpgradeManager.php \
-            tests/activation-cycle9.php \
-            tests/cycle9.php \
+            plugin/sabri-security-center/src/Admin/GovernanceAdmin.php \
+            plugin/sabri-security-center/src/Integration/File00Adapter.php \
+            plugin/sabri-security-center/src/Registry/ModuleRegistry.php \
+            plugin/sabri-security-center/src/Registry/SecurityStateRegistry.php \
+            plugin/sabri-security-center/src/Storage/AuditLogger.php \
+            plugin/sabri-security-center/src/Storage/AuditGapStore.php \
+            plugin/sabri-security-center/src/Storage/ControlRepository.php \
+            plugin/sabri-security-center/src/Storage/FindingRepository.php \
+            plugin/sabri-security-center/src/Storage/GovernanceRepository.php \
+            plugin/sabri-security-center/src/Storage/IncidentRepository.php \
+            plugin/sabri-security-center/src/Storage/RiskRepository.php \
+            plugin/sabri-security-center/src/Storage/Schema.php \
+            plugin/sabri-security-center/src/System/SystemCheck.php \
+            tests/bootstrap.php \
+            tests/governance.php \
+            tests/cycle12-adversarial.php \
+            tests/cycle13-exhaustive.php \
+            tests/cycle14-extraordinary.php \
+            tests/cycle15-illuminative.php \
+            tests/cycle16-closure.php \
             tests/plugin-boot-cycle9.php \
             tests/run.php \
             tests/upgrade.php
@@ -130,25 +176,28 @@ jobs:
           echo "path=$PACKAGE_TWO" >> "$GITHUB_OUTPUT"
 
       - name: Upload reviewed plugin package
+        if: matrix.php == '8.3'
         uses: actions/upload-artifact@v4
         with:
-          name: file-24-security-center-0.25.6
+          name: file-24-security-center-0.25.7
           path: |
             ${{ steps.package.outputs.path }}
             ${{ steps.package.outputs.path }}.sha256
           if-no-files-found: error
 
       - name: Create sanitized source snapshot for corrective review
+        if: matrix.php == '8.3'
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p /tmp/file24-source
           rsync -a --exclude='.git' --exclude='build' ./ /tmp/file24-source/
-          (cd /tmp && zip -X -q -r file24-source-snapshot-cycle10.zip file24-source)
+          (cd /tmp && zip -X -q -r file24-source-snapshot-cycle16.zip file24-source)
 
       - name: Upload sanitized source snapshot for corrective review
+        if: matrix.php == '8.3'
         uses: actions/upload-artifact@v4
         with:
-          name: file-24-sanitized-source-snapshot-cycle10
-          path: /tmp/file24-source-snapshot-cycle10.zip
+          name: file-24-sanitized-source-snapshot-cycle16
+          path: /tmp/file24-source-snapshot-cycle16.zip
           if-no-files-found: error
