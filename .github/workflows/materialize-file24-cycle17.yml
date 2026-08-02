@@ -28,7 +28,7 @@ jobs:
         id: pending
         shell: bash
         run: |
-          if [ -f cycle17/file24-cycle17.patch.bz2 ]; then
+          if [ -f cycle17/part-00.bz2part ]; then
             echo "present=true" >> "$GITHUB_OUTPUT"
           else
             echo "present=false" >> "$GITHUB_OUTPUT"
@@ -47,8 +47,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          echo "adfe08054e531dc438129793ca7ee685cca070c438a46f70b5959da1b1ec1675  cycle17/file24-cycle17.patch.bz2" | sha256sum -c -
-          bunzip2 -c cycle17/file24-cycle17.patch.bz2 > /tmp/file24-cycle17.patch
+          echo "955d5dc847dedcb0fea3ca1d643678496773c10f5dc0a4d11ed5a7ef0ca6804d  cycle17/part-00.bz2part" | sha256sum -c -
+          echo "cb960479ed5ccc1060c4270a72b2d4440f6e137c8b15a446b6d976c83e2772e2  cycle17/part-01.bz2part" | sha256sum -c -
+          echo "13b772d3d60ac62d5dcf2e2102f0cc719ebcc68c11c8f94e3864a7abdcae8ebd  cycle17/part-02.bz2part" | sha256sum -c -
+          echo "9ca9121834fdf3b0c7b872b7c7225fe7a9cfa154aca3bdcac4686841bd31f939  cycle17/part-03.bz2part" | sha256sum -c -
+          cat cycle17/part-*.bz2part > /tmp/file24-cycle17.patch.bz2
+          echo "adfe08054e531dc438129793ca7ee685cca070c438a46f70b5959da1b1ec1675  /tmp/file24-cycle17.patch.bz2" | sha256sum -c -
+          bunzip2 -c /tmp/file24-cycle17.patch.bz2 > /tmp/file24-cycle17.patch
           echo "6a98dc70d5d8b40de4a22cae496a8c5463859fe89edd3193a6d7885de0750d5f  /tmp/file24-cycle17.patch" | sha256sum -c -
           patch -p1 --batch --forward < /tmp/file24-cycle17.patch
           rm -rf cycle17 .github/workflows/materialize-file24-cycle17.yml
