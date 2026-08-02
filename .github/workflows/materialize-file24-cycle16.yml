@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - codex/file-24-final-plan-v3-0.25.7
+  pull_request:
+    branches:
+      - feature/foundation-0.25.0
 
 permissions:
   contents: write
