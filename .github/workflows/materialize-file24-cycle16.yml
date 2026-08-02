@@ -53,6 +53,7 @@ jobs:
           bunzip2 -c /tmp/file24-cycle16.patch.bz2 > /tmp/file24-cycle16.patch
           echo "f49068a8ffa9239c7e351e4b14727db7f26e3f81546c919563bf03c0b23e4c1e  /tmp/file24-cycle16.patch" | sha256sum -c -
           patch -p1 --batch --forward < /tmp/file24-cycle16.patch
+          git checkout HEAD -- .github/workflows/ci.yml
           rm -rf handoff
 
       - name: Normalize reviewed documentation and checksums
