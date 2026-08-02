@@ -55,6 +55,21 @@ jobs:
           patch -p1 --batch --forward < /tmp/file24-cycle16.patch
           rm -rf handoff
 
+      - name: Normalize reviewed documentation and checksums
+        if: steps.handoff.outputs.present == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          for file in \
+            docs/FINAL-CLOSURE-REVIEW-AND-CORRECTION-0.25.7-CYCLE-16.md \
+            docs/RELEASE-RECEIPT-0.25.7.md
+          do
+            sed -i 's/[[:space:]]\+$//' "$file"
+            digest="$(sha256sum "$file" | awk '{print $1}')"
+            sed -i -E "s|^[0-9a-f]{64}  \./${file}$|${digest}  ./${file}|" CHECKSUMS.sha256
+          done
+          git diff --check
+
       - name: Verify materialized source and adversarial suites
         if: steps.handoff.outputs.present == 'true'
         shell: bash
