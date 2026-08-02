@@ -4,14 +4,14 @@ Tags: security, privacy, compliance, resilience, audit
 Requires at least: 6.5
 Tested up to: 7.0
 Requires PHP: 8.0
-Stable tag: 0.25.6
+Stable tag: 0.25.7
 License: GPLv2 or later
 
 Central governance and assurance control plane for the Sabri Social Homeopathy Platform.
 
 == Description ==
 
-Foundation 0.25.6 provides a private Security Center dashboard, bounded module manifests and audit events, risk/incident/control foundations, a private security-findings triage interface, durable and replay-resistant privacy-request orchestration, bounded retry policy and reconciliation operations, verified privacy intake, fail-closed upgrade integrity, advisory security-state requests, system checks, non-destructive repair, and sanitized REST status/Trust Center payloads.
+Foundation 0.25.7 provides a private Security Center dashboard, bounded module manifests and audit events, risk/incident/control foundations, a private security-findings triage interface, durable and replay-resistant privacy-request orchestration, bounded retry policy and reconciliation operations, verified privacy intake, fail-closed upgrade integrity, advisory security-state requests, system checks, non-destructive repair, and sanitized REST status/Trust Center payloads.
 
 It does not replace native-module authorization, File 00 identity, File 20 enforcement, hosting security, legal counsel, backups, or independent security testing.
 
@@ -28,19 +28,20 @@ It does not replace native-module authorization, File 00 identity, File 20 enfor
 
 == Changelog ==
 
-= 0.25.6 =
+= 0.25.7 =
+* Added a bounded governance-decision registry with independent requester/approver identities, File 00 step-up, expiry, optimistic concurrency and exact subject binding.
+* Added independently keyed governance audit gaps and a separation-, capability- and step-up-protected reconciliation workflow.
+* Bound critical risk and finding risk acceptance to current approved governance decisions and automatic expiry reopening.
+* Added audit-atomic incident, control, risk and finding mutations; failed audit writes roll back canonical changes or emit a targeted reconciliation marker.
+* Hardened Security State requests with explicit authorization, sensitive-reason rejection, duplicate suppression, 24-hour expiry, mutation locking and audit rollback.
+* Added schema 0.25.5 with nine owned tables, governed-column verification, migration locking and unsafe-downgrade prevention.
 * Added a bounded private Assurance Registry for compliance applicability, vendor review and backup/restore evidence metadata.
-* Added the `spcrc_manage_assurance` capability and nonce-protected assurance administration workflow.
-* Required final compliance/vendor determinations and verified backups to include bounded review evidence.
-* Rejected credentials, contact data, identity-number patterns, URLs and storage paths from assurance notes.
-* Minimized backup evidence adapter output and required chronological backup/restore evidence.
-* Rejected malformed privacy verification evidence before a canonical request row is created.
-* Replaced destructive manifest replacement with persisted identity binding, guarded insert/update and concurrency detection.
-* Added same-version schema verification before normal runtime boot.
+* Expanded module manifests with contract version, canonical owners, opaque evidence source, degraded behavior and release gate.
+* Rejected credentials, contact data, identity-number patterns, URLs and storage paths from bounded evidence and accountability metadata.
 * Required retention and privacy-recovery schedules during activation, upgrade and repair; failed activation removes partial schedules.
-* Corrected successful plugin boot calls to remove nonexistent repository/repair hook methods.
-* Preserved structured upgrade failure details in System Checks.
-* Added successful-boot, activation, assurance and adversarial regression tests plus SPDX/license evidence.
+* Added complete uninstall capability cleanup while preserving evidence tables by default.
+* Added bounded independently keyed audit-gap storage across canonical, privacy, retention, recovery, repair and automated-expiry paths; missing audit evidence now blocks release and cannot be reported as successful; generic gaps have a step-up- and evidence-gated private reconciliation path.
+* Added Cycle 12–16 fresh/adversarial reviews, corrected PHP 8.0 syntax compatibility, strict authorization-filter booleans, audit-atomic assurance writes, minimized backup evidence, audit-gap System Checks, PHP 8.0/8.3 CI, secret scanning, SPDX/license evidence, checksums and deterministic package parity.
 
 = 0.25.4 =
 * Added explicit identity-and-authority verification evidence before privacy dispatch.

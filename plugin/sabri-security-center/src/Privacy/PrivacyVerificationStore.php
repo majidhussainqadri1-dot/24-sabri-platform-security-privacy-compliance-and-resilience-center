@@ -51,9 +51,9 @@ final class PrivacyVerificationStore
     }
 
     /** @param array<string,mixed> $evidence
-     *  @return true|\WP_Error
+     *  @return bool|\WP_Error
      */
-    public function persist(string $requestUuid, array $evidence): true|\WP_Error
+    public function persist(string $requestUuid, array $evidence): bool|\WP_Error
     {
         global $wpdb;
 

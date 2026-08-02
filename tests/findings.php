@@ -5,6 +5,7 @@ declare(strict_types=1);
 const ARRAY_A = 'ARRAY_A';
 $GLOBALS['filters'] = [];
 $GLOBALS['caps'] = [];
+$GLOBALS['options'] = [];
 
 final class WP_Error
 {
@@ -26,11 +27,13 @@ function get_current_user_id(): int { return 7; }
 function current_user_can(string $capability): bool { return ! empty($GLOBALS['caps'][$capability]); }
 function absint(mixed $value): int { return abs((int) $value); }
 function is_wp_error(mixed $value): bool { return $value instanceof WP_Error; }
+function get_option(string $key, mixed $default = false): mixed { return $GLOBALS['options'][$key] ?? $default; }
 
 final class FindingWpdb
 {
     public string $prefix = 'wp_';
     public array $findings = [];
+    public array $governance = [];
     public bool $failWrite = false;
     public bool $concurrentChange = false;
 
@@ -56,6 +59,7 @@ final class FindingWpdb
     {
         if (! is_array($prepared)) return null;
         $uuid = (string) ($prepared['args'][0] ?? '');
+        if (str_contains((string) ($prepared['query'] ?? ''), 'spcrc_governance_decisions')) return $this->governance[$uuid] ?? null;
         return $this->findings[$uuid] ?? null;
     }
 
@@ -81,9 +85,11 @@ final class FindingWpdb
 $GLOBALS['wpdb'] = new FindingWpdb();
 
 require_once dirname(__DIR__) . '/plugin/sabri-security-center/src/Support/Sanitizer.php';
+require_once dirname(__DIR__) . '/plugin/sabri-security-center/src/Storage/GovernanceRepository.php';
 require_once dirname(__DIR__) . '/plugin/sabri-security-center/src/Storage/FindingRepository.php';
 
 use Sabri\Platform\Security\Storage\FindingRepository;
+use Sabri\Platform\Security\Storage\GovernanceRepository;
 
 function expectFinding(bool $condition, string $message): void
 {
@@ -93,7 +99,8 @@ function expectFinding(bool $condition, string $message): void
     }
 }
 
-$repository = new FindingRepository();
+$governance = new GovernanceRepository();
+$repository = new FindingRepository(null, $governance);
 $invalid = $repository->create(['module_key' => 'file-03']);
 expectFinding(is_wp_error($invalid), 'Finding without a title must be rejected.');
 
@@ -124,7 +131,24 @@ $forbidden = $repository->setStatus($uuid, 'accepted-risk', ['expected_status' =
 expectFinding(is_wp_error($forbidden) && $forbidden->get_error_code() === 'spcrc_finding_risk_acceptance_forbidden', 'Risk acceptance must require separate capability.');
 
 $GLOBALS['caps']['spcrc_accept_critical_risk'] = true;
-expectFinding($repository->setStatus($uuid, 'accepted-risk', ['expected_status' => 'triaged', 'note' => 'Approved exception']) === true, 'Authorized risk acceptance must succeed.');
+$decisionUuid = '22222222-2222-4222-8222-222222222222';
+$GLOBALS['wpdb']->governance[$decisionUuid] = [
+    'decision_uuid' => $decisionUuid,
+    'decision_type' => 'finding-risk-acceptance',
+    'subject_key' => $uuid,
+    'module_key' => 'file03',
+    'status' => 'approved',
+    'requester_user_id' => 8,
+    'approver_user_id' => 7,
+    'evidence_ref' => 'vault:finding-exception',
+    'rationale_hash' => hash('sha256', 'Approved'),
+    'requested_at' => gmdate('Y-m-d H:i:s', time() - 3600),
+    'expires_at' => gmdate('Y-m-d H:i:s', time() + 3600),
+    'decided_at' => gmdate('Y-m-d H:i:s'),
+    'revoked_at' => null,
+    'lock_version' => 1,
+];
+expectFinding($repository->setStatus($uuid, 'accepted-risk', ['expected_status' => 'triaged', 'note' => 'Approved exception', 'decision_uuid' => $decisionUuid]) === true, 'Authorized and governance-bound risk acceptance must succeed.');
 expectFinding($repository->openCount() === 0, 'Accepted-risk findings must leave the open count.');
 expectFinding($repository->setStatus($uuid, 'triaged', ['expected_status' => 'accepted-risk', 'note' => 'Risk reopened']) === true, 'Terminal finding must be explicitly reopenable to triage.');
 

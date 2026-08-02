@@ -71,7 +71,7 @@ final class AssuranceRepository
             return new \WP_Error('spcrc_assurance_owner_invalid', 'A valid assurance owner is required.');
         }
 
-        $evidenceRef = $this->opaqueReference($data['evidence_ref'] ?? '');
+        $evidenceRef = Sanitizer::opaqueReference($data['evidence_ref'] ?? '');
         $rawEvidenceRef = Sanitizer::text($data['evidence_ref'] ?? '', 255);
         if ($rawEvidenceRef !== '' && $evidenceRef === '') {
             return new \WP_Error(
@@ -81,7 +81,7 @@ final class AssuranceRepository
         }
 
         $notes = Sanitizer::text($data['notes'] ?? '', 500);
-        if ($this->containsSensitiveMaterial($notes)) {
+        if (Sanitizer::containsSensitiveMaterial($notes)) {
             return new \WP_Error(
                 'spcrc_assurance_notes_sensitive',
                 'Assurance notes appear to contain credentials, personal contact data, an identity number, a URL or a storage path.'
@@ -116,6 +116,11 @@ final class AssuranceRepository
                 'spcrc_assurance_determination_evidence_missing',
                 'A final assurance determination requires a completed review timestamp and an opaque evidence reference.'
             );
+        }
+        $timeBoundDetermination = ($type === 'compliance' && in_array($status, ['applicable', 'not-applicable'], true))
+            || ($type === 'vendor' && in_array($status, ['approved', 'restricted'], true));
+        if ($timeBoundDetermination && $nextReviewAt === null) {
+            return new \WP_Error('spcrc_assurance_next_review_missing', 'Current compliance and vendor determinations require a future review date.');
         }
 
         if ($type !== 'backup') {
@@ -165,7 +170,8 @@ final class AssuranceRepository
         }
 
         $table = $wpdb->prefix . 'spcrc_assurance_records';
-        $existing = $this->get($type, $key);
+        $existingRaw = $this->getRaw($type, $key);
+        $existing = is_array($existingRaw) ? $this->normalizeRow($existingRaw) : null;
         $now = current_time('mysql', true);
         $payload = [
             'title' => $title,
@@ -230,11 +236,23 @@ final class AssuranceRepository
             }
         }
 
-        $this->recordAudit('assurance_record_saved', $type, 'completed', 'informational', [
+        $auditResult = $this->recordAudit('assurance_record_saved', $type, 'completed', 'informational', [
             'record_uuid' => $recordUuid,
             'record_key' => $key,
             'status' => $status,
         ]);
+        if (is_wp_error($auditResult)) {
+            $rolledBack = is_array($existingRaw)
+                ? $this->restoreRaw($table, $existingRaw)
+                : $wpdb->delete($table, ['record_uuid' => $recordUuid], ['%s']) !== false;
+            if (! $rolledBack) {
+                $this->recordAuditGap($recordUuid, 'assurance_audit_rollback_failed');
+            }
+            return new \WP_Error(
+                'spcrc_assurance_audit_failed',
+                'Assurance record was not accepted because its audit evidence could not be stored.'
+            );
+        }
         return $recordUuid;
     }
 
@@ -249,14 +267,7 @@ final class AssuranceRepository
             return null;
         }
 
-        $row = $wpdb->get_row(
-            $wpdb->prepare(
-                "SELECT * FROM {$wpdb->prefix}spcrc_assurance_records WHERE record_type = %s AND record_key = %s",
-                $type,
-                $key
-            ),
-            ARRAY_A
-        );
+        $row = $this->getRaw($type, $key);
         return is_array($row) ? $this->normalizeRow($row) : null;
     }
 
@@ -321,30 +332,25 @@ final class AssuranceRepository
      */
     public function backupEvidence(mixed $upstream): array
     {
-        if (is_array($upstream)) {
-            $last = Sanitizer::isoTime($upstream['last_success_at'] ?? '');
-            $restore = Sanitizer::isoTime($upstream['restore_tested_at'] ?? '');
-            if ($last !== '' && $restore !== '') {
-                return [
-                    'status' => 'verified',
-                    'last_success_at' => $last,
-                    'restore_tested_at' => $restore,
-                    'evidence_ref' => $this->opaqueReference($upstream['evidence_ref'] ?? ''),
-                ];
-            }
+        $upstreamEvidence = $this->normalizeBackupEvidence(is_array($upstream) ? $upstream : []);
+        if (($upstreamEvidence['status'] ?? '') === 'verified') {
+            return $upstreamEvidence;
         }
 
         $record = $this->latestVerifiedBackup();
-        if ($record === null) {
-            return is_array($upstream) ? $upstream : [];
+        if (is_array($record)) {
+            $storedEvidence = $this->normalizeBackupEvidence([
+                'status' => $record['status'] ?? '',
+                'last_success_at' => $record['backup_completed_at'] ?? '',
+                'restore_tested_at' => $record['restore_tested_at'] ?? '',
+                'evidence_ref' => $record['evidence_ref'] ?? '',
+            ]);
+            if (($storedEvidence['status'] ?? '') === 'verified') {
+                return $storedEvidence;
+            }
         }
 
-        return [
-            'status' => 'verified',
-            'last_success_at' => Sanitizer::isoTime($record['backup_completed_at'] ?? ''),
-            'restore_tested_at' => Sanitizer::isoTime($record['restore_tested_at'] ?? ''),
-            'evidence_ref' => Sanitizer::text($record['evidence_ref'] ?? '', 255),
-        ];
+        return $upstreamEvidence;
     }
 
     /** @return array<string,mixed>|null */
@@ -357,6 +363,117 @@ final class AssuranceRepository
             ARRAY_A
         );
         return is_array($row) ? $this->normalizeRow($row) : null;
+    }
+
+    /** @return array<string,mixed>|null */
+    private function getRaw(string $type, string $key): ?array
+    {
+        global $wpdb;
+
+        $row = $wpdb->get_row(
+            $wpdb->prepare(
+                "SELECT * FROM {$wpdb->prefix}spcrc_assurance_records WHERE record_type = %s AND record_key = %s",
+                $type,
+                $key
+            ),
+            ARRAY_A
+        );
+        return is_array($row) ? $row : null;
+    }
+
+    /** @param array<string,mixed> $row */
+    private function restoreRaw(string $table, array $row): bool
+    {
+        global $wpdb;
+
+        $recordUuid = Sanitizer::uuid($row['record_uuid'] ?? '');
+        $type = Sanitizer::key($row['record_type'] ?? '', 40);
+        $key = Sanitizer::key($row['record_key'] ?? '', 120);
+        if ($recordUuid === '' || ! in_array($type, self::TYPES, true) || $key === '') {
+            return false;
+        }
+
+        $payload = [
+            'title' => (string) ($row['title'] ?? ''),
+            'status' => (string) ($row['status'] ?? ''),
+            'owner_user_id' => isset($row['owner_user_id']) ? (int) $row['owner_user_id'] : null,
+            'jurisdiction' => (string) ($row['jurisdiction'] ?? ''),
+            'data_classes_json' => (string) ($row['data_classes_json'] ?? '[]'),
+            'evidence_ref' => (string) ($row['evidence_ref'] ?? ''),
+            'notes' => (string) ($row['notes'] ?? ''),
+            'reviewed_at' => $row['reviewed_at'] ?? null,
+            'next_review_at' => $row['next_review_at'] ?? null,
+            'backup_completed_at' => $row['backup_completed_at'] ?? null,
+            'restore_tested_at' => $row['restore_tested_at'] ?? null,
+            'updated_at' => (string) ($row['updated_at'] ?? current_time('mysql', true)),
+        ];
+        $restored = $wpdb->update(
+            $table,
+            $payload,
+            ['record_uuid' => $recordUuid, 'record_type' => $type, 'record_key' => $key],
+            ['%s', '%s', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s'],
+            ['%s', '%s', '%s']
+        );
+        if ($restored === false) {
+            return false;
+        }
+
+        $current = $this->getRaw($type, $key);
+        if (! is_array($current)) {
+            return false;
+        }
+        foreach ($payload as $field => $value) {
+            if (($current[$field] ?? null) != $value) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** @param array<string,mixed> $input
+     *  @return array<string,string>
+     */
+    private function normalizeBackupEvidence(array $input): array
+    {
+        $last = Sanitizer::isoTime($input['last_success_at'] ?? '');
+        $restore = Sanitizer::isoTime($input['restore_tested_at'] ?? '');
+        $reference = Sanitizer::opaqueReference($input['evidence_ref'] ?? '');
+        $status = Sanitizer::key($input['status'] ?? 'unknown', 40);
+        if (! in_array($status, self::STATUSES['backup'], true)) {
+            $status = 'unknown';
+        }
+
+        $lastTimestamp = $last === '' ? false : strtotime($last);
+        $restoreTimestamp = $restore === '' ? false : strtotime($restore);
+        $verified = $status === 'verified'
+            && $lastTimestamp !== false
+            && $restoreTimestamp !== false
+            && $restoreTimestamp >= $lastTimestamp
+            && $lastTimestamp <= time() + 300
+            && $restoreTimestamp <= time() + 300
+            && $reference !== '';
+
+        return [
+            'status' => $verified ? 'verified' : ($status === 'verified' ? 'unknown' : $status),
+            'last_success_at' => $last,
+            'restore_tested_at' => $restore,
+            'evidence_ref' => $reference,
+        ];
+    }
+
+    private function recordAuditGap(string $recordUuid, string $reason): void
+    {
+        $recordUuid = Sanitizer::uuid($recordUuid);
+        if ($recordUuid === '') {
+            return;
+        }
+        $raw = get_option('spcrc_assurance_audit_gap', []);
+        $gaps = is_array($raw) ? $raw : [];
+        $gaps[$recordUuid] = [
+            'reason' => Sanitizer::key($reason, 80),
+            'recorded_at' => gmdate('c'),
+        ];
+        update_option('spcrc_assurance_audit_gap', $gaps, false);
     }
 
     /** @param array<string,mixed> $row
@@ -374,8 +491,10 @@ final class AssuranceRepository
             'owner_user_id' => absint($row['owner_user_id'] ?? 0),
             'jurisdiction' => Sanitizer::text($row['jurisdiction'] ?? '', 80),
             'data_classes' => Sanitizer::textList(is_array($classes) ? $classes : [], 20, 80),
-            'evidence_ref' => Sanitizer::text($row['evidence_ref'] ?? '', 255),
-            'notes' => Sanitizer::text($row['notes'] ?? '', 500),
+            'evidence_ref' => Sanitizer::opaqueReference($row['evidence_ref'] ?? ''),
+            'notes' => Sanitizer::containsSensitiveMaterial($row['notes'] ?? '')
+                ? '[REDACTED]'
+                : Sanitizer::text($row['notes'] ?? '', 500),
             'reviewed_at' => Sanitizer::isoTime($row['reviewed_at'] ?? ''),
             'next_review_at' => Sanitizer::isoTime($row['next_review_at'] ?? ''),
             'backup_completed_at' => Sanitizer::isoTime($row['backup_completed_at'] ?? ''),
@@ -395,7 +514,7 @@ final class AssuranceRepository
             'status' => Sanitizer::key($record['status'] ?? '', 40),
             'owner_user_id' => absint($record['owner_user_id'] ?? 0),
             'jurisdiction' => Sanitizer::text($record['jurisdiction'] ?? '', 80),
-            'evidence_ref' => Sanitizer::text($record['evidence_ref'] ?? '', 255),
+            'evidence_ref' => Sanitizer::opaqueReference($record['evidence_ref'] ?? ''),
             'notes' => Sanitizer::text($record['notes'] ?? '', 500),
             'reviewed_at' => $this->mysqlTime($record['reviewed_at'] ?? ''),
             'next_review_at' => $this->mysqlTime($record['next_review_at'] ?? ''),
@@ -413,53 +532,21 @@ final class AssuranceRepository
         return $storedClasses === Sanitizer::textList(is_array($payloadClasses) ? $payloadClasses : [], 20, 80);
     }
 
-    private function opaqueReference(mixed $value): string
-    {
-        $reference = Sanitizer::text($value, 255);
-        if ($reference === '') {
-            return '';
-        }
-        return preg_match('/^[a-z][a-z0-9-]{1,30}:[A-Za-z0-9][A-Za-z0-9._\/-]{3,220}$/', $reference) === 1
-            ? $reference
-            : '';
-    }
-
-    private function containsSensitiveMaterial(string $notes): bool
-    {
-        if ($notes === '') {
-            return false;
-        }
-
-        $patterns = [
-            '/-----BEGIN (?:RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----/i',
-            '/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i',
-            '/(?<!\d)(?:\+?\d[\d\s().-]{8,}\d)(?!\d)/',
-            '/(?<!\d)\d{5}-?\d{7}-?\d(?!\d)/',
-            '/\b(?:password|passwd|secret|api[_ -]?key|access[_ -]?token|refresh[_ -]?token|client[_ -]?secret)\b\s*[:=]\s*\S+/i',
-            '#\b(?:https?|s3|gs|ftp)://\S+#i',
-            '#(?:^|\s)(?:/[A-Za-z0-9._-]+){2,}(?:\s|$)#',
-            '/\b[A-Za-z]:\\\\[^\s]+/i',
-        ];
-
-        foreach ($patterns as $pattern) {
-            if (preg_match($pattern, $notes) === 1) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     private function mysqlTime(mixed $value): ?string
     {
         $iso = Sanitizer::isoTime($value);
         return $iso === '' ? null : gmdate('Y-m-d H:i:s', (int) strtotime($iso));
     }
 
-    /** @param array<string,mixed> $context */
-    private function recordAudit(string $type, string $module, string $result, string $risk, array $context): void
+    /** @param array<string,mixed> $context
+     *  @return bool|\WP_Error
+     */
+    private function recordAudit(string $type, string $module, string $result, string $risk, array $context): bool|\WP_Error
     {
-        if ($this->audit !== null) {
-            $this->audit->record($type, $module, $result, $risk, $context);
+        if ($this->audit === null) {
+            return true;
         }
+        $recorded = $this->audit->record($type, $module, $result, $risk, $context);
+        return is_wp_error($recorded) ? $recorded : true;
     }
 }

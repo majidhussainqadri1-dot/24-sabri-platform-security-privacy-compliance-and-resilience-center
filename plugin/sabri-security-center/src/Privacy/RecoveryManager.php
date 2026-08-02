@@ -4,8 +4,14 @@ declare(strict_types=1);
 
 namespace Sabri\Platform\Security\Privacy;
 
+use Sabri\Platform\Security\Storage\AuditGapStore;
 use Sabri\Platform\Security\Storage\AuditLogger;
 use Sabri\Platform\Security\Storage\PrivacyRequestRepository;
+use Sabri\Platform\Security\Support\Sanitizer;
+
+if (! class_exists(AuditGapStore::class, false)) {
+    require_once dirname(__DIR__) . '/Storage/AuditGapStore.php';
+}
 
 final class RecoveryManager
 {
@@ -49,7 +55,7 @@ final class RecoveryManager
         $marked = $this->requests->markStaleDispatching($age, $limit);
 
         if (is_wp_error($marked)) {
-            $this->audit->record(
+            $this->recordAudit(
                 'privacy_recovery_scan_failed',
                 'file-24-security-center',
                 'failed',
@@ -60,7 +66,7 @@ final class RecoveryManager
             return;
         }
 
-        $this->audit->record(
+        $this->recordAudit(
             'privacy_recovery_scan_completed',
             'file-24-security-center',
             'completed',
@@ -69,4 +75,19 @@ final class RecoveryManager
         );
         do_action('spcrc/privacy_recovery_scan_completed', $marked);
     }
+    /** @param array<string,mixed> $context */
+    private function recordAudit(string $event, string $module, string $result, string $risk, array $context): void
+    {
+        $recorded = $this->audit->record($event, $module, $result, $risk, $context);
+        if (is_wp_error($recorded)) {
+            AuditGapStore::record(
+                'spcrc_privacy_recovery_audit_gap',
+                'recovery_scan',
+                Sanitizer::key($event, 120),
+                'audit_write_failed',
+                ['event_type' => $event]
+            );
+        }
+    }
+
 }

@@ -31,6 +31,7 @@ final class SystemCheck
             $this->checkModuleRegistry(),
             $this->checkExternalLogAdapter(),
             $this->checkBackupEvidenceAdapter(),
+            $this->checkAuditGaps(),
             $this->checkUpgradeError(),
         ];
 
@@ -89,10 +90,14 @@ final class SystemCheck
 
         $installedVersion = (string) get_option('spcrc_schema_version', '');
         $versionMatches = $installedVersion === Schema::VERSION;
-        $passed = $missing === [] && $versionMatches;
+        $integrity = $missing === [] ? Schema::verify() : new \WP_Error('spcrc_schema_integrity_failed', 'Required File 24 tables are missing.');
+        $integrityOk = ! is_wp_error($integrity);
+        $passed = $missing === [] && $versionMatches && $integrityOk;
         $detail = $missing !== []
             ? 'Missing: ' . implode(', ', $missing)
-            : ($versionMatches ? 'All required tables detected; schema ' . Schema::VERSION : 'Tables detected but installed schema is ' . ($installedVersion !== '' ? $installedVersion : 'unknown'));
+            : (! $integrityOk
+                ? 'Schema column or table integrity verification failed: ' . $integrity->get_error_code()
+                : ($versionMatches ? 'All required tables and governed columns detected; schema ' . Schema::VERSION : 'Tables detected but installed schema is ' . ($installedVersion !== '' ? $installedVersion : 'unknown')));
 
         return $this->result(
             'schema',
@@ -151,11 +156,15 @@ final class SystemCheck
     private function checkBackupEvidenceAdapter(): array
     {
         $evidence = apply_filters('spcrc/backup_evidence', []);
+        $status = is_array($evidence) ? Sanitizer::key($evidence['status'] ?? '', 40) : '';
         $lastSuccess = is_array($evidence) ? Sanitizer::isoTime($evidence['last_success_at'] ?? '') : '';
         $restoreTest = is_array($evidence) ? Sanitizer::isoTime($evidence['restore_tested_at'] ?? '') : '';
+        $evidenceRef = is_array($evidence) ? Sanitizer::opaqueReference($evidence['evidence_ref'] ?? '') : '';
         $lastTimestamp = $lastSuccess === '' ? false : strtotime($lastSuccess);
         $restoreTimestamp = $restoreTest === '' ? false : strtotime($restoreTest);
-        $chronologyValid = $lastTimestamp !== false
+        $chronologyValid = $status === 'verified'
+            && $evidenceRef !== ''
+            && $lastTimestamp !== false
             && $restoreTimestamp !== false
             && $restoreTimestamp >= $lastTimestamp
             && $lastTimestamp <= time() + 300
@@ -170,6 +179,53 @@ final class SystemCheck
                 : 'Complete, chronological backup and restore evidence is not configured',
             'warning'
         );
+    }
+
+    /** @return array<string,mixed> */
+    private function checkAuditGaps(): array
+    {
+        $options = [
+            'governance' => 'spcrc_governance_audit_gap',
+            'security-state' => 'spcrc_security_state_audit_gap',
+            'assurance' => 'spcrc_assurance_audit_gap',
+            'risk' => 'spcrc_risk_audit_gap',
+            'finding' => 'spcrc_finding_audit_gap',
+            'incident' => 'spcrc_incident_audit_gap',
+            'control' => 'spcrc_control_audit_gap',
+            'risk-reopen' => 'spcrc_risk_reopen_audit_gap',
+            'finding-reopen' => 'spcrc_finding_reopen_audit_gap',
+            'governance-batch' => 'spcrc_governance_batch_audit_gap',
+            'privacy' => 'spcrc_privacy_audit_gap',
+            'privacy-recovery' => 'spcrc_privacy_recovery_audit_gap',
+            'retention' => 'spcrc_retention_audit_gap',
+            'admin' => 'spcrc_admin_audit_gap',
+        ];
+        $counts = [];
+        foreach ($options as $label => $option) {
+            $raw = get_option($option, []);
+            if (! is_array($raw) || $raw === []) {
+                continue;
+            }
+            $isLegacySingle = isset($raw['reason'])
+                || isset($raw['request_id'])
+                || isset($raw['risk_uuid'])
+                || isset($raw['finding_uuid'])
+                || isset($raw['incident_uuid'])
+                || isset($raw['control_key'])
+                || isset($raw['count'])
+                || isset($raw['recorded_at']);
+            $counts[$label] = $isLegacySingle ? 1 : count($raw);
+        }
+
+        $total = array_sum($counts);
+        $detail = $total === 0
+            ? 'No unresolved File 24 audit-evidence gaps detected'
+            : 'Unresolved audit-evidence gaps: ' . implode(', ', array_map(
+                static fn (string $label, int $count): string => $label . '=' . $count,
+                array_keys($counts),
+                array_values($counts)
+            ));
+        return $this->result('audit_gaps', 'No unresolved File 24 audit-evidence gaps', $total === 0, $detail);
     }
 
     /** @return array<string,mixed> */

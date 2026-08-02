@@ -6,10 +6,10 @@ namespace Sabri\Platform\Security\Storage;
 
 final class Schema
 {
-    public const VERSION = '0.25.4';
+    public const VERSION = '0.25.5';
 
-    /** @return true|\WP_Error */
-    public static function install(): true|\WP_Error
+    /** @return bool|\WP_Error */
+    public static function install(): bool|\WP_Error
     {
         global $wpdb;
 
@@ -43,13 +43,15 @@ final class Schema
             status varchar(40) NOT NULL DEFAULT 'open',
             owner_user_id bigint unsigned NULL,
             summary text NULL,
+            evidence_ref varchar(255) NOT NULL DEFAULT '',
             opened_at datetime NOT NULL,
             updated_at datetime NOT NULL,
             closed_at datetime NULL,
             PRIMARY KEY  (id),
             UNIQUE KEY incident_uuid (incident_uuid),
             KEY status_severity (status, severity),
-            KEY updated_at (updated_at)
+            KEY updated_at (updated_at),
+            KEY incident_evidence (evidence_ref)
         ) {$charset};");
 
         dbDelta("CREATE TABLE {$tables['findings']} (
@@ -62,12 +64,16 @@ final class Schema
             owner_user_id bigint unsigned NULL,
             due_at datetime NULL,
             evidence_ref varchar(255) NOT NULL DEFAULT '',
+            governance_decision_uuid char(36) NULL,
+            acceptance_expires_at datetime NULL,
             created_at datetime NOT NULL,
             updated_at datetime NOT NULL,
             PRIMARY KEY  (id),
             UNIQUE KEY finding_uuid (finding_uuid),
             KEY status_severity (status, severity),
-            KEY module_status (module_key, status)
+            KEY module_status (module_key, status),
+            KEY finding_governance (governance_decision_uuid),
+            KEY finding_acceptance_expiry (acceptance_expires_at)
         ) {$charset};");
 
         dbDelta("CREATE TABLE {$tables['risks']} (
@@ -82,13 +88,20 @@ final class Schema
             treatment varchar(30) NOT NULL DEFAULT 'mitigate',
             owner_user_id bigint unsigned NULL,
             due_at datetime NULL,
+            governance_decision_uuid char(36) NULL,
+            accepted_by_user_id bigint unsigned NULL,
+            accepted_at datetime NULL,
+            acceptance_expires_at datetime NULL,
             created_at datetime NOT NULL,
             updated_at datetime NOT NULL,
             PRIMARY KEY  (id),
             UNIQUE KEY risk_uuid (risk_uuid),
             KEY status_score (status, inherent_score),
             KEY module_status (module_key, status),
-            KEY due_at (due_at)
+            KEY due_at (due_at),
+            KEY governance_decision (governance_decision_uuid),
+            KEY accepted_at (accepted_at),
+            KEY risk_acceptance_expiry (acceptance_expires_at)
         ) {$charset};");
 
         dbDelta("CREATE TABLE {$tables['controls']} (
@@ -154,6 +167,30 @@ final class Schema
             KEY posture_seen (posture, last_seen_at)
         ) {$charset};");
 
+        dbDelta("CREATE TABLE {$tables['governance']} (
+            id bigint unsigned NOT NULL AUTO_INCREMENT,
+            decision_uuid char(36) NOT NULL,
+            decision_type varchar(60) NOT NULL,
+            subject_key varchar(120) NOT NULL,
+            module_key varchar(120) NOT NULL DEFAULT 'file-24-security-center',
+            status varchar(30) NOT NULL DEFAULT 'pending',
+            requester_user_id bigint unsigned NOT NULL,
+            approver_user_id bigint unsigned NULL,
+            evidence_ref varchar(255) NOT NULL,
+            rationale_hash char(64) NOT NULL,
+            requested_at datetime NOT NULL,
+            expires_at datetime NOT NULL,
+            decided_at datetime NULL,
+            revoked_at datetime NULL,
+            lock_version bigint unsigned NOT NULL DEFAULT 0,
+            PRIMARY KEY  (id),
+            UNIQUE KEY decision_uuid (decision_uuid),
+            KEY type_subject (decision_type, subject_key),
+            KEY status_expiry (status, expires_at),
+            KEY requester_status (requester_user_id, status),
+            KEY approver_decided (approver_user_id, decided_at)
+        ) {$charset};");
+
         dbDelta("CREATE TABLE {$tables['assurance']} (
             id bigint unsigned NOT NULL AUTO_INCREMENT,
             record_uuid char(36) NOT NULL,
@@ -184,10 +221,12 @@ final class Schema
         return self::verify();
     }
 
-    /** @return true|\WP_Error */
-    public static function verify(): true|\WP_Error
+    /** @return bool|\WP_Error */
+    public static function verify(): bool|\WP_Error
     {
         global $wpdb;
+
+        $tables = self::tables();
 
         foreach (self::tables() as $key => $table) {
             $found = $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $wpdb->esc_like($table)));
@@ -196,6 +235,26 @@ final class Schema
                     'spcrc_schema_integrity_failed',
                     sprintf('Required File 24 table is unavailable: %s', $key)
                 );
+            }
+        }
+
+        if (method_exists($wpdb, 'get_col')) {
+            $required = [
+                'risks' => ['governance_decision_uuid', 'accepted_by_user_id', 'accepted_at', 'acceptance_expires_at'],
+                'findings' => ['governance_decision_uuid', 'acceptance_expires_at'],
+                'incidents' => ['evidence_ref'],
+                'governance' => ['decision_uuid', 'decision_type', 'subject_key', 'status', 'requester_user_id', 'approver_user_id', 'evidence_ref', 'lock_version'],
+            ];
+            foreach ($required as $tableKey => $columns) {
+                $foundColumns = $wpdb->get_col("SHOW COLUMNS FROM {$tables[$tableKey]}", 0);
+                if (! is_array($foundColumns)) {
+                    return new \WP_Error('spcrc_schema_column_check_failed', sprintf('File 24 columns could not be inspected: %s', $tableKey));
+                }
+                foreach ($columns as $column) {
+                    if (! in_array($column, $foundColumns, true)) {
+                        return new \WP_Error('spcrc_schema_integrity_failed', sprintf('Required File 24 column is unavailable: %s.%s', $tableKey, $column));
+                    }
+                }
             }
         }
 
@@ -216,6 +275,7 @@ final class Schema
             'privacy' => $wpdb->prefix . 'spcrc_privacy_requests',
             'manifests' => $wpdb->prefix . 'spcrc_module_manifests',
             'assurance' => $wpdb->prefix . 'spcrc_assurance_records',
+            'governance' => $wpdb->prefix . 'spcrc_governance_decisions',
         ];
     }
 }

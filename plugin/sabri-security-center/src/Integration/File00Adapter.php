@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Sabri\Platform\Security\Integration;
 
+use Sabri\Platform\Security\Support\Sanitizer;
+
 final class File00Adapter
 {
     public function registerHooks(): void
@@ -13,6 +15,8 @@ final class File00Adapter
         add_filter('spcrc/module_manifests', [$this, 'manifest']);
         add_filter('spcrc/public_browsing_compatible', [$this, 'publicBrowsingCompatible']);
         add_filter('spcrc/privacy_request/file-00-membership-core', [$this, 'privacyHandler'], 10, 3);
+        add_filter('spcrc/step_up_assurance_available', [$this, 'stepUpAvailable']);
+        add_filter('spcrc/verify_step_up_assurance', [$this, 'verifyStepUp'], 10, 4);
     }
 
     public function available(): bool
@@ -30,6 +34,26 @@ final class File00Adapter
     public function isFounder(bool $current, int $userId): bool
     {
         return $current || ($this->available() && $userId > 0 && (bool) smc_is_founder($userId));
+    }
+
+    public function stepUpAvailable(bool $current): bool
+    {
+        return $current || ($this->available() && function_exists('smc_verify_step_up_assertion'));
+    }
+
+    public function verifyStepUp(bool $current, int $userId, string $purpose, string $reference): bool
+    {
+        if ($current) {
+            return true;
+        }
+        if (! $this->available() || ! function_exists('smc_verify_step_up_assertion')) {
+            return false;
+        }
+
+        return $userId > 0
+            && $purpose !== ''
+            && Sanitizer::opaqueReference($reference) !== ''
+            && (bool) smc_verify_step_up_assertion($userId, $purpose, $reference);
     }
 
     public function publicBrowsingCompatible(bool $current): bool
@@ -108,6 +132,12 @@ final class File00Adapter
             'external_vendors' => [],
             'privacy_operations' => ['access', 'deletion', 'portability'],
             'last_security_test' => '',
+            'contract_version' => '1.1.2',
+            'canonical_data_owner' => 'File 00',
+            'canonical_action_owner' => 'File 00 / File 02 split',
+            'evidence_source' => 'module:file-00-membership-core',
+            'degraded_behavior' => 'Privileged writes fail closed when identity assertions are unavailable.',
+            'release_gate' => 'Hostinger staging, provider, recovery and rollback acceptance',
         ];
 
         return $manifests;

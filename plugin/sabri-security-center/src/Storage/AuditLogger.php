@@ -142,7 +142,8 @@ final class AuditLogger
     {
         $value = Sanitizer::text($value, self::MAX_STRING_LENGTH);
         if (
-            preg_match('/-----BEGIN [A-Z ]*PRIVATE KEY-----/i', $value) === 1
+            Sanitizer::containsSensitiveMaterial($value)
+            || preg_match('/-----BEGIN [A-Z ]*PRIVATE KEY-----/i', $value) === 1
             || preg_match('/\bBearer\s+[A-Za-z0-9._~+\/-]+=*/i', $value) === 1
             || preg_match('/^[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}$/', $value) === 1
         ) {

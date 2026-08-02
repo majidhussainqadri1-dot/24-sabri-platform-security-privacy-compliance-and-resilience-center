@@ -72,6 +72,7 @@ final class FindingAdmin
             [
                 'expected_status' => $data['expected_status'] ?? '',
                 'note' => $data['note'] ?? '',
+                'decision_uuid' => $data['decision_uuid'] ?? '',
             ]
         );
         if (is_wp_error($result)) {
@@ -150,6 +151,7 @@ final class FindingAdmin
                                                 <?php endforeach; ?>
                                             </select></label>
                                             <label><span class="screen-reader-text"><?php esc_html_e('Sanitized status note', 'sabri-security-center'); ?></span><textarea required maxlength="1000" name="note" rows="2" placeholder="<?php esc_attr_e('Required accountability note', 'sabri-security-center'); ?>"></textarea></label>
+                                            <label><span class="screen-reader-text"><?php esc_html_e('Governance decision UUID for risk acceptance', 'sabri-security-center'); ?></span><input maxlength="36" name="decision_uuid" type="text" placeholder="<?php esc_attr_e('Required only for accepted-risk', 'sabri-security-center'); ?>"></label>
                                             <?php submit_button(__('Update', 'sabri-security-center'), 'secondary small', 'submit', false); ?>
                                         </form>
                                     <?php endif; ?>

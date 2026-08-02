@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace {
     const ABSPATH = '/tmp/file24-activation/';
     const SPCRC_PLUGIN_FILE = __FILE__;
-    const SPCRC_VERSION = '0.25.6';
+    const SPCRC_VERSION = '0.25.7';
     @mkdir(ABSPATH . 'wp-admin/includes', 0777, true);
     file_put_contents(ABSPATH . 'wp-admin/includes/plugin.php', "<?php\n");
 
@@ -25,7 +25,7 @@ namespace {
     function esc_html(string $text): string { return $text; }
     function plugin_basename(string $file): string { return basename($file); }
     function deactivate_plugins(string $file): void { $GLOBALS['activation_deactivated'] = true; }
-    function wp_die(string $message): never { throw new ActivationAbort($message); }
+    function wp_die(string $message): void { throw new ActivationAbort($message); }
     function is_wp_error(mixed $value): bool { return $value instanceof WP_Error; }
     function update_option(string $key, mixed $value, bool $autoload = true): bool { $GLOBALS['activation_options'][$key] = $value; return true; }
     function get_option(string $key, mixed $default = false): mixed { return $GLOBALS['activation_options'][$key] ?? $default; }
@@ -35,9 +35,9 @@ namespace {
 namespace Sabri\Platform\Security\Storage {
     final class Schema
     {
-        public const VERSION = '0.25.4';
-        public static true|\WP_Error $result = true;
-        public static function install(): true|\WP_Error { return self::$result; }
+        public const VERSION = '0.25.5';
+        public static bool|\WP_Error $result = true;
+        public static function install(): bool|\WP_Error { return self::$result; }
     }
 }
 
@@ -93,8 +93,8 @@ namespace Sabri\Platform\Security {
     $GLOBALS['activation_deactivated'] = false;
     RecoveryManager::$result = true;
     Activation::activate();
-    expectActivation(($GLOBALS['activation_options']['spcrc_version'] ?? '') === '0.25.6', 'Successful activation must persist plugin version.');
-    expectActivation(($GLOBALS['activation_options']['spcrc_schema_version'] ?? '') === '0.25.4', 'Successful activation must persist schema version.');
+    expectActivation(($GLOBALS['activation_options']['spcrc_version'] ?? '') === '0.25.7', 'Successful activation must persist plugin version.');
+    expectActivation(($GLOBALS['activation_options']['spcrc_schema_version'] ?? '') === '0.25.5', 'Successful activation must persist schema version.');
     expectActivation(! isset($GLOBALS['activation_options']['spcrc_last_upgrade_error']), 'Successful activation must clear prior failure evidence.');
 
     echo "PASS: activation fail-closed schedule and version-state contracts\n";

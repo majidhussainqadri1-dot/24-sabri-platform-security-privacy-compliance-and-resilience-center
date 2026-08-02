@@ -171,8 +171,8 @@ final class PrivacyRequestRepository
         ];
     }
 
-    /** @return true|\WP_Error */
-    public function claimModule(string $requestUuid, string $moduleKey): true|\WP_Error
+    /** @return bool|\WP_Error */
+    public function claimModule(string $requestUuid, string $moduleKey): bool|\WP_Error
     {
         $requestUuid = Sanitizer::uuid($requestUuid);
         $moduleKey = Sanitizer::key($moduleKey, 120);
@@ -201,9 +201,9 @@ final class PrivacyRequestRepository
     }
 
     /** @param array<string,mixed> $result
-     *  @return true|\WP_Error
+     *  @return bool|\WP_Error
      */
-    public function storeModuleResult(string $requestUuid, string $moduleKey, array $result): true|\WP_Error
+    public function storeModuleResult(string $requestUuid, string $moduleKey, array $result): bool|\WP_Error
     {
         $requestUuid = Sanitizer::uuid($requestUuid);
         $moduleKey = Sanitizer::key($moduleKey, 120);
@@ -228,14 +228,14 @@ final class PrivacyRequestRepository
     }
 
     /**
-     * @return true|\WP_Error
+     * @return bool|\WP_Error
      */
     public function finalize(
         string $requestUuid,
         string $status,
         string $expectedStatus = 'dispatching',
         string $lastErrorCode = ''
-    ): true|\WP_Error {
+    ): bool|\WP_Error {
         global $wpdb;
 
         $requestUuid = Sanitizer::uuid($requestUuid);
@@ -584,9 +584,9 @@ final class PrivacyRequestRepository
 
     /** @param array<string,mixed> $existing
      *  @param array<string,array<string,mixed>> $results
-     *  @return true|\WP_Error
+     *  @return bool|\WP_Error
      */
-    private function writeModuleResults(array $existing, array $results, string $errorCode): true|\WP_Error
+    private function writeModuleResults(array $existing, array $results, string $errorCode): bool|\WP_Error
     {
         global $wpdb;
 
@@ -666,7 +666,7 @@ final class PrivacyRequestRepository
             'ok' => Sanitizer::boolean($result['ok'] ?? false),
             'status' => $status,
             'code' => Sanitizer::key($result['code'] ?? '', 120),
-            'reference' => Sanitizer::text($result['reference'] ?? '', 200),
+            'reference' => Sanitizer::opaqueReference($result['reference'] ?? '', 200),
             'message' => Sanitizer::text($result['message'] ?? '', 300),
         ];
     }

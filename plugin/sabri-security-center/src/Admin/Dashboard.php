@@ -6,12 +6,18 @@ namespace Sabri\Platform\Security\Admin;
 
 use Sabri\Platform\Security\Registry\ModuleRegistry;
 use Sabri\Platform\Security\Registry\SecurityStateRegistry;
+use Sabri\Platform\Security\Storage\AuditGapStore;
 use Sabri\Platform\Security\Storage\AuditLogger;
 use Sabri\Platform\Security\Storage\ControlRepository;
 use Sabri\Platform\Security\Storage\IncidentRepository;
 use Sabri\Platform\Security\Storage\RiskRepository;
+use Sabri\Platform\Security\Support\Sanitizer;
 use Sabri\Platform\Security\System\Repair;
 use Sabri\Platform\Security\System\SystemCheck;
+
+if (! class_exists(AuditGapStore::class, false)) {
+    require_once dirname(__DIR__) . '/Storage/AuditGapStore.php';
+}
 
 final class Dashboard
 {
@@ -36,6 +42,7 @@ final class Dashboard
         add_action('admin_post_spcrc_create_incident', [$this, 'handleCreateIncident']);
         add_action('admin_post_spcrc_upsert_control', [$this, 'handleUpsertControl']);
         add_action('admin_post_spcrc_run_repair', [$this, 'handleRepair']);
+        add_action('admin_post_spcrc_reconcile_audit_gap', [$this, 'handleReconcileAuditGap']);
     }
 
     public function menu(): void
@@ -67,7 +74,7 @@ final class Dashboard
 
         $checks = $this->checks->run();
         set_transient('spcrc_last_system_check_' . get_current_user_id(), $checks, 10 * MINUTE_IN_SECONDS);
-        $this->audit->record('system_check_run', 'file-24-security-center', 'completed', 'informational', ['check_count' => count($checks)]);
+        $this->recordAudit('system_check_run', 'file-24-security-center', 'completed', 'informational', ['check_count' => count($checks)]);
         $this->redirect('success', 'Security checks were refreshed.');
     }
 
@@ -78,11 +85,10 @@ final class Dashboard
 
         $result = $this->risks->create($this->postData());
         if (is_wp_error($result)) {
-            $this->audit->record('risk_create_failed', 'file-24-security-center', 'failed', 'medium', ['error_code' => $result->get_error_code()]);
+            $this->recordAudit('risk_create_failed', 'file-24-security-center', 'failed', 'medium', ['error_code' => $result->get_error_code()]);
             $this->redirect('error', $result->get_error_message());
         }
 
-        $this->audit->record('risk_created', 'file-24-security-center', 'completed', 'medium', ['risk_uuid' => $result]);
         $this->redirect('success', 'Risk was recorded.');
     }
 
@@ -93,11 +99,10 @@ final class Dashboard
 
         $result = $this->incidents->create($this->postData());
         if (is_wp_error($result)) {
-            $this->audit->record('incident_create_failed', 'file-24-security-center', 'failed', 'high', ['error_code' => $result->get_error_code()]);
+            $this->recordAudit('incident_create_failed', 'file-24-security-center', 'failed', 'high', ['error_code' => $result->get_error_code()]);
             $this->redirect('error', $result->get_error_message());
         }
 
-        $this->audit->record('incident_created', 'file-24-security-center', 'completed', 'high', ['incident_uuid' => $result]);
         $this->redirect('success', 'Incident was opened.');
     }
 
@@ -108,11 +113,10 @@ final class Dashboard
 
         $result = $this->controls->upsert($this->postData());
         if (is_wp_error($result)) {
-            $this->audit->record('control_write_failed', 'file-24-security-center', 'failed', 'medium', ['error_code' => $result->get_error_code()]);
+            $this->recordAudit('control_write_failed', 'file-24-security-center', 'failed', 'medium', ['error_code' => $result->get_error_code()]);
             $this->redirect('error', $result->get_error_message());
         }
 
-        $this->audit->record('control_saved', 'file-24-security-center', 'completed', 'informational', ['control_key' => $result]);
         $this->redirect('success', 'Control was saved.');
     }
 
@@ -123,12 +127,34 @@ final class Dashboard
 
         $result = $this->repair->run();
         if (is_wp_error($result)) {
-            $this->audit->record('non_destructive_repair_failed', 'file-24-security-center', 'failed', 'high', ['error_code' => $result->get_error_code()]);
+            $this->recordAudit('non_destructive_repair_failed', 'file-24-security-center', 'failed', 'high', ['error_code' => $result->get_error_code()]);
             $this->redirect('error', $result->get_error_message());
         }
 
-        $this->audit->record('non_destructive_repair_completed', 'file-24-security-center', 'completed', 'informational', $result);
+        if (! $this->recordAudit('non_destructive_repair_completed', 'file-24-security-center', 'completed', 'informational', $result)) {
+            $this->redirect('error', 'Repair completed, but its audit evidence could not be stored. Release remains blocked until the audit gap is reconciled.');
+        }
         $this->redirect('success', 'Non-destructive repair completed.');
+    }
+
+
+
+    public function handleReconcileAuditGap(): void
+    {
+        $this->assertCapability('spcrc_manage_security_settings', 'You are not allowed to reconcile audit gaps.');
+        check_admin_referer('spcrc_reconcile_audit_gap');
+        $data = $this->postData();
+        $result = AuditGapStore::reconcile(
+            (string) ($data['gap_option'] ?? ''),
+            (string) ($data['gap_id'] ?? ''),
+            (string) ($data['evidence_ref'] ?? ''),
+            (string) ($data['step_up_reference'] ?? ''),
+            $this->audit
+        );
+        if (is_wp_error($result)) {
+            $this->redirect('error', $result->get_error_message());
+        }
+        $this->redirect('success', 'Audit gap was reconciled with step-up and private evidence.');
     }
 
     public function render(): void
@@ -178,6 +204,7 @@ final class Dashboard
             <?php $this->renderRiskSection($recentRisks); ?>
             <?php $this->renderIncidentSection($recentIncidents); ?>
             <?php $this->renderControlSection($recentControls); ?>
+            <?php $this->renderAuditGapSection(); ?>
             <?php $this->renderRepairSection(); ?>
 
             <div class="notice notice-info inline">
@@ -348,6 +375,56 @@ final class Dashboard
         <?php
     }
 
+
+
+    private function renderAuditGapSection(): void
+    {
+        if (! current_user_can('spcrc_manage_security_settings')) {
+            return;
+        }
+        $rows = [];
+        foreach (AuditGapStore::managedOptions() as $label => $option) {
+            foreach (AuditGapStore::all($option) as $gapId => $gap) {
+                $rows[] = ['label' => $label, 'option' => $option, 'gap_id' => $gapId, 'gap' => $gap];
+                if (count($rows) >= 100) {
+                    break 2;
+                }
+            }
+        }
+        ?>
+        <section class="spcrc-panel" aria-labelledby="spcrc-audit-gaps-heading">
+            <h2 id="spcrc-audit-gaps-heading"><?php esc_html_e('Audit-evidence gaps', 'sabri-security-center'); ?></h2>
+            <p><?php esc_html_e('Reconcile only after the underlying operation has been independently verified. A fresh File 00 step-up reference and an opaque private evidence reference are required.', 'sabri-security-center'); ?></p>
+            <table class="widefat striped spcrc-data-table">
+                <caption class="screen-reader-text"><?php esc_html_e('Unresolved operational audit-evidence gaps', 'sabri-security-center'); ?></caption>
+                <thead><tr><th scope="col"><?php esc_html_e('Category', 'sabri-security-center'); ?></th><th scope="col"><?php esc_html_e('Reason', 'sabri-security-center'); ?></th><th scope="col"><?php esc_html_e('Recorded', 'sabri-security-center'); ?></th><th scope="col"><?php esc_html_e('Reconcile', 'sabri-security-center'); ?></th></tr></thead>
+                <tbody>
+                <?php if ($rows === []) : ?>
+                    <tr><td colspan="4"><?php esc_html_e('No generic operational audit gaps are open.', 'sabri-security-center'); ?></td></tr>
+                <?php else : foreach ($rows as $row) : $gap = is_array($row['gap']) ? $row['gap'] : []; ?>
+                    <tr>
+                        <td><code><?php echo esc_html((string) $row['label']); ?></code></td>
+                        <td><?php echo esc_html((string) ($gap['reason'] ?? 'audit_gap')); ?></td>
+                        <td><?php echo esc_html((string) ($gap['recorded_at'] ?? '')); ?></td>
+                        <td>
+                            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+                                <input type="hidden" name="action" value="spcrc_reconcile_audit_gap">
+                                <input type="hidden" name="gap_option" value="<?php echo esc_attr((string) $row['option']); ?>">
+                                <input type="hidden" name="gap_id" value="<?php echo esc_attr((string) $row['gap_id']); ?>">
+                                <?php wp_nonce_field('spcrc_reconcile_audit_gap'); ?>
+                                <label><span class="screen-reader-text"><?php esc_html_e('Private evidence reference', 'sabri-security-center'); ?></span><input type="text" name="evidence_ref" required maxlength="200" placeholder="vault:case-reference"></label>
+                                <label><span class="screen-reader-text"><?php esc_html_e('File 00 step-up reference', 'sabri-security-center'); ?></span><input type="text" name="step_up_reference" required maxlength="200" placeholder="file00:step-up-reference"></label>
+                                <?php submit_button(__('Reconcile', 'sabri-security-center'), 'secondary', 'submit', false); ?>
+                            </form>
+                        </td>
+                    </tr>
+                <?php endforeach; endif; ?>
+                </tbody>
+            </table>
+        </section>
+        <?php
+    }
+
     private function renderRepairSection(): void
     {
         if (! current_user_can('spcrc_manage_security_settings')) {
@@ -432,4 +509,21 @@ final class Dashboard
         wp_safe_redirect(add_query_arg(['page' => 'sabri-security-center'], admin_url('admin.php')));
         exit;
     }
+    /** @param array<string,mixed> $context */
+    private function recordAudit(string $event, string $module, string $result, string $risk, array $context): bool
+    {
+        $recorded = $this->audit->record($event, $module, $result, $risk, $context);
+        if (is_wp_error($recorded)) {
+            AuditGapStore::record(
+                'spcrc_admin_audit_gap',
+                'admin_operation',
+                Sanitizer::key($event, 120),
+                'audit_write_failed',
+                ['event_type' => $event]
+            );
+            return false;
+        }
+        return true;
+    }
+
 }

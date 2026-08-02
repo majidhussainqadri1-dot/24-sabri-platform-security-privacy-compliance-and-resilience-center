@@ -3,13 +3,14 @@
 declare(strict_types=1);
 
 namespace {
-    define('SPCRC_VERSION', '0.25.6');
+    define('SPCRC_VERSION', '0.25.7');
     define('SPCRC_PLUGIN_FILE', __FILE__);
     define('SPCRC_PLUGIN_DIR', dirname(__DIR__) . '/plugin/sabri-security-center/');
     define('SPCRC_PLUGIN_URL', 'https://example.test/plugins/sabri-security-center/');
     define('MINUTE_IN_SECONDS', 60);
     $GLOBALS['boot_hooks'] = [];
     $GLOBALS['boot_actions'] = [];
+    $GLOBALS['boot_options'] = [];
 
     final class WP_Error
     {
@@ -23,8 +24,11 @@ namespace {
     function add_filter(string $hook, callable $callback, int $priority = 10, int $acceptedArgs = 1): void { add_action($hook, $callback, $priority, $acceptedArgs); }
     function do_action(string $hook, mixed ...$args): void { $GLOBALS['boot_actions'][] = [$hook, $args]; }
     function is_wp_error(mixed $value): bool { return $value instanceof WP_Error; }
-    function get_option(string $key, mixed $default = false): mixed { return $default; }
-    function update_option(string $key, mixed $value, bool $autoload = true): bool { return true; }
+    function get_option(string $key, mixed $default = false): mixed { return $GLOBALS['boot_options'][$key] ?? $default; }
+    function update_option(string $key, mixed $value, bool $autoload = true): bool { $changed = ! array_key_exists($key, $GLOBALS['boot_options']) || $GLOBALS['boot_options'][$key] !== $value; $GLOBALS['boot_options'][$key] = $value; return $changed; }
+    function add_option(string $key, mixed $value = '', string $deprecated = '', bool|string|null $autoload = null): bool { if (array_key_exists($key, $GLOBALS['boot_options'])) return false; $GLOBALS['boot_options'][$key] = $value; return true; }
+    function delete_option(string $key): bool { $exists = array_key_exists($key, $GLOBALS['boot_options']); unset($GLOBALS['boot_options'][$key]); return $exists; }
+    function wp_generate_uuid4(): string { return 'aaaaaaaa-aaaa-4aaa-8aaa-' . str_pad((string) (count($GLOBALS['boot_options']) + 1), 12, '0', STR_PAD_LEFT); }
 
     spl_autoload_register(static function (string $class): void {
         $prefix = 'Sabri\\Platform\\Security\\';
@@ -38,7 +42,7 @@ namespace Sabri\Platform\Security {
     final class UpgradeManager
     {
         public static int $calls = 0;
-        public static function maybeUpgrade(): true|\WP_Error { ++self::$calls; return true; }
+        public static function maybeUpgrade(): bool|\WP_Error { ++self::$calls; return true; }
     }
 
     require_once dirname(__DIR__) . '/plugin/sabri-security-center/src/Plugin.php';

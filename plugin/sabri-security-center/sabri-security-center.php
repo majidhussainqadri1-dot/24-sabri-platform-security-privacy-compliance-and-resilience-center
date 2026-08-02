@@ -3,7 +3,7 @@
  * Plugin Name: Sabri Platform Security, Privacy, Compliance and Resilience Center
  * Plugin URI:  https://sabrihomeopathy.com/
  * Description: Central security governance and assurance control plane for the Sabri Social Homeopathy Platform.
- * Version:     0.25.6
+ * Version:     0.25.7
  * Author:      Dr. Allamah Majid Hussain Sabri Muhaddith Mursheed
  * Text Domain: sabri-security-center
  * Requires at least: 6.5
@@ -17,7 +17,7 @@ if (! defined('ABSPATH')) {
     exit;
 }
 
-define('SPCRC_VERSION', '0.25.6');
+define('SPCRC_VERSION', '0.25.7');
 define('SPCRC_PLUGIN_FILE', __FILE__);
 define('SPCRC_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('SPCRC_PLUGIN_URL', plugin_dir_url(__FILE__));

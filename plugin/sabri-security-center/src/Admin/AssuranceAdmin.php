@@ -149,7 +149,7 @@ final class AssuranceAdmin
         }
     }
 
-    private function redirect(string $type, string $message): never
+    private function redirect(string $type, string $message): void
     {
         set_transient('spcrc_assurance_notice_' . get_current_user_id(), [
             'type' => $type,

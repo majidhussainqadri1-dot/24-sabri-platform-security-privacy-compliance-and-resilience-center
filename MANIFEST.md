@@ -1,6 +1,6 @@
 # Source Manifest
 
-Foundation corrective candidate 0.25.6 contains only public, sanitized source and documentation.
+Foundation corrective candidate 0.25.7 contains only public, sanitized source and documentation.
 
 Sensitive operational material is intentionally excluded.
 
@@ -13,7 +13,15 @@ Sensitive operational material is intentionally excluded.
 - Privacy verification and orchestration: `plugin/sabri-security-center/src/Privacy/`
 - Fail-closed activation, upgrade and repair: `plugin/sabri-security-center/src/Activation.php`, `plugin/sabri-security-center/src/UpgradeManager.php`, `plugin/sabri-security-center/src/System/Repair.php`
 - Collision-resistant module registry: `plugin/sabri-security-center/src/Registry/ModuleRegistry.php`
-- Cycle 9 review record: `docs/REVIEW-AND-CORRECTION-0.25.6-CYCLE-9.md`
+- Cycle 12 review record: `docs/REVIEW-AND-CORRECTION-0.25.7-CYCLE-12.md`
+- Cycle 13 review/correction record: `docs/REVIEW-AND-CORRECTION-0.25.7-CYCLE-13.md`
+- Cycle 14 extraordinary fresh review: `docs/EXTRAORDINARY-REVIEW-AND-CORRECTION-0.25.7-CYCLE-14.md`
+- Cycle 15 requested Alhami/Illuminative review: `docs/ILLUMINATIVE-REVIEW-AND-CORRECTION-0.25.7-CYCLE-15.md`
+- Cycle 16 final closure review: `docs/FINAL-CLOSURE-REVIEW-AND-CORRECTION-0.25.7-CYCLE-16.md`
+- Bounded audit-gap registry: `plugin/sabri-security-center/src/Storage/AuditGapStore.php`
+- Requirements traceability: `docs/REQUIREMENTS-TRACEABILITY-0.25.7.md`
+- Known external evidence gates: `docs/KNOWN-LIMITATIONS-0.25.7.md`
+- Reviewed release receipt: `docs/RELEASE-RECEIPT-0.25.7.md`
 - Migration and rollback boundaries: `docs/MIGRATION.md`, `docs/ROLLBACK.md`
 - Foundation and adversarial contract tests: `tests/`
 - SPDX software bill of materials: `plugin/sabri-security-center/SBOM.spdx.json`

@@ -20,6 +20,8 @@ final class Capabilities
             'spcrc_manage_incidents',
             'spcrc_manage_privacy_requests',
             'spcrc_manage_assurance',
+            'spcrc_request_governance_decision',
+            'spcrc_approve_governance_decision',
             'spcrc_run_security_assessments',
             'spcrc_manage_security_settings',
         ];
@@ -28,7 +30,7 @@ final class Capabilities
     /** @return string[] */
     public static function autoGranted(): array
     {
-        return array_values(array_diff(self::all(), ['spcrc_accept_critical_risk']));
+        return array_values(array_diff(self::all(), ['spcrc_accept_critical_risk', 'spcrc_approve_governance_decision']));
     }
 
     public static function install(): void
