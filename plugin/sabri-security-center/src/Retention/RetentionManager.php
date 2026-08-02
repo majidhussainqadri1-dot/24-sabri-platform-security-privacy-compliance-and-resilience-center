@@ -4,7 +4,12 @@ declare(strict_types=1);
 
 namespace Sabri\Platform\Security\Retention;
 
+use Sabri\Platform\Security\Storage\AuditGapStore;
 use Sabri\Platform\Security\Storage\AuditLogger;
+
+if (! class_exists(AuditGapStore::class, false)) {
+    require_once dirname(__DIR__) . '/Storage/AuditGapStore.php';
+}
 
 final class RetentionManager
 {
@@ -120,13 +125,22 @@ final class RetentionManager
         update_option('spcrc_last_retention_run', ['at' => gmdate('c')] + $result, false);
 
         if ($this->audit !== null) {
-            $this->audit->record(
+            $recorded = $this->audit->record(
                 'security_event_retention_' . $status,
                 'file-24-security-center',
                 $status,
                 $status === 'failed' ? 'high' : ($status === 'locked' ? 'low' : 'informational'),
                 $result
             );
+            if (is_wp_error($recorded)) {
+                AuditGapStore::record(
+                    'spcrc_retention_audit_gap',
+                    'retention_run',
+                    gmdate('YmdHis'),
+                    'audit_write_failed',
+                    ['status' => $status, 'error_code' => $errorCode]
+                );
+            }
         }
 
         do_action('spcrc/retention_result', $result);

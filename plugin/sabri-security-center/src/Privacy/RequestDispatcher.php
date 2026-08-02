@@ -5,9 +5,14 @@ declare(strict_types=1);
 namespace Sabri\Platform\Security\Privacy;
 
 use Sabri\Platform\Security\Registry\ModuleRegistry;
+use Sabri\Platform\Security\Storage\AuditGapStore;
 use Sabri\Platform\Security\Storage\AuditLogger;
 use Sabri\Platform\Security\Storage\PrivacyRequestRepository;
 use Sabri\Platform\Security\Support\Sanitizer;
+
+if (! class_exists(AuditGapStore::class, false)) {
+    require_once dirname(__DIR__) . '/Storage/AuditGapStore.php';
+}
 
 final class RequestDispatcher
 {
@@ -176,13 +181,18 @@ final class RequestDispatcher
         );
 
         $response = $this->finalizeResponse($requestUuid, $requestType, 'dispatching');
-        $this->audit->record(
+        $audit = $this->recordAudit(
             'privacy_request_retry_dispatched',
             'file-24-security-center',
             Sanitizer::key($response['status'] ?? 'failed', 40),
             ! empty($response['ok']) ? 'informational' : 'medium',
             ['request_uuid' => $requestUuid, 'modules' => $retryModules]
         );
+        if (is_wp_error($audit)) {
+            $response['ok'] = false;
+            $response['status'] = 'audit-evidence-missing';
+            $response['error'] = 'spcrc_privacy_audit_gap';
+        }
         return $response;
     }
 
@@ -193,7 +203,7 @@ final class RequestDispatcher
     {
         $stored = $this->requests->completeModule($requestUuid, $moduleKey, $result);
         if (is_wp_error($stored)) {
-            $this->audit->record(
+            $this->recordAudit(
                 'privacy_request_module_callback_rejected',
                 Sanitizer::key($moduleKey, 120),
                 'blocked',
@@ -213,7 +223,7 @@ final class RequestDispatcher
             ];
         }
 
-        $this->audit->record(
+        $audit = $this->recordAudit(
             'privacy_request_module_callback_stored',
             Sanitizer::key($moduleKey, 120),
             Sanitizer::key($stored['status'] ?? 'pending', 40),
@@ -221,6 +231,16 @@ final class RequestDispatcher
             ['request_uuid' => Sanitizer::uuid($requestUuid)]
         );
         do_action('spcrc/privacy_request_module_result_stored', $requestUuid, $moduleKey, $stored);
+
+        if (is_wp_error($audit)) {
+            return [
+                'ok' => false,
+                'request_uuid' => Sanitizer::uuid($requestUuid),
+                'module_key' => Sanitizer::key($moduleKey, 120),
+                'status' => 'audit-evidence-missing',
+                'error' => 'spcrc_privacy_audit_gap',
+            ];
+        }
 
         return [
             'ok' => ! empty($stored['ok']),
@@ -238,7 +258,7 @@ final class RequestDispatcher
         foreach ($moduleKeys as $moduleKey) {
             $claimed = $this->requests->claimModule($requestUuid, $moduleKey);
             if (is_wp_error($claimed)) {
-                $this->audit->record(
+                $this->recordAudit(
                     'privacy_request_module_claim_failed',
                     $moduleKey,
                     'recovery-required',
@@ -271,7 +291,7 @@ final class RequestDispatcher
 
             $stored = $this->requests->storeModuleResult($requestUuid, $moduleKey, $result);
             if (is_wp_error($stored)) {
-                $this->audit->record(
+                $this->recordAudit(
                     'privacy_request_module_result_storage_failed',
                     $moduleKey,
                     'recovery-required',
@@ -291,7 +311,7 @@ final class RequestDispatcher
         $errorCode = $this->firstFailureCode($results);
         $finalized = $this->requests->finalize($requestId, $aggregate['status'], $expectedStatus, $errorCode);
         if (is_wp_error($finalized)) {
-            $this->audit->record(
+            $this->recordAudit(
                 'privacy_request_finalization_failed',
                 'file-24-security-center',
                 'storage-failed',
@@ -307,13 +327,16 @@ final class RequestDispatcher
             $aggregate = ['ok' => false, 'status' => 'storage-failed'];
         }
 
-        $this->audit->record(
+        $audit = $this->recordAudit(
             'privacy_request_dispatched',
             'file-24-security-center',
             $aggregate['status'],
             $aggregate['ok'] ? 'informational' : ($aggregate['status'] === 'storage-failed' ? 'high' : 'medium'),
             ['request_uuid' => $requestId, 'request_type' => $requestType, 'modules' => array_keys($results)]
         );
+        if (is_wp_error($audit)) {
+            $aggregate = ['ok' => false, 'status' => 'audit-evidence-missing'];
+        }
 
         $response = [
             'ok' => $aggregate['ok'],
@@ -327,7 +350,7 @@ final class RequestDispatcher
 
     private function rejectedResponse(string $requestId, string $requestType, \WP_Error $error, string $event = 'privacy_request_rejected_before_dispatch'): array
     {
-        $this->audit->record(
+        $this->recordAudit(
             $event,
             'file-24-security-center',
             'blocked',
@@ -377,7 +400,7 @@ final class RequestDispatcher
                 'ok' => $ok,
                 'status' => $status,
                 'code' => Sanitizer::key($result['code'] ?? '', 120),
-                'reference' => Sanitizer::text($result['reference'] ?? '', 200),
+                'reference' => Sanitizer::opaqueReference($result['reference'] ?? '', 200),
                 'message' => Sanitizer::text($result['message'] ?? '', 300),
                 'retry_safe' => $retrySafe,
             ];
@@ -404,9 +427,9 @@ final class RequestDispatcher
     }
 
     /** @param string[] $moduleKeys
-     *  @return true|\WP_Error
+     *  @return bool|\WP_Error
      */
-    private function preflightModules(array $moduleKeys, string $requestType): true|\WP_Error
+    private function preflightModules(array $moduleKeys, string $requestType): bool|\WP_Error
     {
         foreach ($moduleKeys as $moduleKey) {
             $manifest = $this->modules->get($moduleKey);
@@ -439,4 +462,28 @@ final class RequestDispatcher
             array_slice($moduleKeys, 0, 100)
         ))));
     }
+    /** @param array<string,mixed> $context
+     *  @return string|\WP_Error
+     */
+    private function recordAudit(
+        string $eventType,
+        string $moduleKey,
+        string $result = 'recorded',
+        string $riskLevel = 'low',
+        array $context = []
+    ): string|\WP_Error {
+        $recorded = $this->audit->record($eventType, $moduleKey, $result, $riskLevel, $context);
+        if (is_wp_error($recorded)) {
+            $entityId = Sanitizer::uuid($context['request_uuid'] ?? '');
+            AuditGapStore::record(
+                'spcrc_privacy_audit_gap',
+                'privacy_request',
+                $entityId !== '' ? $entityId : Sanitizer::key($eventType, 120),
+                'audit_write_failed',
+                ['event_type' => $eventType, 'module_key' => $moduleKey]
+            );
+        }
+        return $recorded;
+    }
+
 }

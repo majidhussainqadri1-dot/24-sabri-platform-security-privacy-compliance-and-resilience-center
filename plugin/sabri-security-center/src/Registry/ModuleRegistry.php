@@ -149,13 +149,19 @@ final class ModuleRegistry
             'external_vendors' => Sanitizer::textList($manifest['external_vendors'] ?? [], 50, 160),
             'privacy_operations' => Sanitizer::textList($manifest['privacy_operations'] ?? [], 20, 60),
             'last_security_test' => Sanitizer::isoTime($manifest['last_security_test'] ?? ''),
+            'contract_version' => Sanitizer::text($manifest['contract_version'] ?? 'unversioned', 40),
+            'canonical_data_owner' => Sanitizer::text($manifest['canonical_data_owner'] ?? $owner, 120),
+            'canonical_action_owner' => Sanitizer::text($manifest['canonical_action_owner'] ?? $owner, 120),
+            'evidence_source' => Sanitizer::opaqueReference($manifest['evidence_source'] ?? ''),
+            'degraded_behavior' => Sanitizer::text($manifest['degraded_behavior'] ?? 'Unknown/unavailable; no permissive fallback.', 300),
+            'release_gate' => Sanitizer::text($manifest['release_gate'] ?? 'Evidence not supplied.', 300),
         ];
     }
 
     /** @param array<string,mixed> $manifest
-     *  @return true|\WP_Error
+     *  @return bool|\WP_Error
      */
-    private function persist(array $manifest): true|\WP_Error
+    private function persist(array $manifest): bool|\WP_Error
     {
         global $wpdb;
 
@@ -276,9 +282,9 @@ final class ModuleRegistry
     }
 
     /** @param array<string,mixed> $manifest
-     *  @return true|\WP_Error
+     *  @return bool|\WP_Error
      */
-    private function resolveConcurrentWrite(string $table, array $manifest, string $hash, string $operation): true|\WP_Error
+    private function resolveConcurrentWrite(string $table, array $manifest, string $hash, string $operation): bool|\WP_Error
     {
         $current = $this->stored($table, (string) $manifest['module_key']);
         if (! is_array($current)) {
@@ -338,12 +344,19 @@ final class ModuleRegistry
                 '/wp-admin/admin.php?page=sabri-security-findings',
                 '/wp-admin/admin.php?page=sabri-security-privacy-requests',
                 '/wp-admin/admin.php?page=sabri-security-assurance',
+                '/wp-admin/admin.php?page=sabri-security-governance',
                 '/wp-json/sabri-security/v1/status',
             ],
             'capabilities' => Capabilities::all(),
             'external_vendors' => [],
             'privacy_operations' => [],
             'last_security_test' => '',
+            'contract_version' => '1.0.0',
+            'canonical_data_owner' => 'File 24',
+            'canonical_action_owner' => 'Native owners; File 24 assurance only',
+            'evidence_source' => 'release:file-24-0.25.7',
+            'degraded_behavior' => 'Native controls remain authoritative; privileged assurance writes fail closed.',
+            'release_gate' => 'Staging, independent penetration test, restore drill and Founder production approval',
         ];
     }
 }

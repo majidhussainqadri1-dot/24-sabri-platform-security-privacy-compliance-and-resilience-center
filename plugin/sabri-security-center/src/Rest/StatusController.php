@@ -10,6 +10,7 @@ use Sabri\Platform\Security\Storage\AssuranceRepository;
 use Sabri\Platform\Security\Storage\ControlRepository;
 use Sabri\Platform\Security\Storage\FindingRepository;
 use Sabri\Platform\Security\Storage\IncidentRepository;
+use Sabri\Platform\Security\Storage\GovernanceRepository;
 use Sabri\Platform\Security\Storage\RiskRepository;
 use Sabri\Platform\Security\Support\Sanitizer;
 use Sabri\Platform\Security\System\SystemCheck;
@@ -26,7 +27,8 @@ final class StatusController
         private ?IncidentRepository $incidents = null,
         private ?ControlRepository $controls = null,
         private ?FindingRepository $findings = null,
-        private ?AssuranceRepository $assurance = null
+        private ?AssuranceRepository $assurance = null,
+        private ?GovernanceRepository $governance = null
     ) {
     }
 
@@ -65,6 +67,9 @@ final class StatusController
         }
         if ($this->controls && current_user_can('spcrc_manage_controls')) {
             $counts['controls'] = $this->controls->count();
+        }
+        if ($this->governance && current_user_can('spcrc_request_governance_decision')) {
+            $counts['pending_governance_decisions'] = $this->governance->pendingCount();
         }
         if ($this->assurance && current_user_can('spcrc_manage_assurance')) {
             $counts['assurance_records'] = $this->assurance->count();
@@ -123,6 +128,9 @@ final class StatusController
             'owner' => Sanitizer::text($manifest['owner'] ?? '', 120),
             'posture' => Sanitizer::key($manifest['posture'] ?? 'unassessed', 40),
             'last_security_test' => Sanitizer::isoTime($manifest['last_security_test'] ?? ''),
+            'contract_version' => Sanitizer::text($manifest['contract_version'] ?? 'unversioned', 40),
+            'degraded_behavior' => Sanitizer::text($manifest['degraded_behavior'] ?? '', 300),
+            'release_gate' => Sanitizer::text($manifest['release_gate'] ?? '', 300),
         ];
     }
 
@@ -148,7 +156,7 @@ final class StatusController
     {
         return [
             'platform' => Sanitizer::text($payload['platform'] ?? 'Sabri Social Homeopathy Platform', 120),
-            'security_program' => Sanitizer::text($payload['security_program'] ?? 'Foundation under active development', 200),
+            'security_program' => 'Foundation candidate; production assurance pending',
             'privacy_request_available' => Sanitizer::boolean($payload['privacy_request_available'] ?? false),
             'responsible_disclosure_available' => Sanitizer::boolean($payload['responsible_disclosure_available'] ?? false),
             'unsupported_claims' => Sanitizer::textList($payload['unsupported_claims'] ?? [], 10, 180),

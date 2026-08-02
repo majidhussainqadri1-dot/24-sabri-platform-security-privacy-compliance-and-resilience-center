@@ -8,6 +8,7 @@ use Sabri\Platform\Security\Admin\AssetLoader;
 use Sabri\Platform\Security\Admin\AssuranceAdmin;
 use Sabri\Platform\Security\Admin\Dashboard;
 use Sabri\Platform\Security\Admin\FindingAdmin;
+use Sabri\Platform\Security\Admin\GovernanceAdmin;
 use Sabri\Platform\Security\Admin\VerifiedPrivacyAdmin;
 use Sabri\Platform\Security\Integration\File00Adapter;
 use Sabri\Platform\Security\Integration\File20Adapter;
@@ -22,6 +23,7 @@ use Sabri\Platform\Security\Storage\AssuranceRepository;
 use Sabri\Platform\Security\Storage\AuditLogger;
 use Sabri\Platform\Security\Storage\ControlRepository;
 use Sabri\Platform\Security\Storage\FindingRepository;
+use Sabri\Platform\Security\Storage\GovernanceRepository;
 use Sabri\Platform\Security\Storage\IncidentRepository;
 use Sabri\Platform\Security\Storage\PrivacyRequestRepository;
 use Sabri\Platform\Security\Storage\RiskRepository;
@@ -57,8 +59,9 @@ final class Plugin
         $audit = new AuditLogger();
         $modules = new ModuleRegistry();
         $states = new SecurityStateRegistry($modules, $audit);
-        $findings = new FindingRepository($audit);
-        $risks = new RiskRepository($audit);
+        $governance = new GovernanceRepository($audit);
+        $findings = new FindingRepository($audit, $governance);
+        $risks = new RiskRepository($audit, $governance);
         $incidents = new IncidentRepository($audit);
         $controls = new ControlRepository($audit);
         $assurance = new AssuranceRepository($audit);
@@ -74,6 +77,8 @@ final class Plugin
         (new RetentionManager($audit))->registerHooks();
         $modules->registerHooks();
         $states->registerHooks();
+        $governance->registerHooks();
+        $risks->registerHooks();
         $findings->registerHooks();
         $assurance->registerHooks();
         $privacy->registerHooks();
@@ -81,9 +86,10 @@ final class Plugin
         (new AssetLoader())->registerHooks();
         (new Dashboard($modules, $states, $checks, $audit, $risks, $incidents, $controls, $repair))->registerHooks();
         (new FindingAdmin($findings))->registerHooks();
+        (new GovernanceAdmin($governance))->registerHooks();
         (new AssuranceAdmin($assurance))->registerHooks();
         (new VerifiedPrivacyAdmin($privacyRequests, $privacy, $modules))->registerHooks();
-        (new StatusController($modules, $states, $checks, $risks, $incidents, $controls, $findings, $assurance))->registerHooks();
+        (new StatusController($modules, $states, $checks, $risks, $incidents, $controls, $findings, $assurance, $governance))->registerHooks();
 
         do_action('spcrc/booted', $this);
     }

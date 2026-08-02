@@ -48,7 +48,7 @@ function expect(bool $condition, string $message): void
 
 expect(Sanitizer::boolean('false') === false, 'Boolean sanitizer must not cast string false to true.');
 expect(Sanitizer::uuid('bad') === '', 'Invalid UUID must be rejected.');
-expect(Schema::VERSION === '0.25.4' && count(Schema::tables()) === 8, 'Corrective schema must expose eight owned tables.');
+expect(Schema::VERSION === '0.25.5' && count(Schema::tables()) === 9, 'Corrective schema must expose nine owned tables.');
 
 $registry = new ModuleRegistry();
 $manifest = [
@@ -101,13 +101,13 @@ expect($risks->openCount() === 1, 'Open risk count must reflect stored risks.');
 expect(($risks->recent(1)[0]['inherent_score'] ?? 0) === 20, 'Risk score must equal likelihood times impact.');
 
 $incidents = new IncidentRepository();
-$incidentUuid = $incidents->create(['title' => 'Test incident', 'severity' => 'sev1', 'summary' => 'Sanitized summary']);
+$incidentUuid = $incidents->create(['title' => 'Test incident', 'severity' => 'sev1', 'summary' => 'Sanitized summary', 'evidence_ref' => 'vault:incident-test-one']);
 expect(is_string($incidentUuid), 'Incident repository must create an incident.');
 expect($incidents->openCount() === 1, 'Open incident count must reflect stored incidents.');
 
 $controls = new ControlRepository();
 expect($controls->upsert(['control_key' => 'ac-01', 'title' => 'Access control', 'status' => 'implemented']) === 'ac-01', 'Control must be inserted.');
-expect($controls->upsert(['control_key' => 'ac-01', 'title' => 'Access control revised', 'status' => 'tested']) === 'ac-01', 'Existing control must update without destructive replacement.');
+expect($controls->upsert(['control_key' => 'ac-01', 'title' => 'Access control revised', 'status' => 'tested', 'evidence_ref' => 'vault:control-test-ac01', 'last_tested_at' => gmdate('c', time() - 60)]) === 'ac-01', 'Existing control must update without destructive replacement.');
 expect($controls->count() === 1 && ($controls->recent(1)[0]['status'] ?? '') === 'tested', 'Control update must preserve one canonical record.');
 
 $assurance = new AssuranceRepository($audit);
@@ -121,14 +121,14 @@ expect(is_string($backup) && $assurance->count('backup') === 1, 'Verified backup
 
 $repair = new Repair();
 $repairResult = $repair->run();
-expect(is_array($repairResult) && get_option('spcrc_schema_version') === '0.25.4', 'Non-destructive repair must verify schema and record version.');
+expect(is_array($repairResult) && get_option('spcrc_schema_version') === '0.25.5', 'Non-destructive repair must verify schema and record version.');
 expect(($repairResult['retention_schedule_verified'] ?? false) && ($repairResult['privacy_recovery_schedule_verified'] ?? false), 'Repair must verify both required schedules.');
 expect(! empty($GLOBALS['administrator_role']->caps['spcrc_manage_risks']) && ! empty($GLOBALS['administrator_role']->caps['spcrc_manage_assurance']), 'Repair must reapply operational capabilities.');
 
 add_filter('spcrc/public_browsing_compatible', '__return_false');
 function __return_false(): bool { return false; }
 $GLOBALS['wp_options']['spcrc_last_upgrade_error'] = [
-    'at' => gmdate('c'), 'error_code' => 'spcrc_test_failure', 'from_schema' => '0.25.3', 'target_schema' => '0.25.4',
+    'at' => gmdate('c'), 'error_code' => 'spcrc_test_failure', 'from_schema' => '0.25.3', 'target_schema' => '0.25.5',
 ];
 $checks = new SystemCheck($registry);
 $checkMap = [];

@@ -6,8 +6,16 @@ namespace Sabri\Platform\Security\Storage;
 
 use Sabri\Platform\Security\Support\Sanitizer;
 
+if (! class_exists(AuditGapStore::class, false)) {
+    require_once __DIR__ . '/AuditGapStore.php';
+}
+
 final class ControlRepository
 {
+    public function __construct(private ?AuditLogger $audit = null)
+    {
+    }
+
     /** @param array<string,mixed> $data
      *  @return string|\WP_Error
      */
@@ -16,8 +24,9 @@ final class ControlRepository
         global $wpdb;
         $key = Sanitizer::key($data['control_key'] ?? '', 120);
         $title = Sanitizer::text($data['title'] ?? '', 200);
-        if ($key === '' || $title === '') {
-            return new \WP_Error('spcrc_control_invalid', 'Control key and title are required.');
+        $framework = Sanitizer::text($data['framework'] ?? '', 120);
+        if ($key === '' || $title === '' || Sanitizer::containsSensitiveMaterial($title) || Sanitizer::containsSensitiveMaterial($framework)) {
+            return new \WP_Error('spcrc_control_invalid', 'A bounded, non-sensitive control key, title and framework are required.');
         }
 
         $status = Sanitizer::key($data['status'] ?? 'unassessed', 40);
@@ -26,19 +35,25 @@ final class ControlRepository
         }
 
         $table = $wpdb->prefix . 'spcrc_controls';
-        $existing = $wpdb->get_var($wpdb->prepare("SELECT id FROM {$table} WHERE control_key = %s", $key));
+        $existing = $wpdb->get_row($wpdb->prepare("SELECT * FROM {$table} WHERE control_key = %s", $key), ARRAY_A);
         $now = current_time('mysql', true);
+        $evidenceRef = Sanitizer::opaqueReference($data['evidence_ref'] ?? '');
+        $lastTestedAt = $this->mysqlTime($data['last_tested_at'] ?? '');
+        if (in_array($status, ['tested', 'accepted'], true) && ($evidenceRef === '' || $lastTestedAt === null)) {
+            return new \WP_Error('spcrc_control_evidence_missing', 'Tested or accepted controls require an opaque evidence reference and completed test timestamp.');
+        }
+
         $payload = [
             'title' => $title,
-            'framework' => Sanitizer::text($data['framework'] ?? '', 120),
+            'framework' => $framework,
             'status' => $status,
             'owner_user_id' => absint($data['owner_user_id'] ?? get_current_user_id()) ?: null,
-            'evidence_ref' => Sanitizer::text($data['evidence_ref'] ?? '', 255),
-            'last_tested_at' => $this->mysqlTime($data['last_tested_at'] ?? ''),
+            'evidence_ref' => $evidenceRef,
+            'last_tested_at' => $lastTestedAt,
             'updated_at' => $now,
         ];
 
-        if ($existing) {
+        if (is_array($existing)) {
             $written = $wpdb->update(
                 $table,
                 $payload,
@@ -54,10 +69,40 @@ final class ControlRepository
                 ['%s', '%s', '%s', '%s', '%s', '%d', '%s', '%s', '%s']
             );
         }
+        if ($written === false) {
+            return new \WP_Error('spcrc_control_write_failed', 'Control could not be stored.');
+        }
 
-        return $written === false
-            ? new \WP_Error('spcrc_control_write_failed', 'Control could not be stored.')
-            : $key;
+        $audit = $this->audit?->record(
+            is_array($existing) ? 'security_control_updated' : 'security_control_created',
+            'file-24-security-center',
+            $status,
+            $status === 'failed' ? 'high' : 'medium',
+            ['control_key' => $key, 'status' => $status, 'evidence_ref' => $evidenceRef]
+        );
+        if (is_wp_error($audit)) {
+            $rolledBack = is_array($existing)
+                ? $wpdb->update(
+                    $table,
+                    [
+                        'title' => $existing['title'] ?? '',
+                        'framework' => $existing['framework'] ?? '',
+                        'status' => $existing['status'] ?? 'unassessed',
+                        'owner_user_id' => $existing['owner_user_id'] ?? null,
+                        'evidence_ref' => $existing['evidence_ref'] ?? '',
+                        'last_tested_at' => $existing['last_tested_at'] ?? null,
+                        'updated_at' => $existing['updated_at'] ?? $now,
+                    ],
+                    ['control_key' => $key]
+                )
+                : $wpdb->delete($table, ['control_key' => $key], ['%s']);
+            if ($rolledBack !== 1) {
+                AuditGapStore::record('spcrc_control_audit_gap', 'control_key', $key, 'write_rollback_failed');
+            }
+            return new \WP_Error('spcrc_control_audit_failed', 'Control change was rolled back because audit evidence could not be stored.');
+        }
+
+        return $key;
     }
 
     public function count(): int

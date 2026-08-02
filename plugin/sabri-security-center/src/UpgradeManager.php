@@ -10,11 +10,26 @@ use Sabri\Platform\Security\Storage\Schema;
 
 final class UpgradeManager
 {
-    /** @return true|\WP_Error */
-    public static function maybeUpgrade(): true|\WP_Error
+    private const LOCK_OPTION = 'spcrc_upgrade_lock';
+    private const LOCK_TTL = 120;
+
+    /** @return bool|\WP_Error */
+    public static function maybeUpgrade(): bool|\WP_Error
     {
         $installedSchema = (string) get_option('spcrc_schema_version', '');
         $installedPlugin = (string) get_option('spcrc_version', '');
+
+        if (
+            ($installedSchema !== '' && version_compare($installedSchema, Schema::VERSION, '>'))
+            || ($installedPlugin !== '' && version_compare($installedPlugin, SPCRC_VERSION, '>'))
+        ) {
+            $error = new \WP_Error(
+                'spcrc_downgrade_blocked',
+                'File 24 detected a newer installed version and refused an unsafe downgrade.'
+            );
+            self::fail($error, $installedSchema);
+            return $error;
+        }
 
         if ($installedSchema === Schema::VERSION && $installedPlugin === SPCRC_VERSION) {
             $schemaIntegrity = Schema::verify();
@@ -29,6 +44,16 @@ final class UpgradeManager
             }
             delete_option('spcrc_last_upgrade_error');
             return true;
+        }
+
+        $lockToken = self::acquireLock();
+        if ($lockToken === '') {
+            $error = new \WP_Error(
+                'spcrc_upgrade_locked',
+                'Another File 24 upgrade is already in progress. Runtime remains blocked until it completes.'
+            );
+            do_action('spcrc/upgrade_lock_contended', $installedSchema, Schema::VERSION);
+            return $error;
         }
 
         try {
@@ -71,11 +96,13 @@ final class UpgradeManager
             ]);
             do_action('spcrc/upgrade_failed', $exception, $installedSchema, Schema::VERSION);
             return $error;
+        } finally {
+            self::releaseLock($lockToken);
         }
     }
 
-    /** @return true|\WP_Error */
-    private static function ensureRuntimeIntegrity(string $installedSchema): true|\WP_Error
+    /** @return bool|\WP_Error */
+    private static function ensureRuntimeIntegrity(string $installedSchema): bool|\WP_Error
     {
         Capabilities::install();
         if (! RetentionManager::ensureScheduled()) {
@@ -96,6 +123,32 @@ final class UpgradeManager
         }
 
         return true;
+    }
+
+    private static function acquireLock(): string
+    {
+        $now = time();
+        $existing = get_option(self::LOCK_OPTION, []);
+        if (is_array($existing) && (int) ($existing['expires_at'] ?? 0) <= $now) {
+            delete_option(self::LOCK_OPTION);
+        }
+
+        $token = function_exists('wp_generate_uuid4') ? wp_generate_uuid4() : bin2hex(random_bytes(16));
+        $added = add_option(
+            self::LOCK_OPTION,
+            ['token' => $token, 'expires_at' => $now + self::LOCK_TTL],
+            '',
+            false
+        );
+        return $added ? $token : '';
+    }
+
+    private static function releaseLock(string $token): void
+    {
+        $existing = get_option(self::LOCK_OPTION, []);
+        if (is_array($existing) && hash_equals((string) ($existing['token'] ?? ''), $token)) {
+            delete_option(self::LOCK_OPTION);
+        }
     }
 
     private static function fail(\WP_Error $error, string $installedSchema): void

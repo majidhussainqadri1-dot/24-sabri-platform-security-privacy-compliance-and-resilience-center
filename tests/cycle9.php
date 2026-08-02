@@ -43,7 +43,7 @@ function expectCycle9(bool $condition, string $message): void
     }
 }
 
-expectCycle9(Schema::VERSION === '0.25.4' && count(Schema::tables()) === 8, 'Schema must expose eight File 24 tables.');
+expectCycle9(Schema::VERSION === '0.25.5' && count(Schema::tables()) === 9, 'Schema must expose nine File 24 tables.');
 Capabilities::install();
 expectCycle9(! empty($GLOBALS['administrator_role']->caps['spcrc_manage_assurance']), 'Assurance capability must be granted to administrators.');
 expectCycle9(empty($GLOBALS['administrator_role']->caps['spcrc_accept_critical_risk']), 'Critical-risk acceptance must remain explicitly delegated.');
@@ -166,7 +166,7 @@ $GLOBALS['wp_options']['spcrc_last_upgrade_error'] = [
     'at' => '2026-08-01T00:00:00Z',
     'error_code' => 'spcrc_test_failure',
     'from_schema' => '0.25.3',
-    'target_schema' => '0.25.4',
+    'target_schema' => '0.25.5',
 ];
 $checkMap = [];
 foreach ((new SystemCheck($registry))->run() as $check) {
@@ -179,7 +179,7 @@ $repaired = (new Repair())->run();
 expectCycle9(is_array($repaired), 'Non-destructive repair must complete when schedules are verified.');
 expectCycle9(($repaired['retention_schedule_verified'] ?? false) === true, 'Repair must verify retention schedule.');
 expectCycle9(($repaired['privacy_recovery_schedule_verified'] ?? false) === true, 'Repair must verify privacy recovery schedule.');
-expectCycle9(get_option('spcrc_schema_version') === '0.25.4' && get_option('spcrc_version') === '0.25.6', 'Repair must verify version truth.');
+expectCycle9(get_option('spcrc_schema_version') === '0.25.5' && get_option('spcrc_version') === '0.25.7', 'Repair must verify version truth.');
 
 $pluginSource = file_get_contents(dirname(__DIR__) . '/plugin/sabri-security-center/src/Plugin.php');
 $registrySource = file_get_contents(dirname(__DIR__) . '/plugin/sabri-security-center/src/Registry/ModuleRegistry.php');

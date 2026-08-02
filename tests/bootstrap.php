@@ -7,7 +7,7 @@ const MINUTE_IN_SECONDS = 60;
 const HOUR_IN_SECONDS = 3600;
 const DAY_IN_SECONDS = 86400;
 const ABSPATH = '/tmp/wordpress/';
-const SPCRC_VERSION = '0.25.6';
+const SPCRC_VERSION = '0.25.7';
 
 @mkdir(ABSPATH . 'wp-admin/includes', 0777, true);
 if (! file_exists(ABSPATH . 'wp-admin/includes/upgrade.php')) {
@@ -28,6 +28,7 @@ $GLOBALS['current_user_caps'] = array_fill_keys([
     'spcrc_manage_risks',
     'spcrc_manage_incidents',
     'spcrc_manage_assurance',
+    'spcrc_request_governance_decision',
     'spcrc_manage_security_settings',
     'spcrc_run_security_assessments',
 ], true);
@@ -66,6 +67,7 @@ final class FakeWpdb
 {
     public string $prefix = 'wp_';
     public bool $failInsert = false;
+    public bool $failAuditInsert = false;
     public bool $zeroUpdate = false;
     public int $manifestInsertCount = 0;
     public int $manifestUpdateCount = 0;
@@ -73,10 +75,13 @@ final class FakeWpdb
     public array $privacy = [];
     public array $manifests = [];
     public array $risks = [];
+    public array $findings = [];
     public array $incidents = [];
     public array $controls = [];
     public array $assurance = [];
+    public array $governance = [];
     public string $last_error = '';
+    public array $missingColumns = [];
 
     public function get_charset_collate(): string { return 'DEFAULT CHARACTER SET utf8mb4'; }
     public function esc_like(string $value): string { return $value; }
@@ -89,6 +94,7 @@ final class FakeWpdb
             if (str_contains($prepared, 'spcrc_incidents') && str_contains($prepared, 'COUNT(*)')) return count(array_filter($this->incidents, static fn(array $r): bool => ($r['status'] ?? '') === 'open'));
             if (str_contains($prepared, 'spcrc_controls') && str_contains($prepared, 'COUNT(*)')) return count($this->controls);
             if (str_contains($prepared, 'spcrc_assurance_records') && str_contains($prepared, 'COUNT(*)')) return count($this->assurance);
+            if (str_contains($prepared, 'spcrc_governance_decisions') && str_contains($prepared, 'COUNT(*)')) return count(array_filter($this->governance, static fn(array $r): bool => ($r['status'] ?? '') === 'pending'));
             return null;
         }
 
@@ -101,7 +107,34 @@ final class FakeWpdb
             $type = (string) ($args[0] ?? '');
             return count(array_filter($this->assurance, static fn(array $r): bool => ($r['record_type'] ?? '') === $type));
         }
+        if (str_contains($query, 'spcrc_governance_decisions') && str_contains($query, 'SELECT decision_uuid')) {
+            $type = (string) ($args[0] ?? '');
+            $subject = (string) ($args[1] ?? '');
+            foreach ($this->governance as $row) {
+                if (($row['decision_type'] ?? '') === $type && ($row['subject_key'] ?? '') === $subject && ($row['status'] ?? '') === 'pending') return $row['decision_uuid'];
+            }
+            return null;
+        }
+        if (str_contains($query, 'spcrc_governance_decisions') && str_contains($query, 'COUNT(*)')) {
+            return count(array_filter($this->governance, static fn(array $r): bool => ($r['status'] ?? '') === 'pending'));
+        }
         return null;
+    }
+
+    public function get_col(string $query, int $column = 0): array
+    {
+        $columns = [
+            'spcrc_risks' => ['id', 'risk_uuid', 'module_key', 'title', 'likelihood', 'impact', 'inherent_score', 'status', 'treatment', 'owner_user_id', 'due_at', 'governance_decision_uuid', 'accepted_by_user_id', 'accepted_at', 'acceptance_expires_at', 'created_at', 'updated_at'],
+            'spcrc_findings' => ['id', 'finding_uuid', 'module_key', 'title', 'severity', 'status', 'owner_user_id', 'due_at', 'evidence_ref', 'governance_decision_uuid', 'acceptance_expires_at', 'created_at', 'updated_at'],
+            'spcrc_incidents' => ['id', 'incident_uuid', 'title', 'severity', 'status', 'owner_user_id', 'summary', 'evidence_ref', 'opened_at', 'updated_at', 'closed_at'],
+            'spcrc_governance_decisions' => ['id', 'decision_uuid', 'decision_type', 'subject_key', 'module_key', 'status', 'requester_user_id', 'approver_user_id', 'evidence_ref', 'rationale_hash', 'requested_at', 'expires_at', 'decided_at', 'revoked_at', 'lock_version'],
+        ];
+        foreach ($columns as $table => $available) {
+            if (str_contains($query, $table)) {
+                return array_values(array_diff($available, $this->missingColumns[$table] ?? []));
+            }
+        }
+        return [];
     }
 
     public function get_row(mixed $prepared, mixed $output = null): mixed
@@ -118,6 +151,11 @@ final class FakeWpdb
             return $this->assurance[(string) ($args[0] ?? '') . ':' . (string) ($args[1] ?? '')] ?? null;
         }
         if (str_contains($query, 'spcrc_privacy_requests')) return $this->privacy[(string) ($args[0] ?? '')] ?? null;
+        if (str_contains($query, 'spcrc_governance_decisions')) return $this->governance[(string) ($args[0] ?? '')] ?? null;
+        if (str_contains($query, 'spcrc_risks') && str_contains($query, 'WHERE risk_uuid')) return $this->risks[(string) ($args[0] ?? '')] ?? null;
+        if (str_contains($query, 'spcrc_findings') && str_contains($query, 'WHERE finding_uuid')) return $this->findings[(string) ($args[0] ?? '')] ?? null;
+        if (str_contains($query, 'spcrc_controls') && str_contains($query, 'WHERE control_key')) return $this->controls[(string) ($args[0] ?? '')] ?? null;
+        if (str_contains($query, 'spcrc_incidents') && str_contains($query, 'WHERE incident_uuid')) return $this->incidents[(string) ($args[0] ?? '')] ?? null;
         return null;
     }
 
@@ -129,6 +167,7 @@ final class FakeWpdb
         if (str_contains($query, 'spcrc_risks')) return array_slice(array_reverse(array_values($this->risks)), 0, $limit);
         if (str_contains($query, 'spcrc_incidents')) return array_slice(array_reverse(array_values($this->incidents)), 0, $limit);
         if (str_contains($query, 'spcrc_controls')) return array_slice(array_reverse(array_values($this->controls)), 0, $limit);
+        if (str_contains($query, 'spcrc_governance_decisions')) return array_slice(array_reverse(array_values($this->governance)), 0, $limit);
         if (str_contains($query, 'spcrc_assurance_records')) {
             $type = str_contains($query, 'WHERE record_type = %s') ? (string) ($args[0] ?? '') : '';
             $rows = array_values(array_filter($this->assurance, static fn(array $r): bool => $type === '' || ($r['record_type'] ?? '') === $type));
@@ -139,10 +178,11 @@ final class FakeWpdb
 
     public function insert(string $table, array $data, array $formats = []): int|false
     {
-        if ($this->failInsert) { $this->last_error = 'forced failure'; return false; }
+        if ($this->failInsert || ($this->failAuditInsert && str_contains($table, 'spcrc_security_events'))) { $this->last_error = 'forced failure'; return false; }
         if (str_contains($table, 'spcrc_security_events')) $this->events[] = $data;
         elseif (str_contains($table, 'spcrc_privacy_requests')) $this->privacy[(string) $data['request_uuid']] = $data;
         elseif (str_contains($table, 'spcrc_risks')) $this->risks[(string) $data['risk_uuid']] = $data;
+        elseif (str_contains($table, 'spcrc_findings')) $this->findings[(string) $data['finding_uuid']] = $data;
         elseif (str_contains($table, 'spcrc_incidents')) $this->incidents[(string) $data['incident_uuid']] = $data;
         elseif (str_contains($table, 'spcrc_controls')) $this->controls[(string) $data['control_key']] = $data;
         elseif (str_contains($table, 'spcrc_module_manifests')) {
@@ -150,6 +190,10 @@ final class FakeWpdb
             $key = (string) $data['module_key'];
             if (isset($this->manifests[$key])) return false;
             $this->manifests[$key] = $data;
+        } elseif (str_contains($table, 'spcrc_governance_decisions')) {
+            $key = (string) $data['decision_uuid'];
+            if (isset($this->governance[$key])) return false;
+            $this->governance[$key] = $data;
         } elseif (str_contains($table, 'spcrc_assurance_records')) {
             $id = (string) $data['record_type'] . ':' . (string) $data['record_key'];
             if (isset($this->assurance[$id])) return false;
@@ -162,6 +206,33 @@ final class FakeWpdb
     {
         if ($this->failInsert) return false;
         if ($this->zeroUpdate) return 0;
+        if (str_contains($table, 'spcrc_governance_decisions')) {
+            $uuid = (string) ($where['decision_uuid'] ?? '');
+            if (! isset($this->governance[$uuid])) return 0;
+            foreach ($where as $key => $value) if (($this->governance[$uuid][$key] ?? null) != $value) return 0;
+            $this->governance[$uuid] = array_merge($this->governance[$uuid], $data);
+            return 1;
+        }
+        if (str_contains($table, 'spcrc_risks')) {
+            $uuid = (string) ($where['risk_uuid'] ?? '');
+            if (! isset($this->risks[$uuid])) return 0;
+            if (isset($where['status']) && ($this->risks[$uuid]['status'] ?? '') !== $where['status']) return 0;
+            $this->risks[$uuid] = array_merge($this->risks[$uuid], $data);
+            return 1;
+        }
+        if (str_contains($table, 'spcrc_findings')) {
+            $uuid = (string) ($where['finding_uuid'] ?? '');
+            if (! isset($this->findings[$uuid])) return 0;
+            if (isset($where['status']) && ($this->findings[$uuid]['status'] ?? '') !== $where['status']) return 0;
+            $this->findings[$uuid] = array_merge($this->findings[$uuid], $data);
+            return 1;
+        }
+        if (str_contains($table, 'spcrc_incidents')) {
+            $uuid = (string) ($where['incident_uuid'] ?? '');
+            if (! isset($this->incidents[$uuid])) return 0;
+            $this->incidents[$uuid] = array_merge($this->incidents[$uuid], $data);
+            return 1;
+        }
         if (str_contains($table, 'spcrc_module_manifests')) {
             ++$this->manifestUpdateCount;
             $key = (string) $where['module_key'];
@@ -189,6 +260,76 @@ final class FakeWpdb
             return 1;
         }
         return 1;
+    }
+
+    public function delete(string $table, array $where, array $formats = []): int|false
+    {
+        if (str_contains($table, 'spcrc_governance_decisions')) {
+            $uuid = (string) ($where['decision_uuid'] ?? '');
+            if (! isset($this->governance[$uuid])) return 0;
+            unset($this->governance[$uuid]);
+            return 1;
+        }
+        if (str_contains($table, 'spcrc_assurance_records')) {
+            $recordUuid = (string) ($where['record_uuid'] ?? '');
+            foreach ($this->assurance as $id => $row) {
+                if (($row['record_uuid'] ?? '') === $recordUuid) {
+                    unset($this->assurance[$id]);
+                    return 1;
+                }
+            }
+            return 0;
+        }
+        foreach ([
+            'spcrc_risks' => ['risk_uuid', 'risks'],
+            'spcrc_findings' => ['finding_uuid', 'findings'],
+            'spcrc_incidents' => ['incident_uuid', 'incidents'],
+            'spcrc_controls' => ['control_key', 'controls'],
+        ] as $needle => [$keyName, $property]) {
+            if (str_contains($table, $needle)) {
+                $key = (string) ($where[$keyName] ?? '');
+                if (! isset($this->{$property}[$key])) return 0;
+                unset($this->{$property}[$key]);
+                return 1;
+            }
+        }
+        return 0;
+    }
+
+    public function query(mixed $prepared): int|false
+    {
+        $query = is_array($prepared) ? (string) ($prepared['query'] ?? '') : (string) $prepared;
+        if (str_contains($query, 'spcrc_governance_decisions')) {
+            $count = 0;
+            foreach ($this->governance as &$row) {
+                if (($row['status'] ?? '') === 'pending' && strtotime((string) ($row['expires_at'] ?? '') . ' UTC') <= time()) {
+                    $row['status'] = 'expired'; ++$count;
+                }
+            }
+            unset($row);
+            return $count;
+        }
+        if (str_contains($query, 'spcrc_risks')) {
+            $count = 0;
+            foreach ($this->risks as &$row) {
+                if (($row['status'] ?? '') === 'accepted' && strtotime((string) ($row['acceptance_expires_at'] ?? '') . ' UTC') <= time()) {
+                    $row['status'] = 'open'; $row['treatment'] = 'mitigate'; $row['governance_decision_uuid'] = null; $row['acceptance_expires_at'] = null; ++$count;
+                }
+            }
+            unset($row);
+            return $count;
+        }
+        if (str_contains($query, 'spcrc_findings')) {
+            $count = 0;
+            foreach ($this->findings as &$row) {
+                if (($row['status'] ?? '') === 'accepted-risk' && strtotime((string) ($row['acceptance_expires_at'] ?? '') . ' UTC') <= time()) {
+                    $row['status'] = 'triaged'; $row['governance_decision_uuid'] = null; $row['acceptance_expires_at'] = null; ++$count;
+                }
+            }
+            unset($row);
+            return $count;
+        }
+        return 0;
     }
 }
 
@@ -232,6 +373,7 @@ function absint(mixed $value): int { return abs((int) $value); }
 function is_wp_error(mixed $value): bool { return $value instanceof WP_Error; }
 function get_option(string $key, mixed $default = false): mixed { return $GLOBALS['wp_options'][$key] ?? $default; }
 function update_option(string $key, mixed $value, bool $autoload = true): bool { $GLOBALS['wp_options'][$key] = $value; return true; }
+function add_option(string $key, mixed $value = '', string $deprecated = '', bool|string|null $autoload = null): bool { if (array_key_exists($key, $GLOBALS['wp_options'])) return false; $GLOBALS['wp_options'][$key] = $value; return true; }
 function delete_option(string $key): bool { unset($GLOBALS['wp_options'][$key]); return true; }
 function set_transient(string $key, mixed $value, int $expiration): bool { $GLOBALS['wp_transients'][$key] = $value; return true; }
 function get_transient(string $key): mixed { return $GLOBALS['wp_transients'][$key] ?? false; }

@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 namespace {
-    define('SPCRC_VERSION', '0.25.6');
+    define('SPCRC_VERSION', '0.25.7');
     $GLOBALS['options'] = [];
     $GLOBALS['actions'] = [];
 
@@ -16,6 +16,8 @@ namespace {
 
     function get_option(string $key, mixed $default = false): mixed { return $GLOBALS['options'][$key] ?? $default; }
     function update_option(string $key, mixed $value, bool $autoload = true): bool { $GLOBALS['options'][$key] = $value; return true; }
+    function add_option(string $key, mixed $value = '', string $deprecated = '', bool|string|null $autoload = null): bool { if (array_key_exists($key, $GLOBALS['options'])) return false; $GLOBALS['options'][$key] = $value; return true; }
+    function wp_generate_uuid4(): string { static $i = 1; return sprintf('00000000-0000-4000-8000-%012d', $i++); }
     function delete_option(string $key): bool { unset($GLOBALS['options'][$key]); return true; }
     function do_action(string $hook, mixed ...$args): void { $GLOBALS['actions'][] = [$hook, $args]; }
     function is_wp_error(mixed $value): bool { return $value instanceof WP_Error; }
@@ -24,10 +26,10 @@ namespace {
 namespace Sabri\Platform\Security\Storage {
     final class Schema
     {
-        public const VERSION = '0.25.4';
-        public static true|\WP_Error $result = true;
-        public static function install(): true|\WP_Error { return self::$result; }
-        public static function verify(): true|\WP_Error { return self::$result; }
+        public const VERSION = '0.25.5';
+        public static bool|\WP_Error $result = true;
+        public static function install(): bool|\WP_Error { return self::$result; }
+        public static function verify(): bool|\WP_Error { return self::$result; }
     }
 }
 
@@ -88,7 +90,7 @@ namespace Sabri\Platform\Security {
     RecoveryManager::$scheduleCalls = 0;
     $migrated = UpgradeManager::maybeUpgrade();
     expectUpgrade($migrated === true, 'Assurance schema migration must return explicit success.');
-    expectUpgrade(get_option('spcrc_version', '') === '0.25.6' && get_option('spcrc_schema_version', '') === '0.25.4', 'Corrective release must advance plugin and schema versions.');
+    expectUpgrade(get_option('spcrc_version', '') === '0.25.7' && get_option('spcrc_schema_version', '') === '0.25.5', 'Corrective release must advance plugin and schema versions.');
     expectUpgrade(Capabilities::$installCalls === 1 && RetentionManager::$scheduleCalls === 1 && RecoveryManager::$scheduleCalls === 1, 'Migration must verify complete runtime integrity.');
 
     RetentionManager::$result = false;
@@ -114,5 +116,19 @@ namespace Sabri\Platform\Security {
     $recovered = UpgradeManager::maybeUpgrade();
     expectUpgrade($recovered === true && get_option('spcrc_last_upgrade_error', null) === null, 'Recovered same-version integrity must clear stale failure evidence.');
 
-    echo "PASS: upgrade failure integrity, dual-schedule runtime blocking and assurance schema migration\n";
+    $GLOBALS['options']['spcrc_version'] = '0.25.6';
+    $GLOBALS['options']['spcrc_schema_version'] = '0.25.4';
+    $GLOBALS['options']['spcrc_upgrade_lock'] = ['token' => 'other-upgrade', 'expires_at' => time() + 60];
+    $locked = UpgradeManager::maybeUpgrade();
+    expectUpgrade(is_wp_error($locked) && $locked->get_error_code() === 'spcrc_upgrade_locked', 'Concurrent migration must fail closed without entering schema writes.');
+    expectUpgrade((get_option('spcrc_last_upgrade_error', [])['error_code'] ?? '') !== 'spcrc_upgrade_locked', 'Transient lock contention must not overwrite durable upgrade failure evidence.');
+    unset($GLOBALS['options']['spcrc_upgrade_lock']);
+
+    $GLOBALS['options']['spcrc_version'] = '1.0.0';
+    $GLOBALS['options']['spcrc_schema_version'] = '1.0.0';
+    $downgrade = UpgradeManager::maybeUpgrade();
+    expectUpgrade(is_wp_error($downgrade) && $downgrade->get_error_code() === 'spcrc_downgrade_blocked', 'Newer installed schema/plugin versions must block downgrade.');
+    expectUpgrade((get_option('spcrc_last_upgrade_error', [])['error_code'] ?? '') === 'spcrc_downgrade_blocked', 'Downgrade block must be recorded as durable integrity evidence.');
+
+    echo "PASS: upgrade locking, downgrade prevention, failure integrity and dual-schedule migration controls\n";
 }

@@ -6,6 +6,10 @@ namespace Sabri\Platform\Security\Storage;
 
 use Sabri\Platform\Security\Support\Sanitizer;
 
+if (! class_exists(AuditGapStore::class, false)) {
+    require_once __DIR__ . '/AuditGapStore.php';
+}
+
 final class FindingRepository
 {
     private const SEVERITIES = ['informational', 'low', 'medium', 'high', 'critical'];
@@ -20,12 +24,15 @@ final class FindingRepository
         'false-positive' => ['triaged'],
     ];
 
-    public function __construct(private ?AuditLogger $audit = null)
-    {
+    public function __construct(
+        private ?AuditLogger $audit = null,
+        private ?GovernanceRepository $governance = null
+    ) {
     }
 
     public function registerHooks(): void
     {
+        add_action('spcrc_daily_retention', [$this, 'reopenExpiredAcceptances'], 31);
         add_filter('spcrc/security_finding_create', [$this, 'filterCreate'], 10, 2);
         add_filter('spcrc/security_finding_status', [$this, 'filterStatus'], 10, 4);
     }
@@ -65,8 +72,8 @@ final class FindingRepository
         $title = Sanitizer::text($data['title'] ?? '', 200);
         $moduleKey = Sanitizer::key($data['module_key'] ?? '', 120);
         $severity = Sanitizer::key($data['severity'] ?? 'medium', 20);
-        if ($title === '' || $moduleKey === '') {
-            return new \WP_Error('spcrc_finding_invalid', 'Finding title and module are required.');
+        if ($title === '' || $moduleKey === '' || Sanitizer::containsSensitiveMaterial($title)) {
+            return new \WP_Error('spcrc_finding_invalid', 'A bounded, non-sensitive finding title and module are required.');
         }
         if (! in_array($severity, self::SEVERITIES, true)) {
             $severity = 'medium';
@@ -85,33 +92,42 @@ final class FindingRepository
                 'status' => 'open',
                 'owner_user_id' => $actor,
                 'due_at' => $this->mysqlTime($data['due_at'] ?? ''),
-                'evidence_ref' => Sanitizer::text($data['evidence_ref'] ?? '', 255),
+                'evidence_ref' => Sanitizer::opaqueReference($data['evidence_ref'] ?? ''),
+                'governance_decision_uuid' => null,
+                'acceptance_expires_at' => null,
                 'created_at' => $now,
                 'updated_at' => $now,
             ],
-            ['%s', '%s', '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%s']
+            ['%s', '%s', '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%s', '%s', '%s']
         );
 
         if ($inserted === false) {
             return new \WP_Error('spcrc_finding_write_failed', 'Finding could not be stored.');
         }
 
-        $this->audit?->record(
+        $audit = $this->audit?->record(
             'security_finding_created',
             $moduleKey,
             'created',
             $severity,
             ['finding_uuid' => $uuid, 'severity' => $severity]
         );
+        if (is_wp_error($audit)) {
+            $deleted = $wpdb->delete($wpdb->prefix . 'spcrc_findings', ['finding_uuid' => $uuid], ['%s']);
+            if ($deleted !== 1) {
+                AuditGapStore::record('spcrc_finding_audit_gap', 'finding_uuid', $uuid, 'create_rollback_failed');
+            }
+            return new \WP_Error('spcrc_finding_audit_failed', 'Finding creation was rolled back because audit evidence could not be stored.');
+        }
 
         do_action('spcrc/security_finding_created', $uuid, $moduleKey, $severity);
         return $uuid;
     }
 
     /** @param array<string,mixed> $context
-     *  @return true|\WP_Error
+     *  @return bool|\WP_Error
      */
-    public function setStatus(string $findingUuid, string $status, array $context = []): true|\WP_Error
+    public function setStatus(string $findingUuid, string $status, array $context = []): bool|\WP_Error
     {
         global $wpdb;
 
@@ -126,7 +142,7 @@ final class FindingRepository
 
         $table = $wpdb->prefix . 'spcrc_findings';
         $existing = $wpdb->get_row($wpdb->prepare(
-            "SELECT status, module_key, severity FROM {$table} WHERE finding_uuid = %s",
+            "SELECT status, module_key, severity, governance_decision_uuid, acceptance_expires_at, updated_at FROM {$table} WHERE finding_uuid = %s",
             $findingUuid
         ), ARRAY_A);
         if (! is_array($existing) || ($existing['status'] ?? '') === '') {
@@ -146,19 +162,40 @@ final class FindingRepository
         if (! in_array($status, self::TRANSITIONS[$currentStatus] ?? [], true)) {
             return new \WP_Error('spcrc_finding_transition_invalid', 'This finding status transition is not allowed.');
         }
-        if ($note === '') {
-            return new \WP_Error('spcrc_finding_note_required', 'A sanitized accountability note is required for every status transition.');
+        if ($note === '' || Sanitizer::containsSensitiveMaterial($note)) {
+            return new \WP_Error('spcrc_finding_note_required', 'A bounded, non-sensitive accountability note is required for every status transition.');
         }
-        if ($status === 'accepted-risk' && (! function_exists('current_user_can') || ! current_user_can('spcrc_accept_critical_risk'))) {
-            return new \WP_Error('spcrc_finding_risk_acceptance_forbidden', 'You are not allowed to accept security risk.');
+        $decisionUuid = '';
+        $acceptanceExpiresAt = null;
+        if ($status === 'accepted-risk') {
+            if (! function_exists('current_user_can') || ! current_user_can('spcrc_accept_critical_risk')) {
+                return new \WP_Error('spcrc_finding_risk_acceptance_forbidden', 'You are not allowed to accept security risk.');
+            }
+            $decisionUuid = Sanitizer::uuid($context['decision_uuid'] ?? '');
+            if ($this->governance === null || ! $this->governance->isApprovedFor($decisionUuid, 'finding-risk-acceptance', $findingUuid)) {
+                return new \WP_Error('spcrc_finding_risk_acceptance_governance_missing', 'A current approved governance decision bound to this finding is required.');
+            }
+            $decision = $this->governance->get($decisionUuid);
+            $acceptanceExpiresAt = is_array($decision) ? (string) ($decision['expires_at'] ?? '') : '';
+            if ($acceptanceExpiresAt === '' || strtotime($acceptanceExpiresAt . ' UTC') <= time()) {
+                return new \WP_Error('spcrc_finding_acceptance_expiry_invalid', 'Finding risk acceptance has no usable future expiry.');
+            }
         }
 
         $now = current_time('mysql', true);
+        $statusPayload = ['status' => $status, 'updated_at' => $now];
+        if ($status === 'accepted-risk') {
+            $statusPayload['governance_decision_uuid'] = $decisionUuid;
+            $statusPayload['acceptance_expires_at'] = $acceptanceExpiresAt;
+        } elseif ($currentStatus === 'accepted-risk') {
+            $statusPayload['governance_decision_uuid'] = null;
+            $statusPayload['acceptance_expires_at'] = null;
+        }
         $updated = $wpdb->update(
             $table,
-            ['status' => $status, 'updated_at' => $now],
+            $statusPayload,
             ['finding_uuid' => $findingUuid, 'status' => $currentStatus],
-            ['%s', '%s'],
+            array_fill(0, count($statusPayload), '%s'),
             ['%s', '%s']
         );
         if ($updated === false) {
@@ -168,7 +205,7 @@ final class FindingRepository
             return new \WP_Error('spcrc_finding_concurrent_change', 'Finding changed concurrently. Refresh and try again.');
         }
 
-        $this->audit?->record(
+        $audit = $this->audit?->record(
             'security_finding_status_changed',
             $moduleKey !== '' ? $moduleKey : 'file-24-security-center',
             $status,
@@ -177,13 +214,47 @@ final class FindingRepository
                 'finding_uuid' => $findingUuid,
                 'previous_status' => $currentStatus,
                 'new_status' => $status,
-                'accountability_note' => $note,
                 'accountability_note_hash' => hash('sha256', $note),
             ]
         );
+        if (is_wp_error($audit)) {
+            $rolledBack = $wpdb->update(
+                $table,
+                [
+                    'status' => $currentStatus,
+                    'governance_decision_uuid' => $existing['governance_decision_uuid'] ?? null,
+                    'acceptance_expires_at' => $existing['acceptance_expires_at'] ?? null,
+                    'updated_at' => $existing['updated_at'] ?? $now,
+                ],
+                ['finding_uuid' => $findingUuid, 'status' => $status]
+            );
+            if ($rolledBack !== 1) {
+                AuditGapStore::record('spcrc_finding_audit_gap', 'finding_uuid', $findingUuid, 'status_rollback_failed');
+            }
+            return new \WP_Error('spcrc_finding_status_audit_failed', 'Finding status change was rolled back because audit evidence could not be stored.');
+        }
         do_action('spcrc/security_finding_status_changed', $findingUuid, $currentStatus, $status);
 
         return true;
+    }
+
+    public function reopenExpiredAcceptances(): int
+    {
+        global $wpdb;
+        $now = current_time('mysql', true);
+        $updated = $wpdb->query($wpdb->prepare(
+            "UPDATE {$wpdb->prefix}spcrc_findings SET status = 'triaged', governance_decision_uuid = NULL, acceptance_expires_at = NULL, updated_at = %s WHERE status = 'accepted-risk' AND acceptance_expires_at IS NOT NULL AND acceptance_expires_at <= %s",
+            $now,
+            $now
+        ));
+        $count = $updated === false ? 0 : (int) $updated;
+        if ($count > 0) {
+            $audit = $this->audit?->record('expired_finding_acceptances_reopened', 'file-24-security-center', 'reopened', 'high', ['count' => $count]);
+            if (is_wp_error($audit)) {
+                AuditGapStore::record('spcrc_finding_reopen_audit_gap', 'expired_acceptance_batch', (string) $count, 'reopen_audit_failed', ['count' => $count]);
+            }
+        }
+        return $count;
     }
 
     public function openCount(): int
@@ -199,7 +270,7 @@ final class FindingRepository
         global $wpdb;
         $limit = max(1, min(100, $limit));
         $rows = $wpdb->get_results(
-            $wpdb->prepare("SELECT finding_uuid, module_key, title, severity, status, owner_user_id, due_at, evidence_ref, created_at, updated_at FROM {$wpdb->prefix}spcrc_findings ORDER BY updated_at DESC LIMIT %d", $limit),
+            $wpdb->prepare("SELECT finding_uuid, module_key, title, severity, status, owner_user_id, due_at, evidence_ref, governance_decision_uuid, acceptance_expires_at, created_at, updated_at FROM {$wpdb->prefix}spcrc_findings ORDER BY updated_at DESC LIMIT %d", $limit),
             ARRAY_A
         );
         return is_array($rows) ? $rows : [];

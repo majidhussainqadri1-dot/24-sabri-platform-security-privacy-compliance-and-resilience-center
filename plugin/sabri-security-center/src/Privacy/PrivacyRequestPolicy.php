@@ -128,18 +128,18 @@ final class PrivacyRequestPolicy
         return array_merge($begin, $validation);
     }
 
-    public function claimModule(string $requestUuid, string $moduleKey): true|\WP_Error
+    public function claimModule(string $requestUuid, string $moduleKey): bool|\WP_Error
     {
         return $this->storage->claimModule($requestUuid, $moduleKey);
     }
 
     /** @param array<string,mixed> $result */
-    public function storeModuleResult(string $requestUuid, string $moduleKey, array $result): true|\WP_Error
+    public function storeModuleResult(string $requestUuid, string $moduleKey, array $result): bool|\WP_Error
     {
         return $this->storage->storeModuleResult($requestUuid, $moduleKey, $this->encodeRetrySafety($result));
     }
 
-    public function finalize(string $requestUuid, string $status, string $expectedStatus = 'dispatching', string $lastErrorCode = ''): true|\WP_Error
+    public function finalize(string $requestUuid, string $status, string $expectedStatus = 'dispatching', string $lastErrorCode = ''): bool|\WP_Error
     {
         return $this->storage->finalize($requestUuid, $status, $expectedStatus, $lastErrorCode);
     }

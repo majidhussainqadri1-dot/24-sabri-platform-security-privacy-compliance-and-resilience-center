@@ -60,6 +60,56 @@ final class Sanitizer
     }
 
 
+    /**
+     * Accept only a bounded opaque locator. File paths, URLs, e-mail addresses,
+     * bearer material and free-form evidence are deliberately excluded.
+     */
+    public static function opaqueReference(mixed $value, int $maxLength = 255): string
+    {
+        if (! is_scalar($value) && $value !== null) {
+            return '';
+        }
+
+        $reference = trim((string) $value);
+        if ($reference === '' || strlen($reference) > $maxLength) {
+            return '';
+        }
+        if (
+            preg_match('/\s/', $reference) === 1
+            || str_contains($reference, '/')
+            || str_contains($reference, '\\')
+            || str_contains($reference, '@')
+            || preg_match('/^[a-z][a-z0-9+.-]*:\/\//i', $reference) === 1
+            || preg_match('/^[A-Za-z]:/', $reference) === 1
+        ) {
+            return '';
+        }
+
+        return preg_match('/^[a-z][a-z0-9_-]{1,31}:[A-Za-z0-9][A-Za-z0-9._:-]{2,220}$/', $reference) === 1
+            ? self::truncate($reference, $maxLength)
+            : '';
+    }
+
+    public static function containsSensitiveMaterial(mixed $value): bool
+    {
+        if (! is_scalar($value) && $value !== null) {
+            return true;
+        }
+
+        $text = trim((string) $value);
+        if ($text === '') {
+            return false;
+        }
+
+        return preg_match('/-----BEGIN [A-Z ]*PRIVATE KEY-----/i', $text) === 1
+            || preg_match('/\b(?:api[_-]?key|secret|password|passwd|token|authorization)\s*[:=]\s*\S+/i', $text) === 1
+            || preg_match('/\bBearer\s+[A-Za-z0-9._~+\/-]+=*/i', $text) === 1
+            || preg_match('/\b[a-z][a-z0-9+.-]*:\/\//i', $text) === 1
+            || preg_match('/(?:^|\s)(?:[A-Za-z]:\\\\|\/(?:var|home|srv|private|etc|tmp|mnt|opt)\/|wp-content\/)/i', $text) === 1
+            || preg_match('/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i', $text) === 1
+            || preg_match('/\b\d{10,16}\b/', preg_replace('/[- ]/', '', $text) ?? $text) === 1;
+    }
+
     public static function boolean(mixed $value): bool
     {
         if (is_bool($value)) {
