@@ -56,7 +56,12 @@ jobs:
             echo "adfe08054e531dc438129793ca7ee685cca070c438a46f70b5959da1b1ec1675  /tmp/file24-cycle17.patch.bz2" | sha256sum -c -
             bunzip2 -c /tmp/file24-cycle17.patch.bz2 > /tmp/file24-cycle17.patch
             echo "6a98dc70d5d8b40de4a22cae496a8c5463859fe89edd3193a6d7885de0750d5f  /tmp/file24-cycle17.patch" | sha256sum -c -
-            patch -p1 --batch --forward --exclude='.github/workflows/ci.yml' < /tmp/file24-cycle17.patch
+            awk '
+              /^diff --git a\/\.github\/workflows\/ci\.yml b\/\.github\/workflows\/ci\.yml$/ { skip=1; next }
+              /^diff --git / { skip=0 }
+              !skip { print }
+            ' /tmp/file24-cycle17.patch > /tmp/file24-cycle17-nonci.patch
+            patch -p1 --batch --forward < /tmp/file24-cycle17-nonci.patch
             rm -rf cycle17
           fi
           git diff --check
