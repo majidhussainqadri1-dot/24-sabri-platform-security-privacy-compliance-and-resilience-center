@@ -2,7 +2,7 @@
 
 File 24 is the central security-governance and assurance plane for the Sabri Social Homeopathy Platform. Native modules retain authentication, authorization and canonical data ownership.
 
-## Foundation scope — eight-round corrective candidate 0.25.9
+## Foundation scope — twelve-round corrective candidate 0.26.0
 
 This reviewed Foundation establishes:
 
@@ -35,7 +35,7 @@ This public repository contains sanitized source and documentation only. Live vu
 
 Audit or compensation failures create bounded, independently keyed release blockers rather than being overwritten or silently treated as success. Generic operational gaps can be reconciled only through a private capability-, nonce-, File 00 step-up-, evidence- and audit-gated workflow.
 
-The 0.25.9 implementation is a reviewed Foundation candidate and is not production-ready. Automated checks do not replace real WordPress/MySQL activation, migration and rollback, Hostinger staging, live File 00/File 20 integration, accessibility/browser acceptance, restore drills, provider validation, abuse testing, legal review or independent penetration testing.
+The 0.26.0 implementation is a reviewed Foundation candidate and is not production-ready. Automated checks do not replace real WordPress/MySQL activation, migration and rollback, Hostinger staging, live File 00/File 20 integration, accessibility/browser acceptance, restore drills, provider validation, abuse testing, legal review or independent penetration testing.
 
 ## Build and QA
 
@@ -74,6 +74,19 @@ php tests/cycle27-security-state-atomic.php
 php tests/cycle28-control-upsert-lock.php
 php tests/cycle29-privacy-verification-compensation.php
 php tests/cycle29-eight-round-release-closure.php
+php tests/cycle30-expired-lock-refresh.php
+php tests/cycle31-lock-token-generation.php
+php tests/cycle32-audit-evidence-integrity.php
+php tests/cycle33-audit-gap-capacity.php
+php tests/cycle34-strict-absolute-time.php
+php tests/cycle35-governance-request-lease.php
+php tests/cycle36-governance-audit-gap-concurrency.php
+php tests/cycle37-governance-expiry-atomic.php
+php tests/cycle38-risk-optimistic-concurrency.php
+php tests/cycle39-finding-optimistic-concurrency.php
+php tests/cycle40-assurance-audit-rollback.php
+php tests/cycle41-privacy-verifier-authority.php
+php tests/cycle41-twelve-round-release-closure.php
 ./tools/build-release.sh
 ```
 

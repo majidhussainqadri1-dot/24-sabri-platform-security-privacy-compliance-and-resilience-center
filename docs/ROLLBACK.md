@@ -1,4 +1,4 @@
-# Rollback — Foundation 0.25.9
+# Rollback — Foundation 0.26.0
 
 Rollback is code-first and evidence-preserving:
 
@@ -11,8 +11,8 @@ Rollback is code-first and evidence-preserving:
 7. Clear scheduled hooks only when the prior package does not own compatible callbacks.
 8. Inspect all option-backed locks. Remove one only when the owner is proven absent/stale and the action is recorded; never delete an active foreign lock.
 9. Do not retry privacy work merely because older code cannot interpret newer compensation or gap evidence.
-10. Treat older-code inability to evaluate 0.25.9 evidence bindings as a reason to remain blocked, not as approval.
-11. Reconcile audit gaps only after returning to 0.25.9 or a later compatible release through the authorized workflow.
+10. Treat older-code inability to evaluate 0.26.0 evidence bindings as a reason to remain blocked, not as approval.
+11. Reconcile audit gaps only after returning to 0.26.0 or a later compatible release through the authorized workflow.
 12. Re-run prior-package checks and verify native modules still enforce their own authorization.
 13. Use the previously tested full staging restore when code rollback does not restore integrity.
 14. Record rollback, evidence preservation and later reconciliation in the private operational change/incident system.

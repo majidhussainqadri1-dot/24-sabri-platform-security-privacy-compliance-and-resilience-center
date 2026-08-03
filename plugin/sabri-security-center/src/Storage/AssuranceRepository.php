@@ -6,6 +6,10 @@ namespace Sabri\Platform\Security\Storage;
 
 use Sabri\Platform\Security\Support\Sanitizer;
 
+if (! class_exists(AuditGapStore::class, false)) {
+    require_once __DIR__ . '/AuditGapStore.php';
+}
+
 /**
  * Stores bounded compliance-applicability, vendor-assurance and backup/restore
  * evidence metadata. Raw contracts, credentials, backup locations, identity
@@ -244,7 +248,7 @@ final class AssuranceRepository
         if (is_wp_error($auditResult)) {
             $rolledBack = is_array($existingRaw)
                 ? $this->restoreRaw($table, $existingRaw)
-                : $wpdb->delete($table, ['record_uuid' => $recordUuid], ['%s']) !== false;
+                : $wpdb->delete($table, ['record_uuid' => $recordUuid], ['%s']) === 1;
             if (! $rolledBack) {
                 $this->recordAuditGap($recordUuid, 'assurance_audit_rollback_failed');
             }
@@ -461,19 +465,18 @@ final class AssuranceRepository
         ];
     }
 
-    private function recordAuditGap(string $recordUuid, string $reason): void
+    private function recordAuditGap(string $recordUuid, string $reason): bool
     {
         $recordUuid = Sanitizer::uuid($recordUuid);
         if ($recordUuid === '') {
-            return;
+            return false;
         }
-        $raw = get_option('spcrc_assurance_audit_gap', []);
-        $gaps = is_array($raw) ? $raw : [];
-        $gaps[$recordUuid] = [
-            'reason' => Sanitizer::key($reason, 80),
-            'recorded_at' => gmdate('c'),
-        ];
-        update_option('spcrc_assurance_audit_gap', $gaps, false);
+        return AuditGapStore::record(
+            'spcrc_assurance_audit_gap',
+            'assurance_record',
+            $recordUuid,
+            $reason
+        );
     }
 
     /** @param array<string,mixed> $row

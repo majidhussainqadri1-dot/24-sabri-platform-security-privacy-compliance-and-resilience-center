@@ -38,7 +38,16 @@ final class AuditLogger
         $safeContext = $this->redact($context);
         $json = wp_json_encode($safeContext, JSON_UNESCAPED_SLASHES);
         if (! is_string($json)) {
-            $json = '{}';
+            $error = new \WP_Error(
+                'spcrc_audit_context_encode_failed',
+                'The bounded security-event context could not be encoded safely.'
+            );
+            do_action('spcrc/security_event_failed', $error, [
+                'event_type' => $eventType,
+                'module_key' => $moduleKey,
+                'risk_level' => $riskLevel,
+            ]);
+            return $error;
         }
 
         $payload = [
@@ -59,8 +68,8 @@ final class AuditLogger
             ['%s', '%s', '%s', '%d', '%s', '%s', '%s', '%s', '%s']
         );
 
-        if ($inserted === false) {
-            $error = new \WP_Error('spcrc_audit_write_failed', 'The security event could not be stored.');
+        if ($inserted !== 1) {
+            $error = new \WP_Error('spcrc_audit_write_failed', 'The security event could not be stored exactly once.');
             do_action('spcrc/security_event_failed', $error, $payload);
             return $error;
         }

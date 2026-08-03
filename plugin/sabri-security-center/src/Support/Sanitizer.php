@@ -131,8 +131,49 @@ final class Sanitizer
             return '';
         }
 
-        $timestamp = strtotime($value);
-        return $timestamp === false ? '' : gmdate('c', $timestamp);
+        $dateTime = self::absoluteDateTime($value);
+        return $dateTime instanceof \DateTimeImmutable
+            ? $dateTime->setTimezone(new \DateTimeZone('UTC'))->format('Y-m-d\TH:i:sP')
+            : '';
+    }
+
+    private static function absoluteDateTime(string $value): ?\DateTimeImmutable
+    {
+        $utc = new \DateTimeZone('UTC');
+        $formats = [];
+
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $value) === 1) {
+            $formats[] = ['!Y-m-d', $value, $utc, 'Y-m-d'];
+        } elseif (preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/', $value) === 1) {
+            $formats[] = ['!Y-m-d H:i:s', $value, $utc, 'Y-m-d H:i:s'];
+        } elseif (preg_match('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})$/', $value) === 1) {
+            $normalized = str_ends_with($value, 'Z') ? substr($value, 0, -1) . '+00:00' : $value;
+            if (preg_match('/\.([0-9]{1,6})([+-]\d{2}:\d{2})$/', $normalized, $fraction) === 1) {
+                $padded = str_pad($fraction[1], 6, '0');
+                $normalized = preg_replace('/\.[0-9]{1,6}([+-]\d{2}:\d{2})$/', '.' . $padded . '$1', $normalized) ?? '';
+                $formats[] = ['!Y-m-d\TH:i:s.uP', $normalized, null, 'Y-m-d\TH:i:s.uP'];
+            } elseif (preg_match('/T\d{2}:\d{2}:\d{2}[+-]/', $normalized) === 1) {
+                $formats[] = ['!Y-m-d\TH:i:sP', $normalized, null, 'Y-m-d\TH:i:sP'];
+            } else {
+                $formats[] = ['!Y-m-d\TH:iP', $normalized, null, 'Y-m-d\TH:iP'];
+            }
+        } else {
+            return null;
+        }
+
+        foreach ($formats as [$format, $input, $timezone, $roundTripFormat]) {
+            $parsed = $timezone instanceof \DateTimeZone
+                ? \DateTimeImmutable::createFromFormat($format, $input, $timezone)
+                : \DateTimeImmutable::createFromFormat($format, $input);
+            $errors = \DateTimeImmutable::getLastErrors();
+            $hasErrors = is_array($errors) && ((int) ($errors['warning_count'] ?? 0) > 0 || (int) ($errors['error_count'] ?? 0) > 0);
+            if (! $parsed instanceof \DateTimeImmutable || $hasErrors || $parsed->format($roundTripFormat) !== $input) {
+                continue;
+            }
+            return $parsed;
+        }
+
+        return null;
     }
 
     private static function truncate(string $value, int $maxLength): string

@@ -194,9 +194,9 @@ final class FindingRepository
         $updated = $wpdb->update(
             $table,
             $statusPayload,
-            ['finding_uuid' => $findingUuid, 'status' => $currentStatus],
+            ['finding_uuid' => $findingUuid, 'status' => $currentStatus, 'updated_at' => (string) ($existing['updated_at'] ?? '')],
             array_fill(0, count($statusPayload), '%s'),
-            ['%s', '%s']
+            ['%s', '%s', '%s']
         );
         if ($updated === false) {
             return new \WP_Error('spcrc_finding_status_write_failed', 'Finding status could not be stored.');
@@ -226,7 +226,13 @@ final class FindingRepository
                     'acceptance_expires_at' => $existing['acceptance_expires_at'] ?? null,
                     'updated_at' => $existing['updated_at'] ?? $now,
                 ],
-                ['finding_uuid' => $findingUuid, 'status' => $status]
+                [
+                    'finding_uuid' => $findingUuid,
+                    'status' => $status,
+                    'updated_at' => $now,
+                    'governance_decision_uuid' => $statusPayload['governance_decision_uuid'] ?? ($existing['governance_decision_uuid'] ?? null),
+                    'acceptance_expires_at' => $statusPayload['acceptance_expires_at'] ?? ($existing['acceptance_expires_at'] ?? null),
+                ]
             );
             if ($rolledBack !== 1) {
                 AuditGapStore::record('spcrc_finding_audit_gap', 'finding_uuid', $findingUuid, 'status_rollback_failed');

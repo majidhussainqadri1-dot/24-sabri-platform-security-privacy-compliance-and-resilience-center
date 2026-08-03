@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 namespace {
-    define('SPCRC_VERSION', '0.25.9');
+    define('SPCRC_VERSION', '0.26.0');
     $GLOBALS['options'] = [];
     $GLOBALS['actions'] = [];
 
@@ -120,7 +120,7 @@ namespace Sabri\Platform\Security {
     RecoveryManager::$scheduleCalls = 0;
     $migrated = UpgradeManager::maybeUpgrade();
     expectUpgrade($migrated === true, 'Assurance schema migration must return explicit success.');
-    expectUpgrade(get_option('spcrc_version', '') === '0.25.9' && get_option('spcrc_schema_version', '') === '0.25.5', 'Corrective release must advance plugin and schema versions.');
+    expectUpgrade(get_option('spcrc_version', '') === '0.26.0' && get_option('spcrc_schema_version', '') === '0.25.5', 'Corrective release must advance plugin and schema versions.');
     expectUpgrade(Capabilities::$installCalls === 1 && RetentionManager::$scheduleCalls === 1 && RecoveryManager::$scheduleCalls === 1, 'Migration must verify complete runtime integrity.');
 
     RetentionManager::$result = false;
