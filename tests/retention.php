@@ -7,6 +7,7 @@ const DAY_IN_SECONDS = 86400;
 $GLOBALS['scheduled'] = [];
 $GLOBALS['options'] = [];
 $GLOBALS['transients'] = [];
+$GLOBALS['fail_add_option'] = false;
 $GLOBALS['retention_hold'] = false;
 $GLOBALS['retention_maximum'] = 1000;
 $GLOBALS['retention_batch'] = 100;
@@ -24,12 +25,16 @@ function apply_filters(string $hook, mixed $value): mixed
 function wp_next_scheduled(string $hook): int|false { return $GLOBALS['scheduled'][$hook] ?? false; }
 function wp_schedule_event(int $timestamp, string $recurrence, string $hook): bool { $GLOBALS['scheduled'][$hook] = $timestamp; return true; }
 function wp_clear_scheduled_hook(string $hook): int { unset($GLOBALS['scheduled'][$hook]); return 1; }
+function get_option(string $key, mixed $default = false): mixed { return $GLOBALS['options'][$key] ?? $default; }
 function update_option(string $key, mixed $value, bool $autoload = true): bool { $GLOBALS['options'][$key] = $value; return true; }
+function add_option(string $key, mixed $value = '', string $deprecated = '', bool|string|null $autoload = null): bool { if ($GLOBALS['fail_add_option'] || array_key_exists($key, $GLOBALS['options'])) return false; $GLOBALS['options'][$key] = $value; return true; }
+function delete_option(string $key): bool { unset($GLOBALS['options'][$key]); return true; }
 function get_transient(string $key): mixed { return $GLOBALS['transients'][$key] ?? false; }
 function set_transient(string $key, mixed $value, int $expiration): bool { $GLOBALS['transients'][$key] = $value; return true; }
 function delete_transient(string $key): bool { unset($GLOBALS['transients'][$key]); return true; }
 function wp_generate_uuid4(): string { return '00000000-0000-4000-8000-000000000001'; }
-function is_wp_error(mixed $value): bool { return false; }
+final class WP_Error { public function __construct(private string $code, private string $message) {} public function get_error_code(): string { return $this->code; } public function get_error_message(): string { return $this->message; } }
+function is_wp_error(mixed $value): bool { return $value instanceof WP_Error; }
 function do_action(string $hook, mixed ...$args): void {}
 
 final class RetentionWpdb
@@ -85,7 +90,7 @@ $result = $manager->run();
 expectRetention($result['status'] === 'completed', 'Successful retention must report completed.');
 expectRetention($result['age_deleted'] === 3 && $result['overflow_deleted'] === 100, 'Retention must report bounded delete counts.');
 expectRetention(count($GLOBALS['wpdb']->queries) === 2, 'Age and overflow deletion must execute once each.');
-expectRetention(get_transient('spcrc_retention_lock') === false, 'Retention lock must be released.');
+expectRetention(get_option('spcrc_retention_lock', false) === false, 'Atomic retention option lock must be released.');
 
 $GLOBALS['retention_hold'] = 'true';
 $before = count($GLOBALS['wpdb']->queries);
@@ -94,14 +99,26 @@ expectRetention($held['status'] === 'held', 'Retention hold must stop deletion.'
 expectRetention(count($GLOBALS['wpdb']->queries) === $before, 'Retention hold must not execute delete queries.');
 $GLOBALS['retention_hold'] = false;
 
-set_transient('spcrc_retention_lock', 'another-run', 900);
+update_option('spcrc_retention_lock', ['token' => 'another-run', 'expires_at' => time() + 900], false);
 $locked = $manager->run();
-expectRetention($locked['status'] === 'locked', 'Concurrent retention must be skipped.');
-delete_transient('spcrc_retention_lock');
+expectRetention($locked['status'] === 'locked' && $locked['error_code'] === 'spcrc_retention_locked', 'Concurrent retention must be skipped by the atomic option lock.');
+delete_option('spcrc_retention_lock');
+
+update_option('spcrc_retention_lock', ['token' => 'stale-run', 'expires_at' => time() - 1], false);
+$GLOBALS['wpdb']->queryResults = [0, 0];
+$GLOBALS['wpdb']->count = 1000;
+$staleRecovered = $manager->run();
+expectRetention($staleRecovered['status'] === 'completed', 'Expired retention lock must be reclaimed safely.');
+expectRetention(get_option('spcrc_retention_lock', false) === false, 'Reclaimed retention lock must be released by its owner.');
+
+$GLOBALS['fail_add_option'] = true;
+$unavailable = $manager->run();
+expectRetention($unavailable['status'] === 'failed' && $unavailable['error_code'] === 'spcrc_retention_lock_unavailable', 'Database lock acquisition failure must fail closed.');
+$GLOBALS['fail_add_option'] = false;
 
 $GLOBALS['wpdb']->tableExists = false;
 $missing = $manager->run();
 expectRetention($missing['status'] === 'failed' && $missing['error_code'] === 'events_table_unavailable', 'Missing event table must fail closed.');
-expectRetention(get_transient('spcrc_retention_lock') === false, 'Failed retention must release its lock.');
+expectRetention(get_option('spcrc_retention_lock', false) === false, 'Failed retention must release its atomic lock.');
 
 echo "PASS: bounded retention lifecycle and failure controls\n";

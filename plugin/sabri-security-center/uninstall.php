@@ -40,4 +40,12 @@ if ($roles && is_array($roles->role_objects ?? null)) {
 // controls, privacy metadata, manifests, schema/version records, and tables.
 delete_option('spcrc_security_state_requests');
 delete_option('spcrc_last_upgrade_error');
+delete_option('spcrc_upgrade_lock');
+delete_option('spcrc_security_state_lock');
+delete_option('spcrc_retention_lock');
+delete_option('spcrc_audit_gap_store_lock');
+
+// Remove legacy transient forms from earlier reviewed candidates without
+// deleting any durable audit, governance, privacy or assurance evidence.
 delete_transient('spcrc_upgrade_lock');
+delete_transient('spcrc_retention_lock');

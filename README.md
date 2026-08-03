@@ -2,7 +2,7 @@
 
 File 24 is the central security-governance and assurance plane for the Sabri Social Homeopathy Platform. Native modules retain their own authentication, authorization and canonical data ownership.
 
-## Foundation scope — corrective candidate 0.25.7
+## Foundation scope — four-round corrective candidate 0.25.8
 
 This reviewed foundation establishes:
 
@@ -12,8 +12,8 @@ This reviewed foundation establishes:
 - audit-atomic risk, incident, control and security-finding workflows with governed, expiring risk acceptance;
 - a bounded Assurance Registry for compliance applicability, vendor review and backup/restore evidence metadata;
 - verified, replay-resistant privacy orchestration that rejects malformed verification evidence before canonical request storage;
-- bounded retry and stale-dispatch recovery without automatic replay of uncertain native side effects;
-- fail-closed activation/runtime boot, deep table-and-column verification, migration locking and unsafe-downgrade prevention;
+- bounded retry and stale-dispatch recovery with storage-layer enforcement against replay of uncertain native side effects;
+- fail-closed activation/runtime boot, complete nine-table column verification, atomic retention/audit-gap coordination, migration locking and unsafe-downgrade prevention;
 - non-destructive repair that verifies schema, capabilities, schedules and version state;
 - File 00 and File 20 adapters without duplicating their authority;
 - sanitized private status and public Trust Center REST payloads;
@@ -35,7 +35,7 @@ This public repository contains sanitized source and documentation only. Live vu
 
 Audit failures in canonical, privacy, retention, recovery and repair paths create bounded, independently keyed release blockers rather than being overwritten or silently treated as success. Generic operational gaps can be reconciled only through a private capability-, nonce-, File 00 step-up-, evidence- and audit-gated workflow.
 
-The 0.25.7 implementation is a reviewed Foundation candidate with declared PHP 8.0 compatibility and is not production-ready. Automated checks do not replace real WordPress activation, MySQL/MariaDB migration and rollback, Hostinger staging, File 00/File 20 integration, accessibility review, restore drills, abuse testing or independent security acceptance.
+The 0.25.8 implementation is a reviewed Foundation candidate with declared PHP 8.0 compatibility and is not production-ready. Automated checks do not replace real WordPress activation, MySQL/MariaDB migration and rollback, Hostinger staging, File 00/File 20 integration, accessibility review, restore drills, abuse testing or independent security acceptance.
 
 ## Build and QA
 
@@ -60,6 +60,11 @@ php tests/cycle13-exhaustive.php
 php tests/cycle14-extraordinary.php
 php tests/cycle15-illuminative.php
 php tests/cycle16-closure.php
+php tests/cycle17-illuminative.php
+php tests/cycle18-retention-concurrency.php
+php tests/cycle19-privacy-retry-safety.php
+php tests/cycle20-audit-gap-concurrency.php
+php tests/cycle21-schema-release-closure.php
 ./tools/build-release.sh
 ```
 

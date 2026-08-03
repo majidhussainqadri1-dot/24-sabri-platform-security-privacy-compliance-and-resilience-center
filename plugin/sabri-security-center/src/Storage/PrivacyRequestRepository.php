@@ -13,6 +13,7 @@ final class PrivacyRequestRepository
     private const ACTIVE_STATUSES = ['received', 'dispatching', 'pending', 'partial', 'recovery-required'];
     private const RETRYABLE_REQUEST_STATUSES = ['failed', 'partial', 'recovery-required'];
     private const RETRYABLE_MODULE_STATUSES = ['not-started', 'failed', 'rejected', 'unavailable', 'recovery-required'];
+    private const SAFE_CODE_PREFIX = 'retry-safe-';
     private const MODULE_STATUSES = ['not-started', 'dispatching', 'completed', 'pending', 'queued', 'accepted', 'failed', 'rejected', 'unavailable', 'recovery-required'];
 
     /** @return string[] */
@@ -301,11 +302,18 @@ final class PrivacyRequestRepository
         if (! in_array($status, self::RETRYABLE_REQUEST_STATUSES, true)) {
             return new \WP_Error('spcrc_privacy_retry_forbidden', 'Only failed, partial or recovery-required requests may be retried.');
         }
+        if ($assignedUserId < 1 || ! get_userdata($assignedUserId)) {
+            return new \WP_Error('spcrc_privacy_retry_assignee_invalid', 'A valid assigned privacy operator is required for retry.');
+        }
 
         $results = $this->decodeResults($existing['module_results_json'] ?? '');
         $retryModules = [];
         foreach ($results as $moduleKey => $result) {
-            if (in_array(Sanitizer::key($result['status'] ?? '', 40), self::RETRYABLE_MODULE_STATUSES, true)) {
+            $moduleStatus = Sanitizer::key($result['status'] ?? '', 40);
+            $code = Sanitizer::key($result['code'] ?? '', 120);
+            $retrySafe = $moduleStatus === 'not-started'
+                || (in_array($moduleStatus, self::RETRYABLE_MODULE_STATUSES, true) && str_starts_with($code, self::SAFE_CODE_PREFIX));
+            if ($retrySafe) {
                 $retryModules[] = $moduleKey;
                 $results[$moduleKey]['ok'] = false;
                 $results[$moduleKey]['status'] = 'not-started';

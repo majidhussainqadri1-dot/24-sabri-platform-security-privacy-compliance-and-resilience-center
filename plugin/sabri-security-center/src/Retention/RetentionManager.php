@@ -14,7 +14,7 @@ if (! class_exists(AuditGapStore::class, false)) {
 final class RetentionManager
 {
     public const CRON_HOOK = 'spcrc_daily_retention';
-    private const LOCK_KEY = 'spcrc_retention_lock';
+    private const LOCK_OPTION = 'spcrc_retention_lock';
     private const LOCK_SECONDS = 900;
 
     public function __construct(private ?AuditLogger $audit = null)
@@ -45,21 +45,21 @@ final class RetentionManager
         if (function_exists('wp_clear_scheduled_hook')) {
             wp_clear_scheduled_hook(self::CRON_HOOK);
         }
+        if (function_exists('delete_option')) {
+            delete_option(self::LOCK_OPTION);
+        }
         if (function_exists('delete_transient')) {
-            delete_transient(self::LOCK_KEY);
+            delete_transient(self::LOCK_OPTION);
         }
     }
 
     /** @return array{status:string,age_deleted:int,overflow_deleted:int,error_code:string} */
     public function run(): array
     {
-        if (get_transient(self::LOCK_KEY) !== false) {
-            return $this->finish('locked', 0, 0, 'retention_already_running');
-        }
-
-        $lock = wp_generate_uuid4();
-        if (! set_transient(self::LOCK_KEY, $lock, self::LOCK_SECONDS)) {
-            return $this->finish('failed', 0, 0, 'retention_lock_unavailable');
+        $lock = $this->acquireLock();
+        if (is_wp_error($lock)) {
+            $status = $lock->get_error_code() === 'spcrc_retention_locked' ? 'locked' : 'failed';
+            return $this->finish($status, 0, 0, $lock->get_error_code());
         }
 
         try {
@@ -106,9 +106,64 @@ final class RetentionManager
 
             return $this->finish('completed', (int) $ageDeleted, (int) $overflowDeleted, '');
         } finally {
-            if (get_transient(self::LOCK_KEY) === $lock) {
-                delete_transient(self::LOCK_KEY);
+            $this->releaseLock($lock);
+        }
+    }
+
+    /** @return string|\WP_Error */
+    private function acquireLock(): string|\WP_Error
+    {
+        $token = function_exists('wp_generate_uuid4') ? wp_generate_uuid4() : bin2hex(random_bytes(16));
+        $now = time();
+
+        if (function_exists('add_option')) {
+            $existing = get_option(self::LOCK_OPTION, null);
+            if (is_array($existing) && (int) ($existing['expires_at'] ?? 0) > $now) {
+                return new \WP_Error('spcrc_retention_locked', 'Another retention run is already active.');
             }
+            if ($existing !== null && $existing !== false) {
+                delete_option(self::LOCK_OPTION);
+            }
+
+            $added = add_option(
+                self::LOCK_OPTION,
+                ['token' => $token, 'expires_at' => $now + self::LOCK_SECONDS],
+                '',
+                false
+            );
+            if ($added) {
+                return $token;
+            }
+
+            $raced = get_option(self::LOCK_OPTION, null);
+            if (is_array($raced) && (int) ($raced['expires_at'] ?? 0) > $now) {
+                return new \WP_Error('spcrc_retention_locked', 'Another retention run acquired the lock concurrently.');
+            }
+            return new \WP_Error('spcrc_retention_lock_unavailable', 'The retention lock could not be acquired.');
+        }
+
+        if (get_transient(self::LOCK_OPTION) !== false) {
+            return new \WP_Error('spcrc_retention_locked', 'Another retention run is already active.');
+        }
+        if (! set_transient(self::LOCK_OPTION, $token, self::LOCK_SECONDS)) {
+            return new \WP_Error('spcrc_retention_lock_unavailable', 'The retention lock could not be acquired.');
+        }
+        return $token;
+    }
+
+    private function releaseLock(string $token): void
+    {
+        if (function_exists('add_option')) {
+            $existing = get_option(self::LOCK_OPTION, null);
+            if (is_array($existing) && hash_equals((string) ($existing['token'] ?? ''), $token)) {
+                delete_option(self::LOCK_OPTION);
+            }
+            return;
+        }
+
+        $existing = get_transient(self::LOCK_OPTION);
+        if (is_string($existing) && hash_equals($existing, $token)) {
+            delete_transient(self::LOCK_OPTION);
         }
     }
 

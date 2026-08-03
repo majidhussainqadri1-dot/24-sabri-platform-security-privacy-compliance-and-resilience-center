@@ -7,7 +7,7 @@ const MINUTE_IN_SECONDS = 60;
 const HOUR_IN_SECONDS = 3600;
 const DAY_IN_SECONDS = 86400;
 const ABSPATH = '/tmp/wordpress/';
-const SPCRC_VERSION = '0.25.7';
+const SPCRC_VERSION = '0.25.8';
 
 @mkdir(ABSPATH . 'wp-admin/includes', 0777, true);
 if (! file_exists(ABSPATH . 'wp-admin/includes/upgrade.php')) {
@@ -124,10 +124,15 @@ final class FakeWpdb
     public function get_col(string $query, int $column = 0): array
     {
         $columns = [
-            'spcrc_risks' => ['id', 'risk_uuid', 'module_key', 'title', 'likelihood', 'impact', 'inherent_score', 'status', 'treatment', 'owner_user_id', 'due_at', 'governance_decision_uuid', 'accepted_by_user_id', 'accepted_at', 'acceptance_expires_at', 'created_at', 'updated_at'],
-            'spcrc_findings' => ['id', 'finding_uuid', 'module_key', 'title', 'severity', 'status', 'owner_user_id', 'due_at', 'evidence_ref', 'governance_decision_uuid', 'acceptance_expires_at', 'created_at', 'updated_at'],
+            'spcrc_security_events' => ['id', 'event_uuid', 'event_type', 'module_key', 'actor_user_id', 'result', 'risk_level', 'correlation_id', 'context_json', 'created_at'],
             'spcrc_incidents' => ['id', 'incident_uuid', 'title', 'severity', 'status', 'owner_user_id', 'summary', 'evidence_ref', 'opened_at', 'updated_at', 'closed_at'],
+            'spcrc_findings' => ['id', 'finding_uuid', 'module_key', 'title', 'severity', 'status', 'owner_user_id', 'due_at', 'evidence_ref', 'governance_decision_uuid', 'acceptance_expires_at', 'created_at', 'updated_at'],
+            'spcrc_risks' => ['id', 'risk_uuid', 'module_key', 'title', 'likelihood', 'impact', 'inherent_score', 'status', 'treatment', 'owner_user_id', 'due_at', 'governance_decision_uuid', 'accepted_by_user_id', 'accepted_at', 'acceptance_expires_at', 'created_at', 'updated_at'],
+            'spcrc_controls' => ['id', 'control_key', 'title', 'framework', 'status', 'owner_user_id', 'evidence_ref', 'last_tested_at', 'created_at', 'updated_at'],
+            'spcrc_privacy_requests' => ['id', 'request_uuid', 'requester_user_id', 'request_type', 'status', 'assigned_user_id', 'jurisdiction', 'due_at', 'verification_method', 'authority_basis', 'verification_reference', 'verified_by_user_id', 'verified_at', 'module_results_json', 'dispatch_attempts', 'lock_version', 'next_retry_at', 'last_error_code', 'completed_at', 'created_at', 'updated_at'],
+            'spcrc_module_manifests' => ['id', 'module_key', 'module_version', 'manifest_hash', 'posture', 'manifest_json', 'last_seen_at'],
             'spcrc_governance_decisions' => ['id', 'decision_uuid', 'decision_type', 'subject_key', 'module_key', 'status', 'requester_user_id', 'approver_user_id', 'evidence_ref', 'rationale_hash', 'requested_at', 'expires_at', 'decided_at', 'revoked_at', 'lock_version'],
+            'spcrc_assurance_records' => ['id', 'record_uuid', 'record_type', 'record_key', 'title', 'status', 'owner_user_id', 'jurisdiction', 'data_classes_json', 'evidence_ref', 'notes', 'reviewed_at', 'next_review_at', 'backup_completed_at', 'restore_tested_at', 'created_at', 'updated_at'],
         ];
         foreach ($columns as $table => $available) {
             if (str_contains($query, $table)) {

@@ -1,1 +1,0 @@
-Four-round review branch prepared for controlled materialization and PR verification.

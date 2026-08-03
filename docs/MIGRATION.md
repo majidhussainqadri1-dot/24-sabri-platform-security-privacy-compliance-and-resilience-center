@@ -1,20 +1,16 @@
-# Migration — 0.25.6 to 0.25.7
+# Migration — 0.25.7 to 0.25.8
 
-1. Take and independently verify a staging backup before replacing the package.
-2. Install 0.25.7 over 0.25.6 on staging only.
-3. The Upgrade Manager acquires the atomic `spcrc_upgrade_lock`. Lock contention fails closed; an expired lock may be replaced only by the bounded stale-lock path. The lock is released in `finally`.
-4. The manager rejects unsafe downgrade when stored plugin/schema versions exceed the package being run.
-5. Idempotent `dbDelta()` creates `wp_spcrc_governance_decisions` and adds governance-binding/expiry fields to risks/findings plus incident evidence fields.
-6. Schema advances from 0.25.4 to 0.25.5. Plugin version advances to 0.25.7 only after all nine tables, governed columns, capabilities, retention schedule, privacy-recovery schedule and version-state verification succeed.
-7. Existing events, incidents, findings, risks, controls, privacy requests, manifests and assurance records remain preserved.
-8. Existing module manifests are enriched on their next native registration; no module key/name/owner may be rebound.
-9. Existing accepted-risk records are not retroactively treated as governance-approved. Re-open and re-assess them before relying on acceptance.
-10. Governance decisions contain only bounded metadata, hashes and opaque evidence references. Raw evidence, credentials, legal advice and operational playbooks remain outside the public control plane.
-11. Explicitly delegate `spcrc_request_governance_decision`, `spcrc_approve_governance_decision` and `spcrc_accept_critical_risk` according to separation of duties. Approval and critical-risk acceptance are not auto-granted.
-12. Verify the File 00 step-up contract; absent, stale or purpose-mismatched assurance must fail closed.
-13. Inspect `spcrc_governance_audit_gap` for independently keyed gaps. Do not delete it manually; use the authorized, step-up-protected reconciliation workflow after audit storage is healthy.
-14. Verify File 20 advisory request and resolution authorization bridges, duplicate suppression, 24-hour expiry and native enforcement ownership.
-15. Re-run System Checks, the full PHP 8.0/8.3 CI suite, fresh activation, upgrade, repair, deactivation and rollback on real WordPress/MySQL staging.
-16. Validate File 00, File 20, public browsing, privacy dispatch, governance approval, accepted-risk binding, assurance permissions, REST minimization and cron ownership.
+1. Back up the staging database and plugin files through the approved provider workflow; retain an opaque evidence reference outside this repository.
+2. Confirm no active File 24 upgrade, retention, security-state or audit-gap mutation lock exists. Do not manually clear a live owner lock.
+3. Install 0.25.8 over 0.25.7 on staging only.
+4. File 24 retains schema version 0.25.5 because no table shape changes in this corrective release.
+5. Upgrade verification now inspects every required column in all nine owned tables. Any missing column blocks normal File 24 runtime before version success is recorded.
+6. Confirm `spcrc_retention_cleanup`, `spcrc_privacy_recovery_scan`, capabilities and version-state integrity.
+7. Exercise concurrent retention and audit-gap paths; active contention must fail closed and expired locks must recover without losing evidence.
+8. Exercise privacy retries with never-started, explicitly `retry-safe-`, uncertain and completed native-module outcomes. Only the first two categories may replay.
+9. Verify uninstall behavior on a disposable staging clone: capabilities and ephemeral locks are removed while events, risks, findings, incidents, controls, privacy requests, manifests, governance, assurance rows, audit gaps and schema/version evidence remain preserved.
+10. Re-run the full PHP 8.0/8.3 CI suite, deterministic double build, ZIP integrity and checksum validation.
+11. Validate real File 00 step-up, File 20 advisory-state integration, public browsing, REST minimization and external evidence adapters.
+12. Record staging acceptance, rollback evidence and Founder decision in the private operational system.
 
 No companion-module table, exported personal data, native clinical record, raw vendor contract, secret, backup location or private evidence payload is migrated by File 24.

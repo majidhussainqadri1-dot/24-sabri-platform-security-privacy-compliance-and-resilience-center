@@ -71,8 +71,10 @@ expectCycle16(AuditGapStore::count('spcrc_cycle16_bounded_audit_gap') === 100, '
 $GLOBALS['wpdb']->failAuditInsert = true;
 $dispatcher = (new ReflectionClass(RequestDispatcher::class))->newInstanceWithoutConstructor();
 $auditProperty = new ReflectionProperty(RequestDispatcher::class, 'audit');
+$auditProperty->setAccessible(true);
 $auditProperty->setValue($dispatcher, new AuditLogger());
 $recordAudit = new ReflectionMethod(RequestDispatcher::class, 'recordAudit');
+$recordAudit->setAccessible(true);
 $recorded = $recordAudit->invoke(
     $dispatcher,
     'privacy_request_dispatched',
@@ -87,6 +89,7 @@ expectCycle16(AuditGapStore::count('spcrc_privacy_audit_gap') === 1, 'Privacy au
 // Retention deletion without a durable audit event must also block release.
 $retention = new RetentionManager(new AuditLogger());
 $finish = new ReflectionMethod(RetentionManager::class, 'finish');
+$finish->setAccessible(true);
 $retentionResult = $finish->invoke($retention, 'completed', 4, 0, '');
 expectCycle16(($retentionResult['status'] ?? '') === 'completed', 'Retention result semantics must remain unchanged.');
 expectCycle16(AuditGapStore::count('spcrc_retention_audit_gap') === 1, 'Retention audit failure must create a release blocker.');

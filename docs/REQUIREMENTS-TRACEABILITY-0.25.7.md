@@ -11,9 +11,14 @@
 | F24-R061–R070 SDLC/incidents | PHP 8.0/8.3 CI, AuditLogger, findings/incidents, secret scan, SPDX | all CI suites, cycle13-exhaustive.php, cycle14-extraordinary.php, cycle15-illuminative.php | Tabletop and full incident exercise |
 | F24-R071–R080 Resilience | backup chronology, repair, retention, privacy recovery, security-state bounded lifecycle | retention.php, upgrade.php, activation-cycle9.php, cycle13-exhaustive.php, cycle15-illuminative.php | Real restore, RPO/RTO and provider-failure evidence |
 | F24-R081–R090 Plugin/release | manifests, governance schema, upgrade lock, downgrade block, uninstall law, SBOM, deterministic build | CI source contracts, checksums and double-build parity | Hostinger staging acceptance |
-| F24-R091–R100 DoD | RTM, Cycle 12–15 records, known-limitations truth, release receipt | complete CI and package receipt | Independent assurance and Founder production decision |
+| F24-R091–R100 DoD | RTM, Cycle 12–17 records, known-limitations truth, release receipt | complete CI and package receipt | Independent assurance and Founder production decision |
 
 
 ## Cycle 16 closure evidence
 
 Audit-evidence integrity is now traced through `Storage/AuditGapStore.php`, privacy dispatch/retry/callbacks, retention, privacy recovery, repair/admin operations, canonical risk/finding/incident/control rollback paths, automated expiry/reopen batches, `System/SystemCheck.php`, and `tests/cycle16-closure.php`.
+
+
+## Cycle 17 compatibility evidence
+
+The first final GitHub PHP 8.0 matrix run exposed a test-harness Reflection compatibility defect after all earlier suites passed. `tests/cycle16-closure.php` now explicitly enables access only inside the test harness; `tests/cycle17-illuminative.php` permanently verifies PHP 8.0/8.3 compatibility, evidence-count alignment, final CI inclusion, removal of temporary handoff material and preservation of the 0.25.7 release identity.

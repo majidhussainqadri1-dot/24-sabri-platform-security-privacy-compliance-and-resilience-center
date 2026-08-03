@@ -354,7 +354,7 @@ final class ModuleRegistry
             'contract_version' => '1.0.0',
             'canonical_data_owner' => 'File 24',
             'canonical_action_owner' => 'Native owners; File 24 assurance only',
-            'evidence_source' => 'release:file-24-0.25.7',
+            'evidence_source' => 'release:file-24-0.25.8',
             'degraded_behavior' => 'Native controls remain authoritative; privileged assurance writes fail closed.',
             'release_gate' => 'Staging, independent penetration test, restore drill and Founder production approval',
         ];

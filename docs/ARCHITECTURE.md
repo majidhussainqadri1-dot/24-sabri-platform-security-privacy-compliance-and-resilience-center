@@ -1,4 +1,4 @@
-# Architecture — Foundation 0.25.7
+# Architecture — Foundation 0.25.8
 
 ## Core law
 
@@ -78,3 +78,11 @@ The package declares PHP 8.0 minimum support. Production and test code therefore
 ## Audit-evidence gap plane
 
 `Storage/AuditGapStore` is a bounded fail-closed release-blocker registry. It is used only when required canonical audit evidence cannot be durably stored; it never substitutes for the append-only security-event table. Privacy, retention, recovery, repair, canonical rollback and automated-expiry paths emit independently keyed sanitized gaps. `SystemCheck` aggregates category counts without exposing sensitive content. Generic operational gaps have a private reconciliation surface requiring capability, nonce, fresh File 00 step-up, opaque private evidence and a successful authorization audit; native governance/security-state/assurance workflows remain separate.
+
+## Four-round concurrency and integrity closure (0.25.8)
+
+- Retention cleanup owns `spcrc_retention_lock` through atomic option creation, an expiring owner token and owner-matched release.
+- Audit-gap record and reconciliation mutations share `spcrc_audit_gap_store_lock`; active contention fails closed and expired orphan locks are reclaimed.
+- Privacy retry safety is enforced in both the policy and canonical repository. Only never-started or explicitly `retry-safe-` module outcomes may replay.
+- Same-version boot verifies every required column in all nine owned tables before File 24 runtime services are considered healthy.
+- Uninstall removes delegated capabilities and ephemeral coordination state only; durable security, privacy, governance, assurance and audit-gap evidence remains preserved.
