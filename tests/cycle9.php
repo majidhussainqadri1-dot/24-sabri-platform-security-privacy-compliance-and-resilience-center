@@ -179,7 +179,7 @@ $repaired = (new Repair())->run();
 expectCycle9(is_array($repaired), 'Non-destructive repair must complete when schedules are verified.');
 expectCycle9(($repaired['retention_schedule_verified'] ?? false) === true, 'Repair must verify retention schedule.');
 expectCycle9(($repaired['privacy_recovery_schedule_verified'] ?? false) === true, 'Repair must verify privacy recovery schedule.');
-expectCycle9(get_option('spcrc_schema_version') === '0.25.5' && get_option('spcrc_version') === '0.27.0', 'Repair must verify version truth.');
+expectCycle9(get_option('spcrc_schema_version') === '0.25.5' && get_option('spcrc_version') === '0.28.0', 'Repair must verify version truth.');
 
 $pluginSource = file_get_contents(dirname(__DIR__) . '/plugin/sabri-security-center/src/Plugin.php');
 $registrySource = file_get_contents(dirname(__DIR__) . '/plugin/sabri-security-center/src/Registry/ModuleRegistry.php');

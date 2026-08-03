@@ -2,9 +2,9 @@
 
 File 24 is the central security-governance and assurance plane for the Sabri Social Homeopathy Platform. Native modules retain authentication, authorization and canonical data ownership.
 
-## Foundation scope — fifteen-round corrective candidate 0.27.0
+## Foundation scope — forty-round corrective candidate 0.28.0
 
-This reviewed Foundation establishes:
+This reviewed Foundation establishes and re-verifies:
 
 - a versioned module-security manifest registry with persisted identity binding, guarded writes and zero-row concurrency verification;
 - a private role-aware Security Center with separately gated governance request, approval and reconciliation surfaces;
@@ -35,73 +35,13 @@ This public repository contains sanitized source and documentation only. Live vu
 
 Audit or compensation failures create bounded, independently keyed release blockers rather than being overwritten or silently treated as success. Generic operational gaps can be reconciled only through a private capability-, nonce-, File 00 step-up-, evidence- and audit-gated workflow.
 
-The 0.27.0 implementation is a reviewed Foundation candidate and is not production-ready. Automated checks do not replace real WordPress/MySQL activation, migration and rollback, Hostinger staging, live File 00/File 20 integration, accessibility/browser acceptance, restore drills, provider validation, abuse testing, legal review or independent penetration testing.
+The 0.28.0 implementation is a reviewed Foundation candidate and is not production-ready. Automated checks do not replace real WordPress/MySQL activation, migration and rollback, Hostinger staging, live File 00/File 20 integration, accessibility/browser acceptance, restore drills, provider validation, abuse testing, legal review or independent penetration testing.
 
 ## Build and QA
 
 ```bash
-php tests/run.php
-php tests/retention.php
-php tests/upgrade.php
-php tests/activation-cycle9.php
-php tests/boot-failure.php
-php tests/findings.php
-php tests/runtime.php
-php tests/privacy.php
-php tests/privacy-policy.php
-php tests/privacy-verification.php
-php tests/privacy-recovery.php
-php tests/admin-assets.php
-php tests/cycle9.php
-php tests/plugin-boot-cycle9.php
-php tests/governance.php
-php tests/cycle12-adversarial.php
-php tests/cycle13-exhaustive.php
-php tests/cycle14-extraordinary.php
-php tests/cycle15-illuminative.php
-php tests/cycle16-closure.php
-php tests/cycle17-illuminative.php
-php tests/cycle18-retention-concurrency.php
-php tests/cycle19-privacy-retry-safety.php
-php tests/cycle20-audit-gap-concurrency.php
-php tests/cycle21-schema-release-closure.php
-php tests/cycle22-manifest-heartbeat-race.php
-php tests/cycle23-governance-request-lock.php
-php tests/cycle24-upgrade-lock-atomic.php
-php tests/cycle25-retention-ownership.php
-php tests/cycle26-audit-gap-lock-lease.php
-php tests/cycle27-security-state-atomic.php
-php tests/cycle28-control-upsert-lock.php
-php tests/cycle29-privacy-verification-compensation.php
-php tests/cycle29-eight-round-release-closure.php
-php tests/cycle30-expired-lock-refresh.php
-php tests/cycle31-lock-token-generation.php
-php tests/cycle32-audit-evidence-integrity.php
-php tests/cycle33-audit-gap-capacity.php
-php tests/cycle34-strict-absolute-time.php
-php tests/cycle35-governance-request-lease.php
-php tests/cycle36-governance-audit-gap-concurrency.php
-php tests/cycle37-governance-expiry-atomic.php
-php tests/cycle38-risk-optimistic-concurrency.php
-php tests/cycle39-finding-optimistic-concurrency.php
-php tests/cycle40-assurance-audit-rollback.php
-php tests/cycle41-privacy-verifier-authority.php
-php tests/cycle41-twelve-round-release-closure.php
-php tests/cycle42-security-state-capacity.php
-php tests/cycle43-security-state-normalization.php
-php tests/cycle44-audit-pii-identifiers.php
-php tests/cycle45-audit-gap-boundaries.php
-php tests/cycle46-manifest-boundary-integrity.php
-php tests/cycle47-governance-gap-reconciliation.php
-php tests/cycle48-governance-mandatory-audit.php
-php tests/cycle49-canonical-create-integrity.php
-php tests/cycle50-retention-evidence-integrity.php
-php tests/cycle51-control-optimistic-concurrency.php
-php tests/cycle52-assurance-concurrency-integrity.php
-php tests/cycle53-privacy-opaque-reference.php
-php tests/cycle54-privacy-callback-authority.php
-php tests/cycle55-deletion-retry-step-up.php
-php tests/cycle56-secure-request-release-closure.php
+find plugin tests -type f -name '*.php' -print0 | xargs -0 -n1 php -l
+while IFS= read -r -d '' test_file; do php "$test_file"; done < <(find tests -maxdepth 1 -type f -name '*.php' ! -name 'bootstrap.php' -print0 | sort -z)
 ./tools/build-release.sh
 ```
 

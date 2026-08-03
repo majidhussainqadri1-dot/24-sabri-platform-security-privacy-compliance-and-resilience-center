@@ -18,9 +18,21 @@ final class SecureIdentifier
     /** @return string|\WP_Error */
     public static function uuid4(string $purpose = 'record'): string|\WP_Error
     {
-        $candidate = function_exists('wp_generate_uuid4')
-            ? strtolower(trim((string) wp_generate_uuid4()))
-            : '';
+        $candidate = '';
+        if (function_exists('wp_generate_uuid4')) {
+            try {
+                $candidate = strtolower(trim((string) wp_generate_uuid4()));
+            } catch (\Throwable $error) {
+                if (function_exists('do_action')) {
+                    do_action(
+                        'spcrc/wordpress_uuid_generation_failed',
+                        Sanitizer::key($purpose, 80),
+                        get_class($error)
+                    );
+                }
+                $candidate = '';
+            }
+        }
         if (self::validUuid4($candidate)) {
             return $candidate;
         }

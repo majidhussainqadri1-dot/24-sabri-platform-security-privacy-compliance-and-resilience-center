@@ -17,7 +17,19 @@ if (! class_exists(SecureIdentifier::class, false)) {
 final class AuditLogger
 {
     private const ALLOWED_RISK_LEVELS = ['informational', 'low', 'medium', 'high', 'critical'];
-    private const MAX_CONTEXT_ITEMS = 50;
+    private const ALLOWED_RESULTS = [
+        'recorded', 'success', 'successful', 'failure', 'failed', 'open', 'closed',
+        'created', 'updated', 'deleted', 'pending', 'approved', 'accepted', 'rejected',
+        'revoked', 'expired', 'reopened', 'resolved', 'withdrawn', 'superseded',
+        'requested', 'authorized', 'completed', 'partial', 'queued', 'dispatched',
+        'dispatching', 'processing', 'reconciled', 'restored', 'rolled-back',
+        'locked', 'held', 'blocked', 'deferred', 'cancelled', 'skipped', 'unknown',
+        'unavailable', 'not-started', 'recovery-required', 'storage-failed',
+        'audit-evidence-missing', 'received', 'triaged', 'in-progress',
+        'accepted-risk', 'false-positive', 'informational', 'warning', 'critical',
+        'operational', 'foundation', 'unassessed', 'planned', 'implemented',
+        'tested', 'restricted', 'exited', 'verified', 'pass', 'recovery-scheduled',
+    ];    private const MAX_CONTEXT_ITEMS = 50;
     private const MAX_CONTEXT_DEPTH = 5;
     private const MAX_STRING_LENGTH = 500;
 
@@ -38,8 +50,8 @@ final class AuditLogger
         $result = Sanitizer::key($result, 40);
         $riskLevel = in_array($riskLevel, self::ALLOWED_RISK_LEVELS, true) ? $riskLevel : 'low';
 
-        if ($eventType === '' || $moduleKey === '') {
-            return new \WP_Error('spcrc_invalid_audit_event', 'Audit event type and module key are required.');
+        if ($eventType === '' || $moduleKey === '' || ! in_array($result, self::ALLOWED_RESULTS, true)) {
+            return new \WP_Error('spcrc_invalid_audit_event', 'Audit event type, module key and result are required and must use approved semantics.');
         }
 
         $eventUuid = SecureIdentifier::uuid4('audit-event');
@@ -52,6 +64,7 @@ final class AuditLogger
             return $eventUuid;
         }
         $safeContext = $this->redact($context);
+        $correlationId = $this->correlationId($safeContext, $eventUuid);
         $json = function_exists('wp_json_encode')
             ? wp_json_encode($safeContext, JSON_UNESCAPED_SLASHES)
             : json_encode($safeContext, JSON_UNESCAPED_SLASHES);
@@ -73,9 +86,9 @@ final class AuditLogger
             'event_type' => $eventType,
             'module_key' => $moduleKey,
             'actor_user_id' => get_current_user_id() ?: null,
-            'result' => $result !== '' ? $result : 'recorded',
+            'result' => $result,
             'risk_level' => $riskLevel,
-            'correlation_id' => $this->correlationId(),
+            'correlation_id' => $correlationId,
             'context_json' => $json,
             'created_at' => current_time('mysql', true),
         ];
@@ -133,37 +146,45 @@ final class AuditLogger
             }
             ++$items;
 
-            $normalized = strtolower((string) $key);
+            $rawKey = (string) $key;
+            $normalized = strtolower($rawKey);
+            $safeKey = Sanitizer::key($rawKey, 80);
+            if ($safeKey === '') {
+                $safeKey = 'field_' . substr(hash('sha256', $rawKey), 0, 16);
+            }
+            if (array_key_exists($safeKey, $safe)) {
+                $safeKey .= '_' . substr(hash('sha256', $rawKey . '|' . $items), 0, 8);
+            }
             foreach ($blocked as $needle) {
                 if (str_contains($normalized, $needle)) {
-                    $safe[$key] = '[REDACTED]';
+                    $safe[$safeKey] = '[REDACTED]';
                     continue 2;
                 }
             }
 
             if (preg_match('/(^|_)(ip|ip_address|remote_addr)($|_)/', $normalized) === 1) {
-                $safe[$key] = $this->pseudonymize((string) $value, 'ip');
+                $safe[$safeKey] = $this->pseudonymize((string) $value, 'ip');
                 continue;
             }
 
             if (preg_match('/(^|_)user_agent($|_)/', $normalized) === 1) {
-                $safe[$key] = $this->pseudonymize((string) $value, 'ua');
+                $safe[$safeKey] = $this->pseudonymize((string) $value, 'ua');
                 continue;
             }
 
             if (preg_match('/(^|_)(email|email_address|phone|phone_number|mobile|mobile_number|address|postal_address|guardian_contact)($|_)/', $normalized) === 1) {
-                $safe[$key] = $this->pseudonymize((string) $value, 'contact');
+                $safe[$safeKey] = $this->pseudonymize((string) $value, 'contact');
                 continue;
             }
 
             if (is_array($value)) {
-                $safe[$key] = $this->redact($value, $depth + 1);
+                $safe[$safeKey] = $this->redact($value, $depth + 1);
             } elseif (is_string($value)) {
-                $safe[$key] = $this->redactString($value);
+                $safe[$safeKey] = $this->redactString($value);
             } elseif (is_scalar($value) || $value === null) {
-                $safe[$key] = $value;
+                $safe[$safeKey] = $value;
             } else {
-                $safe[$key] = '[UNSERIALIZABLE]';
+                $safe[$safeKey] = '[UNSERIALIZABLE]';
             }
         }
 
@@ -195,17 +216,22 @@ final class AuditLogger
         return 'sha256:' . hash_hmac('sha256', $value, $salt . '|' . $purpose);
     }
 
-    private function correlationId(): string
+    /** @param array<mixed> $safeContext */
+    private function correlationId(array &$safeContext, string $eventUuid): string
     {
         $incoming = isset($_SERVER['HTTP_X_CORRELATION_ID'])
             ? trim((string) wp_unslash($_SERVER['HTTP_X_CORRELATION_ID']))
             : '';
 
         if (preg_match('/^[A-Za-z0-9._-]{8,80}$/', $incoming) === 1) {
-            return $incoming;
+            $safeContext['_incoming_correlation_hash'] = $this->pseudonymize($incoming, 'correlation');
         }
 
         $generated = SecureIdentifier::uuid4('correlation');
-        return is_wp_error($generated) ? 'correlation-unavailable' : $generated;
+        if (is_wp_error($generated)) {
+            do_action('spcrc/correlation_identifier_unavailable', $generated->get_error_code(), $eventUuid);
+            return $eventUuid;
+        }
+        return $generated;
     }
 }

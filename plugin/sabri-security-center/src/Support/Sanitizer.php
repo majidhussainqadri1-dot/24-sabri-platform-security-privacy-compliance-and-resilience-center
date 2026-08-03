@@ -12,7 +12,11 @@ final class Sanitizer
             return '';
         }
 
-        $text = sanitize_text_field((string) $value);
+        $text = self::validUtf8((string) $value);
+        if ($text === '') {
+            return '';
+        }
+        $text = sanitize_text_field($text);
         return self::truncate($text, $maxLength);
     }
 
@@ -107,7 +111,9 @@ final class Sanitizer
             || preg_match('/\b[a-z][a-z0-9+.-]*:\/\//i', $text) === 1
             || preg_match('/(?:^|\s)(?:[A-Za-z]:\\\\|\/(?:var|home|srv|private|etc|tmp|mnt|opt)\/|wp-content\/)/i', $text) === 1
             || preg_match('/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i', $text) === 1
-            || preg_match('/\b\d{10,16}\b/', preg_replace('/[- ]/', '', $text) ?? $text) === 1;
+            || preg_match('/\b\d{10,16}\b/', preg_replace('/[- ]/', '', $text) ?? $text) === 1
+            || preg_match('/\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/', $text) === 1
+            || preg_match('/\b(?:gh[pousr]_[A-Za-z0-9]{20,}|sk-[A-Za-z0-9_-]{20,}|AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{30,})\b/', $text) === 1;
     }
 
     public static function boolean(mixed $value): bool
@@ -182,8 +188,28 @@ final class Sanitizer
             return '';
         }
 
-        return function_exists('mb_substr')
-            ? mb_substr($value, 0, $maxLength)
-            : substr($value, 0, $maxLength);
+        if (function_exists('mb_substr')) {
+            return mb_substr($value, 0, $maxLength, 'UTF-8');
+        }
+        if (function_exists('iconv_substr')) {
+            $truncated = iconv_substr($value, 0, $maxLength, 'UTF-8');
+            return is_string($truncated) ? $truncated : '';
+        }
+
+        if (preg_match_all('/./us', $value, $characters) !== false) {
+            return implode('', array_slice($characters[0], 0, $maxLength));
+        }
+        return '';
+    }
+
+    private static function validUtf8(string $value): string
+    {
+        if ($value === '') {
+            return '';
+        }
+        if (function_exists('wp_check_invalid_utf8')) {
+            return (string) wp_check_invalid_utf8($value, false);
+        }
+        return preg_match('//u', $value) === 1 ? $value : '';
     }
 }

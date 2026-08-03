@@ -7,7 +7,7 @@ const MINUTE_IN_SECONDS = 60;
 const HOUR_IN_SECONDS = 3600;
 const DAY_IN_SECONDS = 86400;
 const ABSPATH = '/tmp/wordpress/';
-const SPCRC_VERSION = '0.27.0';
+const SPCRC_VERSION = '0.28.0';
 
 @mkdir(ABSPATH . 'wp-admin/includes', 0777, true);
 if (! file_exists(ABSPATH . 'wp-admin/includes/upgrade.php')) {
@@ -19,6 +19,7 @@ $GLOBALS['wp_options'] = [];
 $GLOBALS['wp_transients'] = [];
 $GLOBALS['wp_actions'] = [];
 $GLOBALS['wp_scheduled'] = [];
+$GLOBALS['wp_schedule_recurrences'] = [];
 $GLOBALS['current_user_id'] = 7;
 $GLOBALS['current_user_caps'] = array_fill_keys([
     'spcrc_view_overview',
@@ -54,8 +55,10 @@ final class WP_REST_Response
 final class FakeRole
 {
     public array $caps = [];
-    public function add_cap(string $cap): void { $this->caps[$cap] = true; }
+    public ?string $failAdd = null;
+    public function add_cap(string $cap): void { if ($this->failAdd !== $cap) { $this->caps[$cap] = true; } }
     public function remove_cap(string $cap): void { unset($this->caps[$cap]); }
+    public function has_cap(string $cap): bool { return ! empty($this->caps[$cap]); }
 }
 
 final class FakeWpRoles
@@ -103,6 +106,7 @@ final class FakeWpdb
     public array $governance = [];
     public string $last_error = '';
     public array $missingColumns = [];
+    public array $missingIndexes = [];
 
     public function get_charset_collate(): string { return 'DEFAULT CHARACTER SET utf8mb4'; }
     public function esc_like(string $value): string { return $value; }
@@ -189,6 +193,26 @@ final class FakeWpdb
     {
         $query = is_array($prepared) ? (string) ($prepared['query'] ?? '') : (string) $prepared;
         $args = is_array($prepared) ? (array) ($prepared['args'] ?? []) : [];
+        if (str_starts_with(trim($query), 'SHOW INDEX FROM ')) {
+            $indexes = [
+                'spcrc_security_events' => ['PRIMARY', 'event_uuid', 'event_type_created', 'module_created', 'risk_created'],
+                'spcrc_incidents' => ['PRIMARY', 'incident_uuid', 'status_severity', 'updated_at', 'incident_evidence'],
+                'spcrc_findings' => ['PRIMARY', 'finding_uuid', 'status_severity', 'module_status', 'finding_governance', 'finding_acceptance_expiry'],
+                'spcrc_risks' => ['PRIMARY', 'risk_uuid', 'status_score', 'module_status', 'due_at', 'governance_decision', 'accepted_at', 'risk_acceptance_expiry'],
+                'spcrc_controls' => ['PRIMARY', 'control_key', 'status', 'framework', 'updated_at'],
+                'spcrc_privacy_requests' => ['PRIMARY', 'request_uuid', 'status_due', 'status_retry', 'requester_type', 'verification_status', 'verified_by', 'updated_status'],
+                'spcrc_module_manifests' => ['PRIMARY', 'module_key', 'posture_seen'],
+                'spcrc_governance_decisions' => ['PRIMARY', 'decision_uuid', 'status_expires', 'subject_status', 'module_status'],
+                'spcrc_assurance_records' => ['PRIMARY', 'record_uuid', 'type_record', 'type_status', 'next_review', 'backup_restore', 'updated_at'],
+            ];
+            foreach ($indexes as $table => $available) {
+                if (str_contains($query, $table)) {
+                    $found = array_values(array_diff($available, $this->missingIndexes[$table] ?? []));
+                    return array_map(static fn(string $name): array => ['Key_name' => $name], $found);
+                }
+            }
+            return [];
+        }
         $limit = max(1, (int) ($args[array_key_last($args)] ?? 10));
         if (str_contains($query, 'spcrc_risks')) return array_slice(array_reverse(array_values($this->risks)), 0, $limit);
         if (str_contains($query, 'spcrc_incidents')) return array_slice(array_reverse(array_values($this->incidents)), 0, $limit);
@@ -506,7 +530,7 @@ function wp_json_encode(mixed $value, int $flags = 0): string|false { if (! empt
 function maybe_serialize(mixed $value): string { return is_array($value) || is_object($value) ? serialize($value) : (string) $value; }
 function maybe_unserialize(string $value): mixed { $decoded = @unserialize($value); return $decoded === false && $value !== 'b:0;' ? $value : $decoded; }
 function wp_cache_delete(string $key, string $group = ''): bool { return true; }
-function wp_generate_uuid4(): string { if (array_key_exists('wp_uuid_override', $GLOBALS)) return (string) $GLOBALS['wp_uuid_override']; static $counter = 1; return sprintf('00000000-0000-4000-8000-%012d', $counter++); }
+function wp_generate_uuid4(): string { if (! empty($GLOBALS['wp_uuid_throw'])) throw new RuntimeException('forced uuid failure'); if (array_key_exists('wp_uuid_override', $GLOBALS)) return (string) $GLOBALS['wp_uuid_override']; static $counter = 1; return sprintf('00000000-0000-4000-8000-%012d', $counter++); }
 function current_time(string $type, bool $gmt = false): string { return gmdate('Y-m-d H:i:s'); }
 function get_current_user_id(): int { return (int) $GLOBALS['current_user_id']; }
 function current_user_can(string $capability): bool { return ! empty($GLOBALS['current_user_caps'][$capability]); }
@@ -529,6 +553,7 @@ function is_ssl(): bool { return true; }
 function home_url(): string { return 'https://example.test'; }
 function wp_parse_url(string $url, int $component): mixed { return parse_url($url, $component); }
 function wp_next_scheduled(string $hook): int|false { return $GLOBALS['wp_scheduled'][$hook] ?? false; }
-function wp_schedule_event(int $timestamp, string $recurrence, string $hook): bool { $GLOBALS['wp_scheduled'][$hook] = $timestamp; return true; }
-function wp_clear_scheduled_hook(string $hook): int { unset($GLOBALS['wp_scheduled'][$hook]); return 1; }
+function wp_schedule_event(int $timestamp, string $recurrence, string $hook): bool { $GLOBALS['wp_scheduled'][$hook] = $timestamp; $GLOBALS['wp_schedule_recurrences'][$hook] = $recurrence; return true; }
+function wp_get_scheduled_event(string $hook): object|false { return isset($GLOBALS['wp_scheduled'][$hook]) ? (object) ['timestamp' => $GLOBALS['wp_scheduled'][$hook], 'schedule' => ($GLOBALS['wp_schedule_recurrences'][$hook] ?? '')] : false; }
+function wp_clear_scheduled_hook(string $hook): int { unset($GLOBALS['wp_scheduled'][$hook], $GLOBALS['wp_schedule_recurrences'][$hook]); return 1; }
 function dbDelta(string $sql): void {}

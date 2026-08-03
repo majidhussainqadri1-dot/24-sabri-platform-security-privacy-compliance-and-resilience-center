@@ -55,7 +55,8 @@ expectCycle16(is_wp_error($badEvidence) && $badEvidence->get_error_code() === 's
 $reconciled = AuditGapStore::reconcile('spcrc_risk_audit_gap', $riskGapId, 'vault:cycle16-risk-proof', 'file00:cycle16-stepup', new AuditLogger());
 expectCycle16($reconciled === true, 'Managed audit gap must reconcile after capability, step-up, private evidence and audit authorization.');
 expectCycle16(AuditGapStore::count('spcrc_risk_audit_gap') === 0, 'Reconciled gap must be durably removed.');
-expectCycle16(count($GLOBALS['wpdb']->events) >= 1 && ($GLOBALS['wpdb']->events[array_key_last($GLOBALS['wpdb']->events)]['event_type'] ?? '') === 'audit_gap_reconciliation_authorized', 'Reconciliation authorization must be durably audited before removal.');
+expectCycle16(count(array_filter($GLOBALS['wpdb']->events, static fn (array $event): bool => ($event['event_type'] ?? '') === 'audit_gap_reconciliation_authorized')) >= 1, 'Reconciliation authorization must be durably audited before removal.');
+expectCycle16(($GLOBALS['wpdb']->events[array_key_last($GLOBALS['wpdb']->events)]['event_type'] ?? '') === 'audit_gap_reconciled', 'Reconciliation completion must be durably audited after removal.');
 
 AuditGapStore::record('spcrc_cycle16_sensitive_audit_gap', 'evidence', 's3://secret-bucket/private.tar', 'audit_write_failed');
 $sensitive = get_option('spcrc_cycle16_sensitive_audit_gap', []);

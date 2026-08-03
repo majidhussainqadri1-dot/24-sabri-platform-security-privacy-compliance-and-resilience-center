@@ -28,6 +28,8 @@ final class SecurityStateRegistry
     private const MAX_REQUESTS = 100;
     private const MAX_TTL = 86400;
     private const LOCK_TTL = 30;
+    private const CAPACITY_MARKER_OPTION = 'spcrc_security_state_capacity_marker';
+    private const TAMPER_MARKER_OPTION = 'spcrc_security_state_tamper_marker';
     private const ALLOWED_STATES = [
         'elevated-monitoring',
         'restricted-writes',
@@ -53,7 +55,7 @@ final class SecurityStateRegistry
     public function registerHooks(): void
     {
         add_action('spcrc/request_security_state', [$this, 'request'], 10, 3);
-        add_action('spcrc/resolve_security_state_request', [$this, 'resolve'], 10, 2);
+        add_action('spcrc/resolve_security_state_request', [$this, 'resolve'], 10, 3);
         add_filter('spcrc/security_state_requests', [$this, 'merge'], 10, 1);
     }
 
@@ -66,6 +68,8 @@ final class SecurityStateRegistry
             return false;
         }
 
+        $actor = get_current_user_id();
+        $serviceActor = absint($context['actor_user_id'] ?? 0);
         $authorized = current_user_can('spcrc_manage_security_settings') || Sanitizer::boolean(apply_filters(
             'spcrc/authorize_security_state_request',
             false,
@@ -74,6 +78,23 @@ final class SecurityStateRegistry
             $context
         ));
         if (! $authorized || ! Sanitizer::boolean(apply_filters('spcrc/allow_security_state_request', true, $moduleKey, $state, $context))) {
+            return false;
+        }
+        if ($actor < 1) {
+            $serviceAuthorized = $serviceActor > 0 && Sanitizer::boolean(apply_filters(
+                'spcrc/resolve_service_actor',
+                false,
+                $serviceActor,
+                $moduleKey,
+                $state,
+                $context
+            ));
+            if (! $serviceAuthorized) {
+                return false;
+            }
+            $actor = $serviceActor;
+        }
+        if ($this->criticalState($state) && ! $this->verifyStepUp($actor, 'security-state-request:' . $state, $context['step_up_reference'] ?? '')) {
             return false;
         }
 
@@ -123,7 +144,7 @@ final class SecurityStateRegistry
                 'module_key' => $moduleKey,
                 'state' => $state,
                 'reason' => $reason,
-                'requested_by' => get_current_user_id(),
+                'requested_by' => $actor,
                 'requested_at' => gmdate('c'),
                 'expires_at' => gmdate('c', $expiresTimestamp),
                 'status' => 'open',
@@ -164,7 +185,7 @@ final class SecurityStateRegistry
         }
     }
 
-    public function resolve(string $requestId, string $resolution = 'resolved'): bool
+    public function resolve(string $requestId, string $resolution = 'resolved', array $context = []): bool
     {
         $requestId = Sanitizer::uuid($requestId);
         $resolution = Sanitizer::key($resolution, 40);
@@ -195,6 +216,14 @@ final class SecurityStateRegistry
             }
 
             $record = $this->requests[$requestId];
+            $actor = get_current_user_id();
+            if ($this->criticalState((string) ($record['state'] ?? '')) && ! $this->verifyStepUp(
+                $actor,
+                'security-state-resolution:' . (string) ($record['state'] ?? ''),
+                $context['step_up_reference'] ?? ''
+            )) {
+                return false;
+            }
             unset($this->requests[$requestId]);
             if (! $this->refreshLock($lockToken) || ! $this->persist()) {
                 $this->requests[$requestId] = $record;
@@ -247,8 +276,40 @@ final class SecurityStateRegistry
      */
     public function merge(mixed $current): array
     {
-        $current = is_array($current) ? $current : [];
-        return array_replace($current, $this->all());
+        $external = [];
+        if (is_array($current)) {
+            foreach (array_slice($current, 0, self::MAX_REQUESTS, true) as $id => $request) {
+                if (! is_array($request)) {
+                    continue;
+                }
+                $requestId = Sanitizer::uuid($request['request_id'] ?? $id);
+                if ($requestId === '' || isset($this->requests[$requestId])) {
+                    continue;
+                }
+                $moduleKey = Sanitizer::key($request['module_key'] ?? '', 120);
+                $state = Sanitizer::key($request['state'] ?? '', 40);
+                $reason = Sanitizer::text($request['reason'] ?? '', 500);
+                $requestedBy = absint($request['requested_by'] ?? 0);
+                $requestedAt = Sanitizer::isoTime($request['requested_at'] ?? '');
+                $expiresAt = Sanitizer::isoTime($request['expires_at'] ?? '');
+                if ($moduleKey === '' || ! $this->modules->has($moduleKey) || ! in_array($state, self::ALLOWED_STATES, true)
+                    || $reason === '' || Sanitizer::containsSensitiveMaterial($reason) || $requestedBy < 1
+                    || $requestedAt === '' || $expiresAt === '' || strtotime($expiresAt) <= time()) {
+                    continue;
+                }
+                $external[$requestId] = [
+                    'request_id' => $requestId,
+                    'module_key' => $moduleKey,
+                    'state' => $state,
+                    'reason' => $reason,
+                    'requested_by' => $requestedBy,
+                    'requested_at' => $requestedAt,
+                    'expires_at' => $expiresAt,
+                    'status' => 'open',
+                ];
+            }
+        }
+        return array_replace($external, $this->all());
     }
 
     private function reload(): void
@@ -295,6 +356,14 @@ final class SecurityStateRegistry
         }
         $this->normalizationChanged = $raw !== $normalized;
         $this->requests = $normalized;
+        if ($this->normalizationChanged && $raw !== []) {
+            $marker = ['rejected_records' => max(0, count($raw) - count($normalized)), 'recorded_at' => gmdate('c')];
+            $updated = update_option(self::TAMPER_MARKER_OPTION, $marker, false);
+            if (! $updated && get_option(self::TAMPER_MARKER_OPTION, null) !== $marker) {
+                do_action('spcrc/security_state_tamper_marker_failed', $marker);
+            }
+            $this->recordAuditGap('', 'stored_state_normalization_rejected');
+        }
     }
 
     private function prune(bool $persist = true): void
@@ -358,6 +427,11 @@ final class SecurityStateRegistry
         if (count($this->requests) > self::MAX_REQUESTS) {
             // An unresolved security-state request is operational evidence and
             // must never be silently evicted to admit a newer request.
+            $marker = ['unresolved_count' => count($this->requests), 'recorded_at' => gmdate('c')];
+            $updated = update_option(self::CAPACITY_MARKER_OPTION, $marker, false);
+            if (! $updated && get_option(self::CAPACITY_MARKER_OPTION, null) !== $marker) {
+                do_action('spcrc/security_state_capacity_marker_failed', $marker);
+            }
             do_action('spcrc/security_state_capacity_exhausted', count($this->requests));
             return false;
         }
@@ -390,6 +464,24 @@ final class SecurityStateRegistry
         if (! AtomicOptionLock::release(self::LOCK_OPTION, $token)) {
             do_action('spcrc/security_state_lock_release_failed', $token);
         }
+    }
+
+
+    private function criticalState(string $state): bool
+    {
+        return in_array($state, ['platform-read-only', 'incident-containment', 'identity-lockdown'], true);
+    }
+
+    private function verifyStepUp(int $actor, string $purpose, mixed $reference): bool
+    {
+        $reference = Sanitizer::opaqueReference($reference);
+        return $actor > 0 && $reference !== '' && Sanitizer::boolean(apply_filters(
+            'spcrc/verify_step_up_assurance',
+            false,
+            $actor,
+            $purpose,
+            $reference
+        ));
     }
 
     private function hasAuditGap(string $requestId): bool

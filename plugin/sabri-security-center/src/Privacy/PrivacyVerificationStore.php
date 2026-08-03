@@ -13,6 +13,7 @@ use Sabri\Platform\Security\Support\Sanitizer;
  */
 final class PrivacyVerificationStore
 {
+    private const DAY_SECONDS = 86400;
     /** @param array<string,mixed> $evidence
      *  @param array<string,mixed> $requestContext
      *  @return array<string,mixed>|\WP_Error
@@ -32,6 +33,13 @@ final class PrivacyVerificationStore
             return new \WP_Error(
                 'spcrc_privacy_verified_at_invalid',
                 'A valid, non-future verification timestamp is required before dispatch.'
+            );
+        }
+        $maximumAge = $this->maximumEvidenceAge((string) $safe['verification_method']);
+        if ($verifiedAt < time() - $maximumAge) {
+            return new \WP_Error(
+                'spcrc_privacy_verification_stale',
+                'Privacy verification evidence is too old for this verification method.'
             );
         }
         if (! get_userdata((int) $safe['verified_by_user_id'])) {
@@ -156,6 +164,7 @@ final class PrivacyVerificationStore
         $verifiedAt = strtotime((string) $safe['verified_at'] . ' UTC');
         return $verifiedAt !== false
             && $verifiedAt <= time() + 300
+            && $verifiedAt >= time() - $this->maximumEvidenceAge((string) $safe['verification_method'])
             && (bool) get_userdata((int) $safe['verified_by_user_id']);
     }
 
@@ -198,6 +207,25 @@ final class PrivacyVerificationStore
             'verified_by_user_id' => $verifiedBy,
             'verified_at' => gmdate('Y-m-d H:i:s', (int) strtotime($verifiedAt)),
         ];
+    }
+
+
+    private function maximumEvidenceAge(string $method): int
+    {
+        $defaults = [
+            'authenticated-session' => 900,
+            'verified-email-link' => self::DAY_SECONDS,
+            'verified-mobile-otp' => 3600,
+            'guardian-verification' => self::DAY_SECONDS,
+            'authorized-agent-verification' => self::DAY_SECONDS,
+            'manual-document-review' => 7 * self::DAY_SECONDS,
+        ];
+        $age = (int) apply_filters(
+            'spcrc/privacy_verification_maximum_age',
+            $defaults[$method] ?? 3600,
+            $method
+        );
+        return max(300, min(7 * self::DAY_SECONDS, $age));
     }
 
     private function opaqueReference(mixed $value): string

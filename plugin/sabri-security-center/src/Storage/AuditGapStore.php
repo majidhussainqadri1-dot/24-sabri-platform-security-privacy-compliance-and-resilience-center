@@ -27,6 +27,7 @@ final class AuditGapStore
     private const MAX_GAPS = 100;
     private const LOCK_OPTION = 'spcrc_audit_gap_store_lock';
     private const LOCK_TTL = 30;
+    private const CAPACITY_MARKER_OPTION = 'spcrc_audit_gap_capacity_marker';
 
     /** @var array<string,string> */
     private const MANAGED_OPTIONS = [
@@ -75,32 +76,20 @@ final class AuditGapStore
                 do_action('spcrc/audit_gap_identifier_failed', $option, $entityType, $entityId, $reason, $gapId->get_error_code());
                 return false;
             }
-            $safeContext = [];
-            foreach ($context as $key => $value) {
-                if (count($safeContext) >= 10) {
-                    break;
-                }
-                $safeKey = Sanitizer::key($key, 60);
-                if ($safeKey === '' || (! is_scalar($value) && $value !== null)) {
-                    continue;
-                }
-                $safeValue = Sanitizer::text((string) $value, 160);
-                if ($safeValue !== '' && ! Sanitizer::containsSensitiveMaterial($safeValue)) {
-                    $safeContext[$safeKey] = $safeValue;
-                }
-            }
+            $safeContext = self::safeContext($context);
             if (count($gaps) >= self::MAX_GAPS) {
                 // Never evict an unresolved evidence gap merely to admit a new
                 // one. Keeping the existing bounded set preserves the release
                 // blocker; silent eviction could make an unresolved failure
                 // disappear without reconciliation.
+                self::recordCapacityMarker($option, $entityType, $entityId, $reason, count($gaps));
                 do_action('spcrc/audit_gap_capacity_exhausted', $option, $entityType, $entityId, $reason);
                 return false;
             }
 
             $gaps[$gapId] = [
                 'entity_type' => $entityType,
-                'entity_id' => Sanitizer::containsSensitiveMaterial($entityId) ? '[REDACTED]' : $entityId,
+                'entity_id' => self::safeEntityId($entityId),
                 'reason' => $reason,
                 'recorded_at' => gmdate('c'),
                 'context' => $safeContext,
@@ -200,6 +189,8 @@ final class AuditGapStore
                 return new \WP_Error('spcrc_audit_gap_lock_lost', 'Audit-gap ownership was lost before reconciliation could be committed.');
             }
 
+            $originalGaps = $gaps;
+            $resolvedGap = $gaps[$gapId];
             unset($gaps[$gapId]);
             if ($gaps === []) {
                 delete_option($option);
@@ -212,7 +203,30 @@ final class AuditGapStore
                 return new \WP_Error('spcrc_audit_gap_reconciliation_write_failed', 'The reconciled audit gap could not be removed.');
             }
 
-            do_action('spcrc/audit_gap_reconciled', $option, $gapId, $actor, $evidenceReference);
+            $completionAudit = $audit->record(
+                'audit_gap_reconciled',
+                'file-24-security-center',
+                'reconciled',
+                'critical',
+                [
+                    'gap_option' => $option,
+                    'gap_id' => $gapId,
+                    'entity_type' => (string) ($resolvedGap['entity_type'] ?? ''),
+                    'evidence_ref' => $evidenceReference,
+                    'authorization_audit_uuid' => $authorizationAudit,
+                ]
+            );
+            if (is_wp_error($completionAudit)) {
+                $restored = update_option($option, $originalGaps, false)
+                    || get_option($option, null) === $originalGaps;
+                if (! $restored) {
+                    do_action('spcrc/audit_gap_reconciliation_rollback_failed', $option, $gapId, $completionAudit);
+                    return new \WP_Error('spcrc_audit_gap_reconciliation_rollback_failed', 'Reconciliation completion could not be audited and the original audit gap could not be restored.');
+                }
+                return new \WP_Error('spcrc_audit_gap_completion_audit_failed', 'Reconciliation was rolled back because completion evidence could not be audited.');
+            }
+
+            do_action('spcrc/audit_gap_reconciled', $option, $gapId, $actor, $evidenceReference, $completionAudit);
             return true;
         } finally {
             self::releaseLock($lock);
@@ -298,6 +312,63 @@ final class AuditGapStore
         return $gaps;
     }
 
+
+
+    /** @param array<string,mixed> $context @return array<string,string> */
+    private static function safeContext(array $context): array
+    {
+        $safe = [];
+        foreach (array_slice($context, 0, 10, true) as $key => $value) {
+            $safeKey = Sanitizer::key($key, 60);
+            if ($safeKey === '' || (! is_scalar($value) && $value !== null)) {
+                continue;
+            }
+            if (preg_match('/(^|_)(password|token|secret|authorization|cookie|session|nonce|otp|email|phone|mobile|address|identity|passport|national_id|guardian)($|_)/', $safeKey) === 1) {
+                $safe[$safeKey] = '[REDACTED]';
+                continue;
+            }
+            $safeValue = Sanitizer::text((string) $value, 160);
+            $safe[$safeKey] = $safeValue !== '' && ! Sanitizer::containsSensitiveMaterial($safeValue)
+                ? $safeValue
+                : '[REDACTED]';
+        }
+        return $safe;
+    }
+
+    private static function safeEntityId(string $entityId): string
+    {
+        if ($entityId === '') {
+            return '';
+        }
+        if (Sanitizer::containsSensitiveMaterial($entityId)) {
+            return '[REDACTED]';
+        }
+        $uuid = Sanitizer::uuid($entityId);
+        if ($uuid !== '') {
+            return $uuid;
+        }
+        if (preg_match('/^[a-z0-9][a-z0-9._:-]{0,159}$/i', $entityId) === 1 && ! Sanitizer::containsSensitiveMaterial($entityId)) {
+            return $entityId;
+        }
+        $salt = function_exists('wp_salt') ? wp_salt('auth') : hash('sha256', __FILE__);
+        return 'sha256:' . hash_hmac('sha256', $entityId, $salt . '|audit-gap-entity');
+    }
+
+    private static function recordCapacityMarker(string $option, string $entityType, string $entityId, string $reason, int $count): void
+    {
+        $marker = [
+            'option' => $option,
+            'entity_type' => $entityType,
+            'entity_id' => self::safeEntityId($entityId),
+            'reason' => $reason,
+            'unresolved_count' => max(0, $count),
+            'recorded_at' => gmdate('c'),
+        ];
+        $updated = update_option(self::CAPACITY_MARKER_OPTION, $marker, false);
+        if (! $updated && get_option(self::CAPACITY_MARKER_OPTION, null) !== $marker) {
+            do_action('spcrc/audit_gap_capacity_marker_failed', $marker);
+        }
+    }
 
     /** @return string|\WP_Error */
     private static function acquireLock(): string|\WP_Error

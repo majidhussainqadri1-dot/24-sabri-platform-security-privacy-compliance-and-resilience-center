@@ -14,12 +14,17 @@ namespace Sabri\Platform\Security\Support;
  */
 final class AtomicOptionLock
 {
+    private const MAX_TTL = 86400;
+
     /** @return string|\WP_Error */
     public static function acquire(string $option, int $ttl): string|\WP_Error
     {
         $option = self::optionName($option);
-        $ttl = max(5, min(86400, $ttl));
-        if ($option === '' || ! function_exists('add_option') || ! function_exists('get_option')) {
+        $ttl = max(5, min(self::MAX_TTL, $ttl));
+        if ($option === '') {
+            return new \WP_Error('spcrc_atomic_lock_invalid', 'Atomic option-lock name is outside the File 24 coordination namespace.');
+        }
+        if (! function_exists('add_option') || ! function_exists('get_option')) {
             return new \WP_Error('spcrc_atomic_lock_storage_unavailable', 'Atomic option-lock storage is unavailable.');
         }
 
@@ -53,7 +58,7 @@ final class AtomicOptionLock
     public static function refresh(string $option, string $token, int $ttl): bool
     {
         $option = self::optionName($option);
-        $ttl = max(5, min(86400, $ttl));
+        $ttl = max(5, min(self::MAX_TTL, $ttl));
         if ($option === '' || $token === '') {
             return false;
         }
@@ -125,17 +130,39 @@ final class AtomicOptionLock
 
     private static function validPayload(mixed $payload): bool
     {
-        return is_array($payload)
-            && is_string($payload['token'] ?? null)
-            && $payload['token'] !== ''
-            && is_numeric($payload['expires_at'] ?? null);
+        if (! is_array($payload) || ! is_string($payload['token'] ?? null)) {
+            return false;
+        }
+
+        $token = strtolower(trim((string) $payload['token']));
+        $validToken = preg_match('/^[0-9a-f]{32}$/', $token) === 1
+            || preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/', $token) === 1
+            || preg_match('/^[a-z0-9._-]{8,128}$/', $token) === 1;
+        if (! $validToken) {
+            return false;
+        }
+
+        $expires = $payload['expires_at'] ?? null;
+        if (is_string($expires)) {
+            if (preg_match('/^[1-9][0-9]{0,10}$/', $expires) !== 1) {
+                return false;
+            }
+            $expires = (int) $expires;
+        }
+        if (! is_int($expires) || $expires < 1 || $expires > time() + self::MAX_TTL) {
+            return false;
+        }
+
+        return true;
     }
 
     private static function optionName(string $option): string
     {
         $option = strtolower(trim($option));
-        $option = preg_replace('/[^a-z0-9_\-]/', '', $option) ?? '';
-        return substr($option, 0, 191);
+        if (strlen($option) > 191 || preg_match('/^spcrc_[a-z0-9][a-z0-9_\-]*$/', $option) !== 1) {
+            return '';
+        }
+        return $option;
     }
 
     /** @param array<string,mixed> $expected @param array<string,mixed> $replacement */

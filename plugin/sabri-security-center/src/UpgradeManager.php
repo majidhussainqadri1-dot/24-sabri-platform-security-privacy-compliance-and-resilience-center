@@ -23,6 +23,13 @@ final class UpgradeManager
     {
         $installedSchema = (string) get_option('spcrc_schema_version', '');
         $installedPlugin = (string) get_option('spcrc_version', '');
+        foreach (['schema' => $installedSchema, 'plugin' => $installedPlugin] as $kind => $version) {
+            if ($version !== '' && preg_match('/^\d+\.\d+\.\d+(?:\.\d+)?$/', $version) !== 1) {
+                $error = new \WP_Error('spcrc_installed_version_invalid', sprintf('Installed File 24 %s version state is malformed.', $kind));
+                self::fail($error, $installedSchema);
+                return $error;
+            }
+        }
 
         if (
             ($installedSchema !== '' && version_compare($installedSchema, Schema::VERSION, '>'))
@@ -69,10 +76,21 @@ final class UpgradeManager
         }
 
         try {
+            if (! self::refreshLock($lockToken)) {
+                $error = new \WP_Error('spcrc_upgrade_lock_lost', 'File 24 upgrade lock ownership was lost before schema installation.');
+                self::fail($error, $installedSchema);
+                return $error;
+            }
             $installed = Schema::install();
             if (is_wp_error($installed)) {
                 self::fail($installed, $installedSchema);
                 return $installed;
+            }
+
+            if (! self::refreshLock($lockToken)) {
+                $error = new \WP_Error('spcrc_upgrade_lock_lost', 'File 24 upgrade lock ownership was lost after schema installation.');
+                self::fail($error, $installedSchema);
+                return $error;
             }
 
             $integrity = self::ensureRuntimeIntegrity($installedSchema);
@@ -116,12 +134,20 @@ final class UpgradeManager
     /** @return bool|\WP_Error */
     private static function ensureRuntimeIntegrity(string $installedSchema): bool|\WP_Error
     {
-        Capabilities::install();
+        $capabilitiesInstalled = Capabilities::install();
+        if ($capabilitiesInstalled === false) {
+            $error = new \WP_Error('spcrc_capability_install_failed', 'Required File 24 capabilities could not be installed and verified.');
+            self::fail($error, $installedSchema);
+            return $error;
+        }
+        $retentionExisted = function_exists('wp_next_scheduled') && (bool) wp_next_scheduled(RetentionManager::CRON_HOOK);
+        $recoveryExisted = function_exists('wp_next_scheduled') && (bool) wp_next_scheduled(RecoveryManager::EVENT);
         if (! RetentionManager::ensureScheduled()) {
             $error = new \WP_Error(
                 'spcrc_retention_schedule_failed',
                 'Required retention schedule could not be verified.'
             );
+            self::cleanupNewSchedules($retentionExisted, $recoveryExisted);
             self::fail($error, $installedSchema);
             return $error;
         }
@@ -130,6 +156,7 @@ final class UpgradeManager
                 'spcrc_privacy_recovery_schedule_failed',
                 'Required privacy recovery schedule could not be verified.'
             );
+            self::cleanupNewSchedules($retentionExisted, $recoveryExisted);
             self::fail($error, $installedSchema);
             return $error;
         }
@@ -141,6 +168,22 @@ final class UpgradeManager
     private static function acquireLock(): string|\WP_Error
     {
         return AtomicOptionLock::acquire(self::LOCK_OPTION, self::LOCK_TTL);
+    }
+
+
+    private static function refreshLock(string $token): bool
+    {
+        return AtomicOptionLock::refresh(self::LOCK_OPTION, $token, self::LOCK_TTL);
+    }
+
+    private static function cleanupNewSchedules(bool $retentionExisted, bool $recoveryExisted): void
+    {
+        if (! $retentionExisted && method_exists(RetentionManager::class, 'unschedule')) {
+            RetentionManager::unschedule();
+        }
+        if (! $recoveryExisted && method_exists(RecoveryManager::class, 'unschedule')) {
+            RecoveryManager::unschedule();
+        }
     }
 
     private static function releaseLock(string $token): void
@@ -163,6 +206,10 @@ final class UpgradeManager
     /** @param array<string,mixed> $details */
     private static function recordFailure(array $details): void
     {
-        update_option('spcrc_last_upgrade_error', ['at' => gmdate('c')] + $details, false);
+        $failure = ['at' => gmdate('c')] + $details;
+        $updated = update_option('spcrc_last_upgrade_error', $failure, false);
+        if (! $updated && get_option('spcrc_last_upgrade_error', null) !== $failure) {
+            do_action('spcrc/upgrade_failure_evidence_unavailable', $failure);
+        }
     }
 }

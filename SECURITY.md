@@ -18,6 +18,6 @@ Include:
 
 Never include passwords, tokens, identity documents, patient data, private messages, production database extracts, or encryption keys.
 
-## Foundation 0.27.0 public-safe hardening
+## Foundation 0.28.0 public-safe hardening
 
-The current candidate rejects direct contact data in audit context, path-like evidence references, untrusted privacy callbacks, stale control/assurance writes, unresolved evidence eviction and inexact canonical inserts. Sensitive operations evidence remains private.
+The current candidate adds bounded cryptographic coordination, audit semantic integrity, durable audit-gap capacity evidence, manifest hash/route hardening, attributable and step-up-gated security states, verified activation/upgrade evidence, required-index checks, schedule integrity, mutually exclusive privacy recovery and method-specific verification freshness. Sensitive operations evidence remains private.
