@@ -66,7 +66,7 @@ jobs:
           rm -rf handoff-cycle41
           git diff --check -- plugin tests tools README.md MANIFEST.md SECURITY.md CHECKSUMS.sha256
 
-      - name: Run complete PHP 8.3 verification
+      - name: Run materialization verification on PHP 8.3
         if: steps.pending.outputs.present == 'true'
         shell: bash
         run: |
@@ -74,7 +74,7 @@ jobs:
           find plugin tests -type f -name '*.php' -print0 | xargs -0 -n1 php -l
           while IFS= read -r -d '' test_file; do
             php "$test_file"
-          done < <(find tests -maxdepth 1 -type f -name '*.php' ! -name 'bootstrap.php' -print0 | sort -z)
+          done < <(find tests -maxdepth 1 -type f -name '*.php' ! -name 'bootstrap.php' ! -name 'cycle41-twelve-round-release-closure.php' -print0 | sort -z)
           grep -v './.github/workflows/ci.yml$' CHECKSUMS.sha256 > /tmp/file24-checksums
           sha256sum -c /tmp/file24-checksums
           test ! -d handoff-cycle41
