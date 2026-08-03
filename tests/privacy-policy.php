@@ -218,6 +218,7 @@ $GLOBALS['wpdb']->privacy[$missingUuid]['next_retry_at'] = gmdate('Y-m-d H:i:s',
 $missingRetry = $dispatcher->retry($missingUuid, 99);
 expectPolicy(($missingRetry['error'] ?? '') === 'spcrc_privacy_retry_modules_missing', 'Missing handler must not be replayed indefinitely.');
 
+add_filter('spcrc/authorize_privacy_module_callback', static fn (bool $allowed, int $actor, string $requestUuid, string $moduleKey, string $reference): bool => $actor === 99 && $reference === 'callback:policy-module', 10, 5);
 $callbackUuid = '60000000-0000-4000-8000-000000000102';
 $begin = $policy->begin(verifiedPolicyRequest([
     'request_uuid' => $callbackUuid,
@@ -226,13 +227,13 @@ $begin = $policy->begin(verifiedPolicyRequest([
     'module_keys' => ['policy-module'],
 ]));
 expectPolicy(! is_wp_error($begin), 'Pre-dispatch request must be created.');
-$early = $dispatcher->completeModule($callbackUuid, 'policy-module', ['ok' => true, 'status' => 'completed']);
+$early = $dispatcher->completeModule($callbackUuid, 'policy-module', ['ok' => true, 'status' => 'completed', 'callback_reference' => 'callback:policy-module']);
 expectPolicy(($early['error'] ?? '') === 'spcrc_privacy_callback_module_unclaimed', 'Callback cannot fabricate completion before a module dispatch claim.');
 
 expectPolicy($repository->claimModule($callbackUuid, 'policy-module') === true, 'Module claim must succeed.');
 expectPolicy($repository->storeModuleResult($callbackUuid, 'policy-module', ['ok' => true, 'status' => 'pending']) === true, 'Pending result must store.');
 expectPolicy($repository->finalize($callbackUuid, 'pending') === true, 'Pending request must finalize.');
-$unsafe = $dispatcher->completeModule($callbackUuid, 'policy-module', ['ok' => false, 'status' => 'failed', 'code' => 'uncertain']);
+$unsafe = $dispatcher->completeModule($callbackUuid, 'policy-module', ['ok' => false, 'status' => 'failed', 'code' => 'uncertain', 'callback_reference' => 'callback:policy-module']);
 expectPolicy($unsafe['status'] === 'failed', 'Unsafe failed callback must be durably recorded as failed reconciliation evidence.');
 $unsafeResult = $repository->moduleResults($callbackUuid)['policy-module'] ?? [];
 expectPolicy(($unsafeResult['status'] ?? '') === 'failed' && ! str_starts_with((string) ($unsafeResult['code'] ?? ''), 'retry-safe-'), 'Unsafe callback evidence must remain non-retryable.');
@@ -279,8 +280,9 @@ expectPolicy($deletion['status'] === 'failed', 'Deletion test must produce a ret
 $GLOBALS['wpdb']->privacy[$deletionUuid]['next_retry_at'] = gmdate('Y-m-d H:i:s', time() - 1);
 $deletionBlocked = $dispatcher->retry($deletionUuid, 99);
 expectPolicy(($deletionBlocked['error'] ?? '') === 'spcrc_privacy_deletion_retry_confirmation_required', 'Deletion retry must require a fresh destructive confirmation.');
+add_filter('spcrc/verify_step_up_assurance', static fn (bool $ok, int $actor, string $purpose, string $reference): bool => $actor === 99 && $purpose === 'privacy:deletion-retry' && $reference === 'file00:deletion-retry', 10, 4);
 $beforeDeletionRetry = $safeCalls;
-$deletionRetried = $dispatcher->retry($deletionUuid, 99, ['deletion_confirmation' => 'RETRY DELETION ' . $deletionUuid]);
+$deletionRetried = $dispatcher->retry($deletionUuid, 99, ['deletion_confirmation' => 'RETRY DELETION ' . $deletionUuid, 'step_up_reference' => 'file00:deletion-retry']);
 expectPolicy(! isset($deletionRetried['error']) && ($deletionRetried['status'] ?? '') === 'failed' && $safeCalls === $beforeDeletionRetry + 1, 'Confirmed deletion retry must reach only the policy-approved native module exactly once.');
 
 $staleUuid = '60000000-0000-4000-8000-000000000104';

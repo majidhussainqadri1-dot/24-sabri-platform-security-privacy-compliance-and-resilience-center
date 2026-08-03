@@ -1,4 +1,4 @@
-# Foundation Integration Contracts — 0.26.0
+# Foundation Integration Contracts — 0.27.0
 
 ## Contract law
 
@@ -102,3 +102,7 @@ Unknown upstream fields are discarded. `verified` backup posture requires succes
 - `spcrc/responsible_disclosure_channel_available`
 
 Public Trust Center output is allowlisted after filters. Arbitrary private fields are discarded, and the public program status remains `Foundation candidate; production assurance pending` until independent release gates are evidenced.
+
+## Foundation 0.27.0 contract additions
+
+Privacy module callbacks default to deny and require an opaque native authority reference through `spcrc/authorize_privacy_module_callback`. Deletion retries require File 00 step-up through `spcrc/verify_step_up_assurance` with purpose `privacy:deletion-retry`. Manifest routes are same-origin path-only contracts.

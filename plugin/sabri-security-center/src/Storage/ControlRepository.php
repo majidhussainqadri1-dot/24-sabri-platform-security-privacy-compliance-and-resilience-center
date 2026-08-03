@@ -10,6 +10,9 @@ use Sabri\Platform\Security\Support\Sanitizer;
 if (! class_exists(AuditGapStore::class, false)) {
     require_once __DIR__ . '/AuditGapStore.php';
 }
+if (! class_exists(AuditLogger::class, false)) {
+    require_once __DIR__ . '/AuditLogger.php';
+}
 if (! class_exists(AtomicOptionLock::class, false)) {
     require_once dirname(__DIR__) . '/Support/AtomicOptionLock.php';
 }
@@ -18,8 +21,11 @@ final class ControlRepository
 {
     private const LOCK_TTL = 60;
 
-    public function __construct(private ?AuditLogger $audit = null)
+    private AuditLogger $audit;
+
+    public function __construct(?AuditLogger $audit = null)
     {
+        $this->audit = $audit ?? new AuditLogger();
     }
 
     /** @param array<string,mixed> $data
@@ -74,9 +80,9 @@ final class ControlRepository
                 $written = $wpdb->update(
                     $table,
                     $payload,
-                    ['control_key' => $key],
+                    ['control_key' => $key, 'updated_at' => (string) ($existing['updated_at'] ?? '')],
                     ['%s', '%s', '%s', '%d', '%s', '%s', '%s'],
-                    ['%s']
+                    ['%s', '%s']
                 );
                 if ($written === 0) {
                     $current = $wpdb->get_row($wpdb->prepare("SELECT * FROM {$table} WHERE control_key = %s", $key), ARRAY_A);
@@ -107,7 +113,7 @@ final class ControlRepository
                 return new \WP_Error('spcrc_control_lock_lost_after_write', 'Control was stored but exclusive ownership was lost before audit evidence could be completed. Reconciliation is required.');
             }
 
-            $audit = $this->audit?->record(
+            $audit = $this->audit->record(
                 is_array($existing) ? 'security_control_updated' : 'security_control_created',
                 'file-24-security-center',
                 $status,

@@ -5,17 +5,27 @@ declare(strict_types=1);
 namespace Sabri\Platform\Security\Storage;
 
 use Sabri\Platform\Security\Support\Sanitizer;
+use Sabri\Platform\Security\Support\SecureIdentifier;
 
 if (! class_exists(AuditGapStore::class, false)) {
     require_once __DIR__ . '/AuditGapStore.php';
+}
+if (! class_exists(AuditLogger::class, false)) {
+    require_once __DIR__ . '/AuditLogger.php';
+}
+if (! class_exists(SecureIdentifier::class, false)) {
+    require_once dirname(__DIR__) . '/Support/SecureIdentifier.php';
 }
 
 final class IncidentRepository
 {
     private const SEVERITIES = ['sev0', 'sev1', 'sev2', 'sev3', 'sev4'];
 
-    public function __construct(private ?AuditLogger $audit = null)
+    private AuditLogger $audit;
+
+    public function __construct(?AuditLogger $audit = null)
     {
+        $this->audit = $audit ?? new AuditLogger();
     }
 
     /** @param array<string,mixed> $data
@@ -41,7 +51,10 @@ final class IncidentRepository
             return new \WP_Error('spcrc_incident_evidence_required', 'SEV0/SEV1 incidents require an opaque private evidence reference.');
         }
 
-        $uuid = wp_generate_uuid4();
+        $uuid = SecureIdentifier::uuid4('incident');
+        if (is_wp_error($uuid)) {
+            return $uuid;
+        }
         $now = current_time('mysql', true);
         $table = $wpdb->prefix . 'spcrc_incidents';
         $inserted = $wpdb->insert(
@@ -60,11 +73,11 @@ final class IncidentRepository
             ],
             ['%s', '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%s', '%s']
         );
-        if ($inserted === false) {
-            return new \WP_Error('spcrc_incident_write_failed', 'Incident could not be stored.');
+        if ($inserted !== 1) {
+            return new \WP_Error('spcrc_incident_write_failed', 'Incident could not be stored exactly once.');
         }
 
-        $audit = $this->audit?->record(
+        $audit = $this->audit->record(
             'security_incident_created',
             'file-24-security-center',
             'open',

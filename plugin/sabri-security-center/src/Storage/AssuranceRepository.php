@@ -4,10 +4,21 @@ declare(strict_types=1);
 
 namespace Sabri\Platform\Security\Storage;
 
+use Sabri\Platform\Security\Support\AtomicOptionLock;
 use Sabri\Platform\Security\Support\Sanitizer;
+use Sabri\Platform\Security\Support\SecureIdentifier;
 
 if (! class_exists(AuditGapStore::class, false)) {
     require_once __DIR__ . '/AuditGapStore.php';
+}
+if (! class_exists(AuditLogger::class, false)) {
+    require_once __DIR__ . '/AuditLogger.php';
+}
+if (! class_exists(AtomicOptionLock::class, false)) {
+    require_once dirname(__DIR__) . '/Support/AtomicOptionLock.php';
+}
+if (! class_exists(SecureIdentifier::class, false)) {
+    require_once dirname(__DIR__) . '/Support/SecureIdentifier.php';
 }
 
 /**
@@ -18,14 +29,18 @@ if (! class_exists(AuditGapStore::class, false)) {
 final class AssuranceRepository
 {
     private const TYPES = ['compliance', 'vendor', 'backup'];
+    private const LOCK_TTL = 60;
     private const STATUSES = [
         'compliance' => ['not-assessed', 'possibly-applicable', 'applicable', 'not-applicable', 'blocked'],
         'vendor' => ['unassessed', 'under-review', 'approved', 'restricted', 'rejected', 'exited'],
         'backup' => ['unknown', 'scheduled', 'failed', 'successful', 'verified'],
     ];
 
-    public function __construct(private ?AuditLogger $audit = null)
+    private AuditLogger $audit;
+
+    public function __construct(?AuditLogger $audit = null)
     {
+        $this->audit = $audit ?? new AuditLogger();
     }
 
     public function registerHooks(): void
@@ -173,6 +188,13 @@ final class AssuranceRepository
             return new \WP_Error('spcrc_assurance_data_classes_invalid', 'Assurance data classes could not be encoded.');
         }
 
+        $lockOption = 'spcrc_assurance_lock_' . substr(hash('sha256', $type . '|' . $key), 0, 32);
+        $lockToken = AtomicOptionLock::acquire($lockOption, self::LOCK_TTL);
+        if (is_wp_error($lockToken)) {
+            return new \WP_Error('spcrc_assurance_locked', 'This assurance record is being changed by another request. Refresh and try again.');
+        }
+
+        try {
         $table = $wpdb->prefix . 'spcrc_assurance_records';
         $existingRaw = $this->getRaw($type, $key);
         $existing = is_array($existingRaw) ? $this->normalizeRow($existingRaw) : null;
@@ -192,6 +214,10 @@ final class AssuranceRepository
             'updated_at' => $now,
         ];
 
+        if (! AtomicOptionLock::refresh($lockOption, $lockToken, self::LOCK_TTL)) {
+            return new \WP_Error('spcrc_assurance_lock_lost', 'Assurance ownership was lost before the change was stored.');
+        }
+
         if (is_array($existing)) {
             $recordUuid = Sanitizer::uuid($existing['record_uuid'] ?? '');
             if ($recordUuid === '') {
@@ -200,9 +226,9 @@ final class AssuranceRepository
             $written = $wpdb->update(
                 $table,
                 $payload,
-                ['record_uuid' => $recordUuid, 'record_type' => $type, 'record_key' => $key],
+                ['record_uuid' => $recordUuid, 'record_type' => $type, 'record_key' => $key, 'updated_at' => (string) ($existingRaw['updated_at'] ?? '')],
                 ['%s', '%s', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s'],
-                ['%s', '%s', '%s']
+                ['%s', '%s', '%s', '%s']
             );
             if ($written === false) {
                 return new \WP_Error('spcrc_assurance_write_failed', 'Assurance record could not be updated.');
@@ -217,7 +243,10 @@ final class AssuranceRepository
                 }
             }
         } else {
-            $recordUuid = wp_generate_uuid4();
+            $recordUuid = SecureIdentifier::uuid4('assurance-record');
+            if (is_wp_error($recordUuid)) {
+                return $recordUuid;
+            }
             $written = $wpdb->insert(
                 $table,
                 array_merge([
@@ -228,7 +257,7 @@ final class AssuranceRepository
                 ], $payload),
                 ['%s', '%s', '%s', '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s']
             );
-            if ($written === false) {
+            if ($written !== 1) {
                 $concurrent = $this->get($type, $key);
                 if (! is_array($concurrent)) {
                     return new \WP_Error('spcrc_assurance_write_failed', 'Assurance record could not be created.');
@@ -238,6 +267,17 @@ final class AssuranceRepository
                     'Assurance record was created concurrently and was not overwritten.'
                 );
             }
+        }
+
+        if (! AtomicOptionLock::refresh($lockOption, $lockToken, self::LOCK_TTL)) {
+            AuditGapStore::record(
+                'spcrc_assurance_audit_gap',
+                'assurance_record',
+                $recordUuid,
+                'assurance_lock_lost_after_write',
+                ['record_type' => $type, 'record_key' => $key]
+            );
+            return new \WP_Error('spcrc_assurance_lock_lost_after_write', 'Assurance record was stored but exclusive ownership was lost before audit evidence could be completed. Reconciliation is required.');
         }
 
         $auditResult = $this->recordAudit('assurance_record_saved', $type, 'completed', 'informational', [
@@ -258,6 +298,11 @@ final class AssuranceRepository
             );
         }
         return $recordUuid;
+        } finally {
+            if (! AtomicOptionLock::release($lockOption, $lockToken)) {
+                do_action('spcrc/assurance_lock_release_failed', $type, $key);
+            }
+        }
     }
 
     /** @return array<string,mixed>|null */
@@ -546,9 +591,6 @@ final class AssuranceRepository
      */
     private function recordAudit(string $type, string $module, string $result, string $risk, array $context): bool|\WP_Error
     {
-        if ($this->audit === null) {
-            return true;
-        }
         $recorded = $this->audit->record($type, $module, $result, $risk, $context);
         return is_wp_error($recorded) ? $recorded : true;
     }

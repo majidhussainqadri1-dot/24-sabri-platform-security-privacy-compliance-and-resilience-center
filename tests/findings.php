@@ -40,6 +40,7 @@ final class FindingWpdb
     public function insert(string $table, array $data, array $formats = []): int|false
     {
         if ($this->failWrite) return false;
+        if (str_ends_with($table, 'spcrc_security_events')) return 1;
         $this->findings[(string) $data['finding_uuid']] = $data;
         return 1;
     }

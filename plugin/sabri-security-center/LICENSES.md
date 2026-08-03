@@ -1,4 +1,4 @@
-# License Inventory — 0.26.0
+# License Inventory — 0.27.0
 
 ## Plugin source
 
@@ -8,7 +8,7 @@
 
 ## Bundled third-party runtime code
 
-No third-party PHP, JavaScript, font, image or binary library is bundled in the 0.26.0 plugin package.
+No third-party PHP, JavaScript, font, image or binary library is bundled in the 0.27.0 plugin package.
 
 WordPress core APIs are consumed as platform interfaces and are not redistributed inside this package.
 

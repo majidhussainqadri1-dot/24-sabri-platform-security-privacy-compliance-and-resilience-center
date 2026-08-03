@@ -135,6 +135,25 @@ final class ModuleRegistry
         if (! in_array($posture, self::ALLOWED_POSTURES, true)) {
             $posture = 'unassessed';
         }
+        foreach ([$name, $version, $owner] as $identityValue) {
+            if (Sanitizer::containsSensitiveMaterial($identityValue)) {
+                return new \WP_Error('spcrc_manifest_sensitive_identity', 'Manifest identity fields must not contain URLs, contact data, credentials or storage paths.');
+            }
+        }
+        $publicRoutes = $this->routes($manifest['public_routes']);
+        $privateRoutes = $this->routes($manifest['private_routes']);
+        if (is_wp_error($publicRoutes) || is_wp_error($privateRoutes)) {
+            return is_wp_error($publicRoutes) ? $publicRoutes : $privateRoutes;
+        }
+        $lastSecurityTest = Sanitizer::isoTime($manifest['last_security_test'] ?? '');
+        if ($lastSecurityTest !== '' && strtotime($lastSecurityTest) > time() + 300) {
+            return new \WP_Error('spcrc_manifest_security_test_future', 'Manifest security-test evidence cannot be dated in the future.');
+        }
+        $degradedBehavior = Sanitizer::text($manifest['degraded_behavior'] ?? 'Unknown/unavailable; no permissive fallback.', 300);
+        $releaseGate = Sanitizer::text($manifest['release_gate'] ?? 'Evidence not supplied.', 300);
+        if (Sanitizer::containsSensitiveMaterial($degradedBehavior) || Sanitizer::containsSensitiveMaterial($releaseGate)) {
+            return new \WP_Error('spcrc_manifest_sensitive_operational_text', 'Manifest operational text must not contain URLs, contact data, credentials or storage paths.');
+        }
 
         return [
             'module_key' => $moduleKey,
@@ -143,19 +162,50 @@ final class ModuleRegistry
             'owner' => $owner,
             'posture' => $posture,
             'data_classes' => Sanitizer::textList($manifest['data_classes'], 20, 120),
-            'public_routes' => Sanitizer::textList($manifest['public_routes'], 50, 300),
-            'private_routes' => Sanitizer::textList($manifest['private_routes'], 50, 300),
+            'public_routes' => $publicRoutes,
+            'private_routes' => $privateRoutes,
             'capabilities' => Sanitizer::textList($manifest['capabilities'] ?? [], 100, 120),
             'external_vendors' => Sanitizer::textList($manifest['external_vendors'] ?? [], 50, 160),
             'privacy_operations' => Sanitizer::textList($manifest['privacy_operations'] ?? [], 20, 60),
-            'last_security_test' => Sanitizer::isoTime($manifest['last_security_test'] ?? ''),
+            'last_security_test' => $lastSecurityTest,
             'contract_version' => Sanitizer::text($manifest['contract_version'] ?? 'unversioned', 40),
             'canonical_data_owner' => Sanitizer::text($manifest['canonical_data_owner'] ?? $owner, 120),
             'canonical_action_owner' => Sanitizer::text($manifest['canonical_action_owner'] ?? $owner, 120),
             'evidence_source' => Sanitizer::opaqueReference($manifest['evidence_source'] ?? ''),
-            'degraded_behavior' => Sanitizer::text($manifest['degraded_behavior'] ?? 'Unknown/unavailable; no permissive fallback.', 300),
-            'release_gate' => Sanitizer::text($manifest['release_gate'] ?? 'Evidence not supplied.', 300),
+            'degraded_behavior' => $degradedBehavior,
+            'release_gate' => $releaseGate,
         ];
+    }
+
+
+    /** @return string[]|\WP_Error */
+    private function routes(mixed $routes): array|\WP_Error
+    {
+        if (! is_array($routes)) {
+            return new \WP_Error('spcrc_manifest_routes_invalid', 'Manifest routes must be a bounded array of same-origin absolute paths.');
+        }
+        $safe = [];
+        foreach (array_slice($routes, 0, 50) as $route) {
+            if (! is_scalar($route) && $route !== null) {
+                return new \WP_Error('spcrc_manifest_route_invalid', 'Manifest route is invalid.');
+            }
+            $route = trim((string) $route);
+            if (
+                $route === ''
+                || strlen($route) > 300
+                || ! str_starts_with($route, '/')
+                || str_starts_with($route, '//')
+                || str_contains($route, '\\')
+                || str_contains($route, '?')
+                || str_contains($route, '#')
+                || preg_match('/[\x00-\x1F\x7F]/', $route) === 1
+                || preg_match('/^[a-z][a-z0-9+.-]*:\/\//i', $route) === 1
+            ) {
+                return new \WP_Error('spcrc_manifest_route_invalid', 'Manifest routes must be same-origin absolute paths without query strings, fragments or credentials.');
+            }
+            $safe[] = $route;
+        }
+        return array_values(array_unique($safe));
     }
 
     /** @param array<string,mixed> $manifest
@@ -252,8 +302,11 @@ final class ModuleRegistry
             ],
             ['%s', '%s', '%s', '%s', '%s', '%s']
         );
-        if ($inserted !== false) {
+        if ($inserted === 1) {
             return true;
+        }
+        if ($inserted !== false) {
+            return new \WP_Error('spcrc_manifest_insert_inexact', 'Module manifest insert did not store exactly one row.');
         }
 
         return $this->resolveConcurrentWrite($table, $manifest, $hash, 'insert');
@@ -362,7 +415,7 @@ final class ModuleRegistry
             'contract_version' => '1.0.0',
             'canonical_data_owner' => 'File 24',
             'canonical_action_owner' => 'Native owners; File 24 assurance only',
-            'evidence_source' => 'release:file-24-0.26.0',
+            'evidence_source' => 'release:file-24-0.27.0',
             'degraded_behavior' => 'Native controls remain authoritative; privileged assurance writes fail closed.',
             'release_gate' => 'Staging, independent penetration test, restore drill and Founder production approval',
         ];

@@ -6,9 +6,16 @@ namespace Sabri\Platform\Security\Storage;
 
 use Sabri\Platform\Security\Support\AtomicOptionLock;
 use Sabri\Platform\Security\Support\Sanitizer;
+use Sabri\Platform\Security\Support\SecureIdentifier;
 
 if (! class_exists(AuditGapStore::class, false)) {
     require_once __DIR__ . '/AuditGapStore.php';
+}
+if (! class_exists(AuditLogger::class, false)) {
+    require_once __DIR__ . '/AuditLogger.php';
+}
+if (! class_exists(SecureIdentifier::class, false)) {
+    require_once dirname(__DIR__) . '/Support/SecureIdentifier.php';
 }
 if (! class_exists(AtomicOptionLock::class, false)) {
     require_once dirname(__DIR__) . '/Support/AtomicOptionLock.php';
@@ -35,9 +42,13 @@ final class GovernanceRepository
     private const AUDIT_GAP_OPTION = 'spcrc_governance_audit_gap';
     private const AUDIT_GAP_LOCK_OPTION = 'spcrc_governance_audit_gap_lock';
     private const AUDIT_GAP_LOCK_TTL = 30;
+    private const MAX_AUDIT_GAPS = 100;
 
-    public function __construct(private ?AuditLogger $audit = null)
+    private AuditLogger $audit;
+
+    public function __construct(?AuditLogger $audit = null)
     {
+        $this->audit = $audit ?? new AuditLogger();
     }
 
     public function registerHooks(): void
@@ -122,7 +133,10 @@ final class GovernanceRepository
                 );
             }
 
-            $uuid = wp_generate_uuid4();
+            $uuid = SecureIdentifier::uuid4('governance-decision');
+        if (is_wp_error($uuid)) {
+            return $uuid;
+        }
             $inserted = $wpdb->insert(
                 $wpdb->prefix . 'spcrc_governance_decisions',
                 [
@@ -162,7 +176,7 @@ final class GovernanceRepository
                 );
             }
 
-            $audit = $this->audit?->record('governance_decision_requested', $module, 'pending', 'high', [
+            $audit = $this->audit->record('governance_decision_requested', $module, 'pending', 'high', [
                 'decision_uuid' => $uuid,
                 'decision_type' => $type,
                 'subject_key' => $subject,
@@ -262,7 +276,7 @@ final class GovernanceRepository
             return new \WP_Error('spcrc_governance_concurrent_change', 'Governance decision changed concurrently.');
         }
 
-        $audit = $this->audit?->record('governance_decision_' . $status, (string) ($row['module_key'] ?? 'file-24-security-center'), $status, 'critical', [
+        $audit = $this->audit->record('governance_decision_' . $status, (string) ($row['module_key'] ?? 'file-24-security-center'), $status, 'critical', [
             'decision_uuid' => $decisionUuid,
             'decision_type' => $row['decision_type'] ?? '',
             'subject_key' => $row['subject_key'] ?? '',
@@ -365,6 +379,29 @@ final class GovernanceRepository
         if ($note === '' || Sanitizer::containsSensitiveMaterial($note)) {
             return new \WP_Error('spcrc_governance_note_invalid', 'A bounded, non-sensitive reconciliation note is required.');
         }
+        $evidenceRef = Sanitizer::opaqueReference($context['evidence_ref'] ?? '');
+        if ($evidenceRef === '') {
+            return new \WP_Error('spcrc_governance_reconciliation_evidence_required', 'An opaque private reconciliation evidence reference is required.');
+        }
+
+        $specificGaps = $this->auditGaps();
+        if (! isset($specificGaps[$decisionUuid])) {
+            foreach (AuditGapStore::all('spcrc_governance_batch_audit_gap') as $gapId => $gap) {
+                if (
+                    Sanitizer::key($gap['entity_type'] ?? '', 80) === 'governance_decision'
+                    && hash_equals(Sanitizer::text($gap['entity_id'] ?? '', 160), $decisionUuid)
+                ) {
+                    return AuditGapStore::reconcile(
+                        'spcrc_governance_batch_audit_gap',
+                        (string) $gapId,
+                        $evidenceRef,
+                        $stepUpRef,
+                        $this->audit
+                    );
+                }
+            }
+            return new \WP_Error('spcrc_governance_audit_gap_not_found', 'The governance audit gap changed before reconciliation.');
+        }
 
         $gapLock = AtomicOptionLock::acquire(self::AUDIT_GAP_LOCK_OPTION, self::AUDIT_GAP_LOCK_TTL);
         if (is_wp_error($gapLock)) {
@@ -380,7 +417,7 @@ final class GovernanceRepository
                 return new \WP_Error('spcrc_governance_audit_gap_not_found', 'The governance audit gap changed before reconciliation.');
             }
 
-            $audit = $this->audit?->record(
+            $audit = $this->audit->record(
                 'governance_audit_gap_reconciled',
                 (string) ($row['module_key'] ?? 'file-24-security-center'),
                 'reconciled',
@@ -392,6 +429,7 @@ final class GovernanceRepository
                     'stored_status' => $row['status'] ?? '',
                     'reconciliation_note_hash' => hash('sha256', $note),
                     'step_up_reference_hash' => hash('sha256', $stepUpRef),
+                    'evidence_ref' => $evidenceRef,
                 ]
             );
             if (is_wp_error($audit)) {
@@ -442,7 +480,7 @@ final class GovernanceRepository
         ));
         $count = $updated === false ? 0 : (int) $updated;
         if ($count > 0) {
-            $audit = $this->audit?->record('governance_decisions_expired', 'file-24-security-center', 'expired', 'informational', ['count' => $count]);
+            $audit = $this->audit->record('governance_decisions_expired', 'file-24-security-center', 'expired', 'informational', ['count' => $count]);
             if (is_wp_error($audit)) {
                 AuditGapStore::record('spcrc_governance_batch_audit_gap', 'expired_decision_batch', (string) $count, 'expiry_audit_failed', ['count' => $count]);
             }
@@ -498,6 +536,9 @@ final class GovernanceRepository
 
         try {
             $gaps = $this->auditGaps();
+            if (! isset($gaps[$decisionUuid]) && count($gaps) >= self::MAX_AUDIT_GAPS) {
+                return $this->recordFallbackAuditGap($decisionUuid, $reason, 'specific_gap_capacity_exhausted');
+            }
             $gaps[$decisionUuid] = [
                 'reason' => $reason,
                 'recorded_at' => gmdate('c'),

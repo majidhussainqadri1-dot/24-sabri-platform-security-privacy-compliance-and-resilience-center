@@ -9,9 +9,13 @@ use Sabri\Platform\Security\Storage\AuditGapStore;
 use Sabri\Platform\Security\Storage\AuditLogger;
 use Sabri\Platform\Security\Storage\PrivacyRequestRepository;
 use Sabri\Platform\Security\Support\Sanitizer;
+use Sabri\Platform\Security\Support\SecureIdentifier;
 
 if (! class_exists(AuditGapStore::class, false)) {
     require_once dirname(__DIR__) . '/Storage/AuditGapStore.php';
+}
+if (! class_exists(SecureIdentifier::class, false)) {
+    require_once dirname(__DIR__) . '/Support/SecureIdentifier.php';
 }
 
 final class RequestDispatcher
@@ -92,7 +96,11 @@ final class RequestDispatcher
     {
         $requestId = Sanitizer::uuid($request['request_uuid'] ?? '');
         if ($requestId === '') {
-            $requestId = wp_generate_uuid4();
+            $generated = SecureIdentifier::uuid4('privacy-dispatch');
+            if (is_wp_error($generated)) {
+                return ['ok' => false, 'request_uuid' => '', 'status' => 'failed', 'error' => $generated->get_error_code()];
+            }
+            $requestId = $generated;
         }
 
         $requestType = Sanitizer::key($request['request_type'] ?? '', 40);

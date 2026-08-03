@@ -5,17 +5,27 @@ declare(strict_types=1);
 namespace Sabri\Platform\Security\Storage;
 
 use Sabri\Platform\Security\Support\Sanitizer;
+use Sabri\Platform\Security\Support\SecureIdentifier;
 
 if (! class_exists(AuditGapStore::class, false)) {
     require_once __DIR__ . '/AuditGapStore.php';
 }
+if (! class_exists(AuditLogger::class, false)) {
+    require_once __DIR__ . '/AuditLogger.php';
+}
+if (! class_exists(SecureIdentifier::class, false)) {
+    require_once dirname(__DIR__) . '/Support/SecureIdentifier.php';
+}
 
 final class RiskRepository
 {
+    private AuditLogger $audit;
+
     public function __construct(
-        private ?AuditLogger $audit = null,
+        ?AuditLogger $audit = null,
         private ?GovernanceRepository $governance = null
     ) {
+        $this->audit = $audit ?? new AuditLogger();
     }
 
     public function registerHooks(): void
@@ -45,7 +55,10 @@ final class RiskRepository
             return new \WP_Error('spcrc_risk_invalid', 'A bounded, non-sensitive risk title and module are required.');
         }
 
-        $uuid = wp_generate_uuid4();
+        $uuid = SecureIdentifier::uuid4('risk');
+        if (is_wp_error($uuid)) {
+            return $uuid;
+        }
         $now = current_time('mysql', true);
         $inserted = $wpdb->insert(
             $wpdb->prefix . 'spcrc_risks',
@@ -69,10 +82,10 @@ final class RiskRepository
             ],
             ['%s', '%s', '%s', '%d', '%d', '%d', '%s', '%s', '%d', '%s', '%s', '%d', '%s', '%s', '%s', '%s']
         );
-        if ($inserted === false) {
-            return new \WP_Error('spcrc_risk_write_failed', 'Risk could not be stored.');
+        if ($inserted !== 1) {
+            return new \WP_Error('spcrc_risk_write_failed', 'Risk could not be stored exactly once.');
         }
-        $audit = $this->audit?->record('security_risk_created', $moduleKey, 'open', $impact >= 4 ? 'high' : 'medium', [
+        $audit = $this->audit->record('security_risk_created', $moduleKey, 'open', $impact >= 4 ? 'high' : 'medium', [
             'risk_uuid' => $uuid,
             'score' => $likelihood * $impact,
         ]);
@@ -142,7 +155,7 @@ final class RiskRepository
         if ($updated !== 1) {
             return new \WP_Error('spcrc_risk_concurrent_change', 'Risk changed concurrently.');
         }
-        $audit = $this->audit?->record('security_risk_accepted', (string) ($row['module_key'] ?? 'file-24-security-center'), 'accepted', 'critical', [
+        $audit = $this->audit->record('security_risk_accepted', (string) ($row['module_key'] ?? 'file-24-security-center'), 'accepted', 'critical', [
             'risk_uuid' => $riskUuid,
             'governance_decision_uuid' => $decisionUuid,
         ]);
@@ -188,7 +201,7 @@ final class RiskRepository
         ));
         $count = $updated === false ? 0 : (int) $updated;
         if ($count > 0) {
-            $audit = $this->audit?->record('expired_risk_acceptances_reopened', 'file-24-security-center', 'reopened', 'high', ['count' => $count]);
+            $audit = $this->audit->record('expired_risk_acceptances_reopened', 'file-24-security-center', 'reopened', 'high', ['count' => $count]);
             if (is_wp_error($audit)) {
                 AuditGapStore::record('spcrc_risk_reopen_audit_gap', 'expired_acceptance_batch', (string) $count, 'reopen_audit_failed', ['count' => $count]);
             }

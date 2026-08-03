@@ -171,6 +171,7 @@ $GLOBALS['current_user_caps']['spcrc_approve_governance_decision'] = true;
 add_filter('spcrc/verify_step_up_assurance', static fn (bool $ok, int $userId, string $purpose, string $reference): bool => $userId === 8 && $reference === 'assertion:cycle13', 10, 4);
 $reconciled = $governance->reconcileAuditGap($first, [
     'step_up_reference' => 'assertion:cycle13',
+    'evidence_ref' => 'vault:cycle13-reconciliation',
     'note' => 'Independent audit storage has been restored and verified.',
 ]);
 expectCycle13($reconciled === true, 'Authorized independent reconciliation with fresh step-up must succeed.');

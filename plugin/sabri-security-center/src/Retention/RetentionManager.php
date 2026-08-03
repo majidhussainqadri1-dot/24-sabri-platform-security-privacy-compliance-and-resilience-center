@@ -11,6 +11,9 @@ use Sabri\Platform\Security\Support\AtomicOptionLock;
 if (! class_exists(AuditGapStore::class, false)) {
     require_once dirname(__DIR__) . '/Storage/AuditGapStore.php';
 }
+if (! class_exists(AuditLogger::class, false)) {
+    require_once dirname(__DIR__) . '/Storage/AuditLogger.php';
+}
 if (! class_exists(AtomicOptionLock::class, false)) {
     require_once dirname(__DIR__) . '/Support/AtomicOptionLock.php';
 }
@@ -21,8 +24,11 @@ final class RetentionManager
     private const LOCK_OPTION = 'spcrc_retention_lock';
     private const LOCK_SECONDS = 900;
 
-    public function __construct(private ?AuditLogger $audit = null)
+    private AuditLogger $audit;
+
+    public function __construct(?AuditLogger $audit = null)
     {
+        $this->audit = $audit ?? new AuditLogger();
     }
 
     public function registerHooks(): void
@@ -163,25 +169,35 @@ final class RetentionManager
             'error_code' => $errorCode,
         ];
 
-        update_option('spcrc_last_retention_run', ['at' => gmdate('c')] + $result, false);
+        $lastRun = ['at' => gmdate('c')] + $result;
+        $updated = update_option('spcrc_last_retention_run', $lastRun, false);
+        $lastRunPersisted = $updated || get_option('spcrc_last_retention_run', null) === $lastRun;
+        if (! $lastRunPersisted) {
+            AuditGapStore::record(
+                'spcrc_retention_audit_gap',
+                'retention_run',
+                gmdate('YmdHis'),
+                'result_persistence_failed',
+                ['status' => $status, 'error_code' => $errorCode]
+            );
+            do_action('spcrc/retention_result_persistence_failed', $result);
+        }
 
-        if ($this->audit !== null) {
-            $recorded = $this->audit->record(
+        $recorded = $this->audit->record(
                 'security_event_retention_' . $status,
                 'file-24-security-center',
                 $status,
                 $status === 'failed' ? 'high' : ($status === 'locked' ? 'low' : 'informational'),
                 $result
             );
-            if (is_wp_error($recorded)) {
-                AuditGapStore::record(
-                    'spcrc_retention_audit_gap',
-                    'retention_run',
-                    gmdate('YmdHis'),
-                    'audit_write_failed',
-                    ['status' => $status, 'error_code' => $errorCode]
-                );
-            }
+        if (is_wp_error($recorded)) {
+            AuditGapStore::record(
+                'spcrc_retention_audit_gap',
+                'retention_run',
+                gmdate('YmdHis'),
+                'audit_write_failed',
+                ['status' => $status, 'error_code' => $errorCode]
+            );
         }
 
         do_action('spcrc/retention_result', $result);

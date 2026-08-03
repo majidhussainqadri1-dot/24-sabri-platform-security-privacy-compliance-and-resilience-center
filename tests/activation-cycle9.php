@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace {
     const ABSPATH = '/tmp/file24-activation/';
     const SPCRC_PLUGIN_FILE = __FILE__;
-    const SPCRC_VERSION = '0.26.0';
+    const SPCRC_VERSION = '0.27.0';
     @mkdir(ABSPATH . 'wp-admin/includes', 0777, true);
     file_put_contents(ABSPATH . 'wp-admin/includes/plugin.php', "<?php\n");
 
@@ -93,7 +93,7 @@ namespace Sabri\Platform\Security {
     $GLOBALS['activation_deactivated'] = false;
     RecoveryManager::$result = true;
     Activation::activate();
-    expectActivation(($GLOBALS['activation_options']['spcrc_version'] ?? '') === '0.26.0', 'Successful activation must persist plugin version.');
+    expectActivation(($GLOBALS['activation_options']['spcrc_version'] ?? '') === '0.27.0', 'Successful activation must persist plugin version.');
     expectActivation(($GLOBALS['activation_options']['spcrc_schema_version'] ?? '') === '0.25.5', 'Successful activation must persist schema version.');
     expectActivation(! isset($GLOBALS['activation_options']['spcrc_last_upgrade_error']), 'Successful activation must clear prior failure evidence.');
 

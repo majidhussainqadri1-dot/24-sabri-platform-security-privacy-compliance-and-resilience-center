@@ -202,6 +202,7 @@ $unverified = $dispatcher->dispatch(verifiedPrivacy([
 expectPrivacy(($unverified['error'] ?? '') === 'spcrc_privacy_subject_missing', 'Missing subject must fail before dispatch.');
 expectPrivacy($handlerCalls === 0, 'No module handler may run when durable pre-dispatch validation fails.');
 
+add_filter('spcrc/authorize_privacy_module_callback', static fn (bool $allowed, int $actor, string $requestUuid, string $moduleKey, string $reference): bool => $actor === 99 && $reference === 'callback:file00', 10, 5);
 $uuid = '10000000-0000-4000-8000-000000000002';
 $pending = $dispatcher->dispatch(verifiedPrivacy([
     'request_uuid' => $uuid,
@@ -220,12 +221,12 @@ expectPrivacy($requests->activeCount() === 1, 'Pending request must remain activ
 $retryPending = $dispatcher->retry($uuid, 99);
 expectPrivacy(($retryPending['error'] ?? '') === 'spcrc_privacy_retry_forbidden', 'Pending asynchronous work must never be replayed as a retry.');
 
-$callback = $dispatcher->completeModule($uuid, 'file-00-membership-core', ['ok' => true, 'status' => 'completed', 'reference' => 'native:done']);
+$callback = $dispatcher->completeModule($uuid, 'file-00-membership-core', ['ok' => true, 'status' => 'completed', 'reference' => 'native:done', 'callback_reference' => 'callback:file00']);
 expectPrivacy($callback['ok'] === true && $callback['status'] === 'completed', 'Native completion callback must close a pending request truthfully.');
 expectPrivacy(($GLOBALS['wpdb']->privacy[$uuid]['status'] ?? '') === 'completed', 'Completed callback must persist canonical request closure.');
 expectPrivacy(! empty($GLOBALS['wpdb']->privacy[$uuid]['completed_at']), 'Completed request must have a completion timestamp.');
 
-$closedCallback = $dispatcher->completeModule($uuid, 'file-00-membership-core', ['ok' => true, 'status' => 'completed']);
+$closedCallback = $dispatcher->completeModule($uuid, 'file-00-membership-core', ['ok' => true, 'status' => 'completed', 'callback_reference' => 'callback:file00']);
 expectPrivacy(($closedCallback['error'] ?? '') === 'spcrc_privacy_callback_closed', 'Closed requests must reject replayed completion callbacks.');
 
 $collision = $dispatcher->dispatch(verifiedPrivacy([

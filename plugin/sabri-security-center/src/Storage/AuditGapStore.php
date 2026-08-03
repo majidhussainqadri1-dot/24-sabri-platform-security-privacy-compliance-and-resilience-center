@@ -6,9 +6,13 @@ namespace Sabri\Platform\Security\Storage;
 
 use Sabri\Platform\Security\Support\AtomicOptionLock;
 use Sabri\Platform\Security\Support\Sanitizer;
+use Sabri\Platform\Security\Support\SecureIdentifier;
 
 if (! class_exists(AtomicOptionLock::class, false)) {
     require_once dirname(__DIR__) . '/Support/AtomicOptionLock.php';
+}
+if (! class_exists(SecureIdentifier::class, false)) {
+    require_once dirname(__DIR__) . '/Support/SecureIdentifier.php';
 }
 
 /**
@@ -33,6 +37,7 @@ final class AuditGapStore
         'incident' => 'spcrc_incident_audit_gap',
         'control' => 'spcrc_control_audit_gap',
         'assurance' => 'spcrc_assurance_audit_gap',
+        'governance' => 'spcrc_governance_audit_gap',
         'governance-batch' => 'spcrc_governance_batch_audit_gap',
         'privacy' => 'spcrc_privacy_audit_gap',
         'privacy-recovery' => 'spcrc_privacy_recovery_audit_gap',
@@ -65,9 +70,11 @@ final class AuditGapStore
 
         try {
             $gaps = self::normalize(get_option($option, []));
-            $gapId = function_exists('wp_generate_uuid4')
-                ? wp_generate_uuid4()
-                : substr(hash('sha256', $entityType . '|' . $entityId . '|' . $reason . '|' . microtime(true)), 0, 32);
+            $gapId = SecureIdentifier::uuid4('audit-gap');
+            if (is_wp_error($gapId)) {
+                do_action('spcrc/audit_gap_identifier_failed', $option, $entityType, $entityId, $reason, $gapId->get_error_code());
+                return false;
+            }
             $safeContext = [];
             foreach ($context as $key => $value) {
                 if (count($safeContext) >= 10) {
@@ -249,11 +256,44 @@ final class AuditGapStore
             if (! is_array($gap)) {
                 continue;
             }
-            $safeId = Sanitizer::key($id, 120);
+            $safeId = Sanitizer::uuid($id);
+            if ($safeId === '') {
+                $safeId = Sanitizer::key($id, 120);
+            }
             if ($safeId === '') {
                 $safeId = 'gap-' . substr(hash('sha256', (string) $id), 0, 24);
             }
-            $gaps[$safeId] = $gap;
+            $entityType = Sanitizer::key($gap['entity_type'] ?? '', 80);
+            $entityId = Sanitizer::text($gap['entity_id'] ?? '', 160);
+            $reason = Sanitizer::key($gap['reason'] ?? '', 100);
+            if ($entityType === '' || $reason === '') {
+                continue;
+            }
+            if (Sanitizer::containsSensitiveMaterial($entityId)) {
+                $entityId = '[REDACTED]';
+            }
+            $context = [];
+            if (is_array($gap['context'] ?? null)) {
+                foreach (array_slice($gap['context'], 0, 10, true) as $key => $value) {
+                    $key = Sanitizer::key($key, 60);
+                    if ($key === '' || (! is_scalar($value) && $value !== null)) {
+                        continue;
+                    }
+                    if (preg_match('/(^|_)(password|token|secret|authorization|cookie|session|nonce|otp|email|phone|mobile|address|identity|passport|national_id)($|_)/', $key) === 1) {
+                        $context[$key] = '[REDACTED]';
+                        continue;
+                    }
+                    $value = Sanitizer::text((string) $value, 160);
+                    $context[$key] = $value !== '' && ! Sanitizer::containsSensitiveMaterial($value) ? $value : '[REDACTED]';
+                }
+            }
+            $gaps[$safeId] = [
+                'entity_type' => $entityType,
+                'entity_id' => $entityId,
+                'reason' => $reason,
+                'recorded_at' => Sanitizer::isoTime($gap['recorded_at'] ?? ''),
+                'context' => $context,
+            ];
         }
         return $gaps;
     }
@@ -280,6 +320,12 @@ final class AuditGapStore
         if (! AtomicOptionLock::release(self::LOCK_OPTION, $token)) {
             do_action('spcrc/audit_gap_lock_release_failed', $token);
         }
+    }
+
+
+    private static function managedOption(string $option): bool
+    {
+        return in_array($option, self::MANAGED_OPTIONS, true);
     }
 
     private static function optionName(string $option): string

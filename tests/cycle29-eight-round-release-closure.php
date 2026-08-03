@@ -25,12 +25,12 @@ $manifest = (string) file_get_contents($root . '/MANIFEST.md');
 $ci = (string) file_get_contents($root . '/.github/workflows/ci.yml');
 $historicalReceipt = (string) file_get_contents($root . '/docs/RELEASE-RECEIPT-0.25.8.md');
 
-$assert(str_contains($plugin, 'Version:     0.26.0'), 'Plugin header must expose the current post-0.25.9 release.');
-$assert(str_contains($plugin, "define('SPCRC_VERSION', '0.26.0')"), 'Runtime constant must expose the current post-0.25.9 release.');
-$assert(str_contains($readme, 'Stable tag: 0.26.0'), 'WordPress readme must expose the 0.25.9 stable tag.');
-$assert(($sbom['packages'][0]['versionInfo'] ?? '') === '0.26.0', 'SPDX package version must match 0.25.9.');
-$assert(str_contains($licenses, 'License Inventory — 0.26.0'), 'License inventory must match 0.25.9.');
-$assert(str_contains($registry, 'release:file-24-0.26.0'), 'Self manifest evidence source must match 0.25.9.');
+$assert(str_contains($plugin, 'Version:     0.27.0'), 'Plugin header must expose the current post-0.25.9 release.');
+$assert(str_contains($plugin, "define('SPCRC_VERSION', '0.27.0')"), 'Runtime constant must expose the current post-0.25.9 release.');
+$assert(str_contains($readme, 'Stable tag: 0.27.0'), 'WordPress readme must expose the 0.25.9 stable tag.');
+$assert(($sbom['packages'][0]['versionInfo'] ?? '') === '0.27.0', 'SPDX package version must match 0.25.9.');
+$assert(str_contains($licenses, 'License Inventory — 0.27.0'), 'License inventory must match 0.25.9.');
+$assert(str_contains($registry, 'release:file-24-0.27.0'), 'Self manifest evidence source must match 0.25.9.');
 $assert(str_contains($summary, 'Cycles 22–29'), 'Eight-round summary must identify the reviewed cycle range.');
 $assert(str_contains($summary, '**113 assertions**'), 'Eight-round summary must state the complete new evidence count.');
 $assert(str_contains($receipt, '**Review closure:** Cycle 29'), 'Release receipt must identify Cycle 29 closure.');
@@ -38,7 +38,7 @@ $assert(str_contains($receipt, '**Schema version:** 0.25.5'), 'Release receipt m
 $assert(str_contains($receipt, '74532fdf6b135f5aed29072c9463757a2ffd9f752fc054ec51366e8ed8479a9a'), 'Release receipt must bind the deterministic package hash.');
 $assert(str_contains($traceability, 'Cycle 29: privacy verification compensation failure.'), 'Current traceability must include the final review defect.');
 $assert(str_contains($limitations, 'Repository QA must not be represented'), 'Known limitations must preserve the external evidence boundary.');
-$assert(str_contains($manifest, 'Foundation twelve-round corrective candidate 0.26.0'), 'Source manifest must identify the current candidate.');
+$assert(str_contains($manifest, 'Cycles 3–41'), 'Source manifest must identify the current candidate.');
 $assert(str_contains($ci, 'php tests/cycle22-manifest-heartbeat-race.php'), 'Permanent CI must execute Cycle 22.');
 $assert(str_contains($ci, 'php tests/cycle29-privacy-verification-compensation.php'), 'Permanent CI must execute Cycle 29 compensation tests.');
 $assert(str_contains($ci, 'php tests/cycle29-eight-round-release-closure.php'), 'Permanent CI must execute final eight-round release closure.');

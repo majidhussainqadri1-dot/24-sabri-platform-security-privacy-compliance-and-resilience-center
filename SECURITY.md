@@ -17,3 +17,7 @@ Include:
 - suggested remediation, when known.
 
 Never include passwords, tokens, identity documents, patient data, private messages, production database extracts, or encryption keys.
+
+## Foundation 0.27.0 public-safe hardening
+
+The current candidate rejects direct contact data in audit context, path-like evidence references, untrusted privacy callbacks, stale control/assurance writes, unresolved evidence eviction and inexact canonical inserts. Sensitive operations evidence remains private.

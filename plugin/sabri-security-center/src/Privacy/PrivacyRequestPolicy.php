@@ -233,6 +233,25 @@ final class PrivacyRequestPolicy
             return new \WP_Error('spcrc_privacy_callback_invalid', 'Privacy completion callback is invalid.');
         }
 
+        $callbackReference = Sanitizer::opaqueReference($result['callback_reference'] ?? '');
+        $actor = get_current_user_id();
+        $callbackAuthorized = $callbackReference !== '' && Sanitizer::boolean(apply_filters(
+            'spcrc/authorize_privacy_module_callback',
+            false,
+            $actor,
+            $requestUuid,
+            $moduleKey,
+            $callbackReference,
+            $result
+        ));
+        if (! $callbackAuthorized) {
+            return new \WP_Error(
+                'spcrc_privacy_callback_forbidden',
+                'Native privacy completion requires an authenticated, module-bound callback authority reference.'
+            );
+        }
+        unset($result['callback_reference']);
+
         $requestStatus = Sanitizer::key($record['status'] ?? '', 40);
         if (! in_array($requestStatus, ['dispatching', 'pending', 'partial', 'recovery-required'], true)) {
             return new \WP_Error('spcrc_privacy_callback_closed', 'Privacy request is not open for module completion.');
@@ -413,7 +432,19 @@ final class PrivacyRequestPolicy
         $confirmation = is_scalar($authorization['deletion_confirmation'] ?? null)
             ? trim((string) $authorization['deletion_confirmation'])
             : '';
-        return $uuid !== '' && hash_equals('RETRY DELETION ' . $uuid, $confirmation);
+        $stepUpReference = Sanitizer::opaqueReference($authorization['step_up_reference'] ?? '');
+        $actor = get_current_user_id();
+        $stepUpOk = $uuid !== ''
+            && $actor > 0
+            && $stepUpReference !== ''
+            && Sanitizer::boolean(apply_filters(
+                'spcrc/verify_step_up_assurance',
+                false,
+                $actor,
+                'privacy:deletion-retry',
+                $stepUpReference
+            ));
+        return $stepUpOk && hash_equals('RETRY DELETION ' . $uuid, $confirmation);
     }
 
     /** @param array<string,mixed> $result
