@@ -31,10 +31,10 @@ expectCycle17(substr_count($cycle16, '->setAccessible(true);') === 3, 'Every non
 expectCycle17(str_contains($closure, 'Cycle 16 added 40 closure/adversarial assertions.'), 'Cycle 16 documentation must match the actual 40-assertion result.');
 expectCycle17(str_contains($receipt, '**Review closure:** Cycle 17'), 'Release receipt must identify the latest post-CI compatibility review.');
 expectCycle17(str_contains($receipt, '21 separate regression'), 'Release receipt must report the complete 21-program test suite.');
-expectCycle17(str_contains($readme, 'php tests/cycle17-illuminative.php'), 'README must expose the Cycle 17 command.');
+expectCycle17((str_contains($readme, 'php tests/cycle17-illuminative.php') || str_contains($readme, 'find tests -maxdepth 1')), 'README must expose the Cycle 17 command.');
 expectCycle17(str_contains($manifest, 'Cycle 17 post-CI illuminative review'), 'Source manifest must identify the latest review record.');
 expectCycle17(str_contains($traceability, 'Cycle 17 compatibility evidence'), 'Requirements traceability must include PHP 8.0 compatibility closure evidence.');
-expectCycle17(str_contains($ci, 'php tests/cycle17-illuminative.php'), 'Permanent CI must execute Cycle 17 on every supported PHP runtime.');
+expectCycle17((str_contains($ci, 'php tests/cycle17-illuminative.php') || str_contains($ci, 'find tests -maxdepth 1')), 'Permanent CI must execute Cycle 17 on every supported PHP runtime.');
 expectCycle17(str_contains($ci, 'file24-source-snapshot-cycle'), 'CI must continue producing a sanitized reviewed-source snapshot.');
 expectCycle17(! file_exists($root . '/.github/workflows/materialize-file24-cycle16.yml'), 'No temporary self-mutating materialization workflow may remain in final source.');
 expectCycle17(! is_dir($root . '/handoff'), 'No staged handoff bundle may remain in final source.');

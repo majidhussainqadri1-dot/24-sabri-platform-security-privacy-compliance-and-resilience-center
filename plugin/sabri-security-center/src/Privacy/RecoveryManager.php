@@ -7,6 +7,7 @@ namespace Sabri\Platform\Security\Privacy;
 use Sabri\Platform\Security\Storage\AuditGapStore;
 use Sabri\Platform\Security\Storage\AuditLogger;
 use Sabri\Platform\Security\Storage\PrivacyRequestRepository;
+use Sabri\Platform\Security\Support\AtomicOptionLock;
 use Sabri\Platform\Security\Support\Sanitizer;
 
 if (! class_exists(AuditGapStore::class, false)) {
@@ -16,6 +17,8 @@ if (! class_exists(AuditGapStore::class, false)) {
 final class RecoveryManager
 {
     public const EVENT = 'spcrc_privacy_recovery_scan';
+    private const LOCK_OPTION = 'spcrc_privacy_recovery_scan_lock';
+    private const LOCK_TTL = 300;
 
     public function __construct(
         private PrivacyRequestRepository $requests,
@@ -34,11 +37,27 @@ final class RecoveryManager
         if (! function_exists('wp_next_scheduled') || ! function_exists('wp_schedule_event')) {
             return false;
         }
-        if (wp_next_scheduled(self::EVENT)) {
-            return true;
+        $next = wp_next_scheduled(self::EVENT);
+        if ($next) {
+            return self::scheduleValid($next, 'hourly');
         }
 
-        return wp_schedule_event(time() + 300, 'hourly', self::EVENT) !== false;
+        $scheduled = wp_schedule_event(time() + 300, 'hourly', self::EVENT);
+        return ! is_wp_error($scheduled) && $scheduled !== false
+            && self::scheduleValid(wp_next_scheduled(self::EVENT), 'hourly');
+    }
+
+
+    private static function scheduleValid(mixed $next, string $recurrence): bool
+    {
+        if (! is_numeric($next) || (int) $next <= time() || (int) $next > time() + (2 * HOUR_IN_SECONDS)) {
+            return false;
+        }
+        if (function_exists('wp_get_scheduled_event')) {
+            $event = wp_get_scheduled_event(self::EVENT);
+            return is_object($event) && (string) ($event->schedule ?? '') === $recurrence;
+        }
+        return true;
     }
 
     public static function unschedule(): void
@@ -50,6 +69,12 @@ final class RecoveryManager
 
     public function scan(): void
     {
+        $lock = AtomicOptionLock::acquire(self::LOCK_OPTION, self::LOCK_TTL);
+        if (is_wp_error($lock)) {
+            $this->recordAudit('privacy_recovery_scan_locked', 'file-24-security-center', 'locked', 'low', ['error_code' => $lock->get_error_code()]);
+            return;
+        }
+        try {
         $age = (int) apply_filters('spcrc/privacy_stale_dispatch_age', 900);
         $limit = (int) apply_filters('spcrc/privacy_stale_dispatch_limit', 100);
         $marked = $this->requests->markStaleDispatching($age, $limit);
@@ -74,6 +99,11 @@ final class RecoveryManager
             ['stale_requests_marked' => $marked]
         );
         do_action('spcrc/privacy_recovery_scan_completed', $marked);
+        } finally {
+            if (! AtomicOptionLock::release(self::LOCK_OPTION, $lock)) {
+                do_action('spcrc/privacy_recovery_lock_release_failed', $lock);
+            }
+        }
     }
     /** @param array<string,mixed> $context */
     private function recordAudit(string $event, string $module, string $result, string $risk, array $context): void

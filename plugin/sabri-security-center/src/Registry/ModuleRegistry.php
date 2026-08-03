@@ -130,6 +130,9 @@ final class ModuleRegistry
         if ($moduleKey === '' || $name === '' || $version === '' || $owner === '') {
             return new \WP_Error('spcrc_manifest_invalid_identity', 'Manifest identity fields are invalid.');
         }
+        if (preg_match('/^\d+(?:\.\d+){0,3}(?:-[0-9A-Za-z.-]+)?$/', $version) !== 1) {
+            return new \WP_Error('spcrc_manifest_version_invalid', 'Manifest version must use a bounded numeric release identity.');
+        }
 
         $posture = Sanitizer::key($manifest['posture'] ?? 'unassessed', 40);
         if (! in_array($posture, self::ALLOWED_POSTURES, true)) {
@@ -149,6 +152,27 @@ final class ModuleRegistry
         if ($lastSecurityTest !== '' && strtotime($lastSecurityTest) > time() + 300) {
             return new \WP_Error('spcrc_manifest_security_test_future', 'Manifest security-test evidence cannot be dated in the future.');
         }
+        $contractVersion = Sanitizer::text($manifest['contract_version'] ?? '1.0.0', 40);
+        if (preg_match('/^\d+\.\d+(?:\.\d+)?$/', $contractVersion) !== 1) {
+            return new \WP_Error('spcrc_manifest_contract_version_invalid', 'Manifest contract version must be explicit and numeric.');
+        }
+        $canonicalDataOwner = Sanitizer::text($manifest['canonical_data_owner'] ?? $owner, 120);
+        $canonicalActionOwner = Sanitizer::text($manifest['canonical_action_owner'] ?? $owner, 160);
+        $evidenceSource = Sanitizer::opaqueReference($manifest['evidence_source'] ?? '');
+        foreach ([$canonicalDataOwner, $canonicalActionOwner] as $canonicalOwner) {
+            if ($canonicalOwner === '' || Sanitizer::containsSensitiveMaterial($canonicalOwner)) {
+                return new \WP_Error('spcrc_manifest_canonical_owner_invalid', 'Canonical ownership statements must be bounded and non-sensitive.');
+            }
+        }
+        $dataClasses = $this->safeList($manifest['data_classes'], 20, 120, 'data_classes');
+        $capabilities = $this->safeList($manifest['capabilities'] ?? [], 100, 120, 'capabilities');
+        $externalVendors = $this->safeList($manifest['external_vendors'] ?? [], 50, 160, 'external_vendors');
+        $privacyOperations = $this->safeList($manifest['privacy_operations'] ?? [], 20, 60, 'privacy_operations');
+        foreach ([$dataClasses, $capabilities, $externalVendors, $privacyOperations] as $list) {
+            if (is_wp_error($list)) {
+                return $list;
+            }
+        }
         $degradedBehavior = Sanitizer::text($manifest['degraded_behavior'] ?? 'Unknown/unavailable; no permissive fallback.', 300);
         $releaseGate = Sanitizer::text($manifest['release_gate'] ?? 'Evidence not supplied.', 300);
         if (Sanitizer::containsSensitiveMaterial($degradedBehavior) || Sanitizer::containsSensitiveMaterial($releaseGate)) {
@@ -161,17 +185,17 @@ final class ModuleRegistry
             'version' => $version,
             'owner' => $owner,
             'posture' => $posture,
-            'data_classes' => Sanitizer::textList($manifest['data_classes'], 20, 120),
+            'data_classes' => $dataClasses,
             'public_routes' => $publicRoutes,
             'private_routes' => $privateRoutes,
-            'capabilities' => Sanitizer::textList($manifest['capabilities'] ?? [], 100, 120),
-            'external_vendors' => Sanitizer::textList($manifest['external_vendors'] ?? [], 50, 160),
-            'privacy_operations' => Sanitizer::textList($manifest['privacy_operations'] ?? [], 20, 60),
+            'capabilities' => $capabilities,
+            'external_vendors' => $externalVendors,
+            'privacy_operations' => $privacyOperations,
             'last_security_test' => $lastSecurityTest,
-            'contract_version' => Sanitizer::text($manifest['contract_version'] ?? 'unversioned', 40),
-            'canonical_data_owner' => Sanitizer::text($manifest['canonical_data_owner'] ?? $owner, 120),
-            'canonical_action_owner' => Sanitizer::text($manifest['canonical_action_owner'] ?? $owner, 120),
-            'evidence_source' => Sanitizer::opaqueReference($manifest['evidence_source'] ?? ''),
+            'contract_version' => $contractVersion,
+            'canonical_data_owner' => $canonicalDataOwner,
+            'canonical_action_owner' => $canonicalActionOwner,
+            'evidence_source' => $evidenceSource,
             'degraded_behavior' => $degradedBehavior,
             'release_gate' => $releaseGate,
         ];
@@ -200,6 +224,8 @@ final class ModuleRegistry
                 || str_contains($route, '#')
                 || preg_match('/[\x00-\x1F\x7F]/', $route) === 1
                 || preg_match('/^[a-z][a-z0-9+.-]*:\/\//i', $route) === 1
+                || preg_match('/(?:^|\/)\.{1,2}(?:\/|$)/', rawurldecode($route)) === 1
+                || preg_match('/%(?:2e|2f|5c)/i', $route) === 1
             ) {
                 return new \WP_Error('spcrc_manifest_route_invalid', 'Manifest routes must be same-origin absolute paths without query strings, fragments or credentials.');
             }
@@ -332,14 +358,43 @@ final class ModuleRegistry
      */
     private function decodeStoredManifest(array $stored): array|\WP_Error
     {
-        $decoded = json_decode((string) ($stored['manifest_json'] ?? ''), true);
+        $json = (string) ($stored['manifest_json'] ?? '');
+        $storedHash = strtolower((string) ($stored['manifest_hash'] ?? ''));
+        if (preg_match('/^[0-9a-f]{64}$/', $storedHash) !== 1 || ! hash_equals($storedHash, hash('sha256', $json))) {
+            return new \WP_Error('spcrc_manifest_stored_hash_invalid', 'Stored module manifest hash does not match its canonical JSON evidence.');
+        }
+        $decoded = json_decode($json, true);
         if (! is_array($decoded)) {
             return new \WP_Error(
                 'spcrc_manifest_stored_identity_invalid',
                 'Stored module identity could not be verified safely.'
             );
         }
+        $decodedVersion = Sanitizer::text($decoded['version'] ?? '', 60);
+        if ($decodedVersion === '' || ! hash_equals($decodedVersion, Sanitizer::text($stored['module_version'] ?? '', 60))) {
+            return new \WP_Error('spcrc_manifest_stored_version_invalid', 'Stored module version does not match its canonical manifest evidence.');
+        }
         return $decoded;
+    }
+
+    /** @return string[]|\WP_Error */
+    private function safeList(mixed $values, int $maxItems, int $maxLength, string $field): array|\WP_Error
+    {
+        if (! is_array($values)) {
+            return new \WP_Error('spcrc_manifest_list_invalid', sprintf('Manifest field %s must be a bounded list.', $field));
+        }
+        $safe = [];
+        foreach (array_slice($values, 0, max(0, $maxItems)) as $value) {
+            if (! is_scalar($value) && $value !== null) {
+                return new \WP_Error('spcrc_manifest_list_value_invalid', sprintf('Manifest field %s contains an invalid value.', $field));
+            }
+            $value = Sanitizer::text($value, $maxLength);
+            if ($value === '' || Sanitizer::containsSensitiveMaterial($value)) {
+                return new \WP_Error('spcrc_manifest_list_sensitive', sprintf('Manifest field %s contains sensitive or unsafe material.', $field));
+            }
+            $safe[] = $value;
+        }
+        return array_values(array_unique($safe));
     }
 
     /** @param array<string,mixed> $manifest
@@ -415,7 +470,7 @@ final class ModuleRegistry
             'contract_version' => '1.0.0',
             'canonical_data_owner' => 'File 24',
             'canonical_action_owner' => 'Native owners; File 24 assurance only',
-            'evidence_source' => 'release:file-24-0.27.0',
+            'evidence_source' => 'release:file-24-0.28.0',
             'degraded_behavior' => 'Native controls remain authoritative; privileged assurance writes fail closed.',
             'release_gate' => 'Staging, independent penetration test, restore drill and Founder production approval',
         ];

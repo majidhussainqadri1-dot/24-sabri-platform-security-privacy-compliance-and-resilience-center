@@ -4,14 +4,14 @@ Tags: security, privacy, compliance, resilience, audit
 Requires at least: 6.5
 Tested up to: 7.0
 Requires PHP: 8.0
-Stable tag: 0.27.0
+Stable tag: 0.28.0
 License: GPLv2 or later
 
 Central governance and assurance control plane for the Sabri Social Homeopathy Platform.
 
 == Description ==
 
-Foundation 0.27.0 provides a private Security Center dashboard, bounded module manifests and audit events, risk/incident/control foundations, a private security-findings triage interface, durable and replay-resistant privacy-request orchestration, bounded retry policy and reconciliation operations, verified privacy intake, fail-closed upgrade integrity, advisory security-state requests, system checks, non-destructive repair, and sanitized REST status/Trust Center payloads.
+Foundation 0.28.0, after forty further review-and-correction rounds, provides a private Security Center dashboard, bounded module manifests and audit events, risk/incident/control foundations, a private security-findings triage interface, durable and replay-resistant privacy-request orchestration, bounded retry policy and reconciliation operations, verified privacy intake, fail-closed upgrade integrity, advisory security-state requests, system checks, non-destructive repair, and sanitized REST status/Trust Center payloads.
 
 It does not replace native-module authorization, File 00 identity, File 20 enforcement, hosting security, legal counsel, backups, or independent security testing.
 
@@ -28,14 +28,12 @@ It does not replace native-module authorization, File 00 identity, File 20 enfor
 
 == Changelog ==
 
-= 0.27.0 =
-* Added fifteen fresh review/correction cycles (42–56) with 123 dedicated assertions and final release closure.
-* Preserved unresolved security-state and governance evidence at bounded capacity instead of silently evicting it.
-* Added validated cryptographic UUIDv4 generation for state, audit, gap, assurance and privacy-request identities.
-* Pseudonymized direct contact fields in audit context and hardened audit-gap context normalization.
-* Restricted module-manifest routes to same-origin absolute paths and required exact one-row persistence.
-* Added optimistic concurrency and owner-token leases to control and assurance mutations.
-* Enforced canonical opaque privacy references, module-bound callback authority and fresh File 00 step-up for deletion retry.
+= 0.28.0 =
+* Added forty fresh review/correction cycles (57–96) with 219 dedicated assertions and final release closure.
+* Hardened identifiers, atomic locks, Unicode sanitization, audit semantics, manifest integrity and durable capacity/tamper evidence.
+* Added attributable and step-up-gated critical security states, atomic capability installation and activation/upgrade compensation.
+* Added schema-index verification, retention/recovery schedule integrity and fresh privacy-verification evidence windows.
+* Preserved all earlier privacy, governance, retention, migration, audit and concurrency regressions.
 * Added PHP 8.0/8.3 CI, source checksums, SPDX/license evidence and deterministic package verification.
 
 = 0.26.0 =

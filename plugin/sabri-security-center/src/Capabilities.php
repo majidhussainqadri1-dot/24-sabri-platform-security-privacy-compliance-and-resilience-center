@@ -33,15 +33,49 @@ final class Capabilities
         return array_values(array_diff(self::all(), ['spcrc_accept_critical_risk', 'spcrc_approve_governance_decision']));
     }
 
-    public static function install(): void
+    public static function install(): bool
     {
         $administrator = get_role('administrator');
         if (! $administrator) {
-            return;
+            return false;
         }
 
+        $added = [];
         foreach (self::autoGranted() as $capability) {
+            if (self::roleHasCapability($administrator, $capability)) {
+                continue;
+            }
             $administrator->add_cap($capability);
+            if (! self::roleHasCapability($administrator, $capability)) {
+                self::rollbackAddedCapabilities($administrator, $added);
+                return false;
+            }
+            $added[] = $capability;
+        }
+        return true;
+    }
+
+
+    private static function roleHasCapability(object $role, string $capability): bool
+    {
+        if (method_exists($role, 'has_cap')) {
+            return (bool) $role->has_cap($capability);
+        }
+        $caps = is_array($role->caps ?? null)
+            ? $role->caps
+            : (is_array($role->capabilities ?? null) ? $role->capabilities : []);
+        return ! empty($caps[$capability]);
+    }
+
+    /** @param string[] $capabilities */
+    private static function rollbackAddedCapabilities(object $role, array $capabilities): void
+    {
+        if (! method_exists($role, 'remove_cap')) {
+            do_action('spcrc/capability_install_rollback_unavailable', $capabilities);
+            return;
+        }
+        foreach (array_reverse($capabilities) as $capability) {
+            $role->remove_cap($capability);
         }
     }
 

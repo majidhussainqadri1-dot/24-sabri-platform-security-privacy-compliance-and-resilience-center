@@ -3,8 +3,10 @@
 declare(strict_types=1);
 
 namespace {
+    if (! defined('HOUR_IN_SECONDS')) { define('HOUR_IN_SECONDS', 3600); }
     $GLOBALS['recovery_hooks'] = [];
     $GLOBALS['recovery_scheduled'] = false;
+    $GLOBALS['recovery_recurrence'] = '';
     $GLOBALS['recovery_actions'] = [];
 
     final class WP_Error
@@ -20,18 +22,56 @@ namespace {
     }
     function do_action(string $hook, mixed ...$args): void { $GLOBALS['recovery_actions'][] = [$hook, $args]; }
     function apply_filters(string $hook, mixed $value): mixed { return $value; }
-    function wp_next_scheduled(string $hook): int|false { return $GLOBALS['recovery_scheduled'] ? 123 : false; }
+    function wp_next_scheduled(string $hook): int|false
+    {
+        return $hook === 'spcrc_privacy_recovery_scan' && is_int($GLOBALS['recovery_scheduled'])
+            ? $GLOBALS['recovery_scheduled']
+            : false;
+    }
     function wp_schedule_event(int $timestamp, string $recurrence, string $hook): bool
     {
-        $GLOBALS['recovery_scheduled'] = $hook === 'spcrc_privacy_recovery_scan' && $recurrence === 'hourly';
-        return $GLOBALS['recovery_scheduled'];
+        if ($hook !== 'spcrc_privacy_recovery_scan' || $recurrence !== 'hourly') {
+            return false;
+        }
+        $GLOBALS['recovery_scheduled'] = $timestamp;
+        $GLOBALS['recovery_recurrence'] = $recurrence;
+        return true;
+    }
+    function wp_get_scheduled_event(string $hook): object|false
+    {
+        $next = wp_next_scheduled($hook);
+        if ($next === false) {
+            return false;
+        }
+        return (object) ['timestamp' => $next, 'schedule' => $GLOBALS['recovery_recurrence']];
     }
     function wp_clear_scheduled_hook(string $hook): int|false
     {
         $GLOBALS['recovery_scheduled'] = false;
+        $GLOBALS['recovery_recurrence'] = '';
         return 1;
     }
     function is_wp_error(mixed $value): bool { return $value instanceof WP_Error; }
+}
+
+namespace Sabri\Platform\Security\Support {
+    final class AtomicOptionLock
+    {
+        private static bool $owned = false;
+        public static function acquire(string $optionName, int $ttl = 60): string|\WP_Error
+        {
+            if (self::$owned) {
+                return new \WP_Error('spcrc_lock_unavailable', 'Lock unavailable.');
+            }
+            self::$owned = true;
+            return str_repeat('a', 32);
+        }
+        public static function release(string $optionName, string $token): bool
+        {
+            self::$owned = false;
+            return true;
+        }
+    }
 }
 
 namespace Sabri\Platform\Security\Storage {
@@ -75,7 +115,7 @@ namespace Sabri\Platform\Security\Privacy {
     expectRecovery(isset($GLOBALS['recovery_hooks']['init']), 'Recovery schedule must be registered on init.');
     expectRecovery(isset($GLOBALS['recovery_hooks'][RecoveryManager::EVENT]), 'Recovery scan callback must be registered.');
     expectRecovery(RecoveryManager::ensureScheduled(), 'Hourly recovery scan must schedule successfully.');
-    expectRecovery($GLOBALS['recovery_scheduled'] === true, 'Recovery schedule state must be visible.');
+    expectRecovery(is_int($GLOBALS['recovery_scheduled']) && $GLOBALS['recovery_scheduled'] > time(), 'Recovery schedule state must be visible.');
 
     $requests->result = 2;
     $manager->scan();

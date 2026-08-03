@@ -21,6 +21,20 @@ final class Schema
         'assurance' => ['id', 'record_uuid', 'record_type', 'record_key', 'title', 'status', 'owner_user_id', 'jurisdiction', 'data_classes_json', 'evidence_ref', 'notes', 'reviewed_at', 'next_review_at', 'backup_completed_at', 'restore_tested_at', 'created_at', 'updated_at'],
     ];
 
+
+    /** @var array<string,string[]> */
+    private const REQUIRED_INDEXES = [
+        'events' => ['PRIMARY', 'event_uuid', 'event_type_created', 'module_created', 'risk_created'],
+        'incidents' => ['PRIMARY', 'incident_uuid', 'status_severity', 'updated_at'],
+        'findings' => ['PRIMARY', 'finding_uuid', 'status_severity', 'module_status'],
+        'risks' => ['PRIMARY', 'risk_uuid', 'status_score', 'module_status'],
+        'controls' => ['PRIMARY', 'control_key', 'status', 'updated_at'],
+        'privacy' => ['PRIMARY', 'request_uuid', 'status_due', 'status_retry', 'updated_status'],
+        'manifests' => ['PRIMARY', 'module_key', 'posture_seen'],
+        'governance' => ['PRIMARY', 'decision_uuid', 'status_expires', 'subject_status'],
+        'assurance' => ['PRIMARY', 'record_uuid', 'type_record', 'type_status', 'next_review'],
+    ];
+
     /** @return bool|\WP_Error */
     public static function install(): bool|\WP_Error
     {
@@ -260,6 +274,27 @@ final class Schema
                 foreach ($columns as $column) {
                     if (! in_array($column, $foundColumns, true)) {
                         return new \WP_Error('spcrc_schema_integrity_failed', sprintf('Required File 24 column is unavailable: %s.%s', $tableKey, $column));
+                    }
+                }
+            }
+        }
+
+
+        if (method_exists($wpdb, 'get_results')) {
+            foreach (self::REQUIRED_INDEXES as $tableKey => $indexes) {
+                $rows = $wpdb->get_results("SHOW INDEX FROM {$tables[$tableKey]}", ARRAY_A);
+                if (! is_array($rows) || $rows === []) {
+                    return new \WP_Error('spcrc_schema_index_check_failed', sprintf('File 24 indexes could not be inspected: %s', $tableKey));
+                }
+                $foundIndexes = [];
+                foreach ($rows as $row) {
+                    if (is_array($row) && isset($row['Key_name'])) {
+                        $foundIndexes[] = (string) $row['Key_name'];
+                    }
+                }
+                foreach ($indexes as $index) {
+                    if (! in_array($index, $foundIndexes, true)) {
+                        return new \WP_Error('spcrc_schema_integrity_failed', sprintf('Required File 24 index is unavailable: %s.%s', $tableKey, $index));
                     }
                 }
             }

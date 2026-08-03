@@ -7,6 +7,7 @@ namespace Sabri\Platform\Security\Retention;
 use Sabri\Platform\Security\Storage\AuditGapStore;
 use Sabri\Platform\Security\Storage\AuditLogger;
 use Sabri\Platform\Security\Support\AtomicOptionLock;
+use Sabri\Platform\Security\Support\Sanitizer;
 
 if (! class_exists(AuditGapStore::class, false)) {
     require_once dirname(__DIR__) . '/Storage/AuditGapStore.php';
@@ -42,12 +43,27 @@ final class RetentionManager
         if (! function_exists('wp_next_scheduled') || ! function_exists('wp_schedule_event')) {
             return false;
         }
-        if (wp_next_scheduled(self::CRON_HOOK)) {
-            return true;
+        $next = wp_next_scheduled(self::CRON_HOOK);
+        if ($next) {
+            return self::scheduleValid($next, 'daily');
         }
 
         $scheduled = wp_schedule_event(time() + HOUR_IN_SECONDS, 'daily', self::CRON_HOOK);
-        return ! is_wp_error($scheduled) && $scheduled !== false;
+        return ! is_wp_error($scheduled) && $scheduled !== false
+            && self::scheduleValid(wp_next_scheduled(self::CRON_HOOK), 'daily');
+    }
+
+
+    private static function scheduleValid(mixed $next, string $recurrence): bool
+    {
+        if (! is_numeric($next) || (int) $next <= time() || (int) $next > time() + (2 * DAY_IN_SECONDS)) {
+            return false;
+        }
+        if (function_exists('wp_get_scheduled_event')) {
+            $event = wp_get_scheduled_event(self::CRON_HOOK);
+            return is_object($event) && (string) ($event->schedule ?? '') === $recurrence;
+        }
+        return true;
     }
 
     public static function unschedule(): void
@@ -125,6 +141,9 @@ final class RetentionManager
                 }
             }
 
+            if (! $this->refreshLock($lock)) {
+                return $this->finish('failed', (int) $ageDeleted, (int) $overflowDeleted, 'retention_lock_lost_before_evidence');
+            }
             return $this->finish('completed', (int) $ageDeleted, (int) $overflowDeleted, '');
         } finally {
             $this->releaseLock($lock);
@@ -162,6 +181,14 @@ final class RetentionManager
     /** @return array{status:string,age_deleted:int,overflow_deleted:int,error_code:string} */
     private function finish(string $status, int $ageDeleted, int $overflowDeleted, string $errorCode): array
     {
+        $allowedStatuses = ['completed', 'failed', 'locked', 'held'];
+        $status = in_array($status, $allowedStatuses, true) ? $status : 'failed';
+        $errorCode = Sanitizer::key($errorCode, 120);
+        if ($status === 'completed') {
+            $errorCode = '';
+        } elseif ($errorCode === '') {
+            $errorCode = 'retention_status_failed';
+        }
         $result = [
             'status' => $status,
             'age_deleted' => max(0, $ageDeleted),
