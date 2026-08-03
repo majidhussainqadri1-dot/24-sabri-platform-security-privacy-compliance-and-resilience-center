@@ -72,7 +72,8 @@ $source = (string) file_get_contents($base . 'Storage/AuditGapStore.php');
 expectCycle20(str_contains($source, "private const LOCK_OPTION = 'spcrc_audit_gap_store_lock';"), 'Audit-gap mutation must use one canonical atomic lock option.');
 expectCycle20(substr_count($source, 'self::acquireLock()') === 2, 'Both record and reconcile mutations must acquire the lock.');
 expectCycle20(substr_count($source, 'self::releaseLock($lock)') === 2, 'Both mutation paths must release their owned lock in finally blocks.');
-expectCycle20(str_contains($source, 'add_option(self::LOCK_OPTION'), 'Lock acquisition must use atomic add_option semantics.');
-expectCycle20(str_contains($source, "hash_equals((string) (\$existing['token'] ?? ''), \$token)"), 'Lock release must be owner-token bound.');
+expectCycle20(str_contains($source, 'AtomicOptionLock::acquire(self::LOCK_OPTION, self::LOCK_TTL)'), 'Lock acquisition must use exact-value atomic semantics.');
+expectCycle20(str_contains($source, 'AtomicOptionLock::release(self::LOCK_OPTION, $token)'), 'Lock release must be owner-token bound.');
+expectCycle20(substr_count($source, 'AtomicOptionLock::refresh(self::LOCK_OPTION, $lock, self::LOCK_TTL)') === 2, 'Both mutation paths must renew ownership before committing option changes.');
 
 echo "PASS: {$assertions} Cycle 20 audit-gap concurrency assertions\n";

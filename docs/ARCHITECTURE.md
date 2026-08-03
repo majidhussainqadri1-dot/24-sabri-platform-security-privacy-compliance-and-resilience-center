@@ -1,4 +1,4 @@
-# Architecture — Foundation 0.25.8
+# Architecture — Foundation 0.25.9
 
 ## Core law
 
@@ -86,3 +86,7 @@ The package declares PHP 8.0 minimum support. Production and test code therefore
 - Privacy retry safety is enforced in both the policy and canonical repository. Only never-started or explicitly `retry-safe-` module outcomes may replay.
 - Same-version boot verifies every required column in all nine owned tables before File 24 runtime services are considered healthy.
 - Uninstall removes delegated capabilities and ephemeral coordination state only; durable security, privacy, governance, assurance and audit-gap evidence remains preserved.
+
+## Eight-round concurrency and compensation closure (0.25.9)
+
+Cycles 22–29 standardize exact-value option locks, lease renewal and owner-only release across governance admission, upgrade, retention, audit-gap, security-state and control mutations. Manifest heartbeat admission now proves canonical identity after a zero-row write. Privacy verification compensation is checked and creates bounded release-blocking evidence when recovery state cannot be persisted.

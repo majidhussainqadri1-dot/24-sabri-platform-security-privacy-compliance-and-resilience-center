@@ -83,15 +83,15 @@ $ci = (string) file_get_contents($root . '/.github/workflows/ci.yml');
 $manifest = (string) file_get_contents($root . '/MANIFEST.md');
 $receipt = (string) file_get_contents($root . '/docs/RELEASE-RECEIPT-0.25.8.md');
 
-expectCycle21(str_contains($plugin, 'Version:     0.25.8') && str_contains($plugin, "define('SPCRC_VERSION', '0.25.8')"), 'Plugin header and runtime constant must agree on 0.25.8.');
-expectCycle21(str_contains($readme, 'Stable tag: 0.25.8'), 'WordPress readme must expose the 0.25.8 stable tag.');
-expectCycle21(($sbom['packages'][0]['versionInfo'] ?? '') === '0.25.8', 'SPDX package version must agree on 0.25.8.');
+expectCycle21(str_contains($plugin, 'Version:     0.25.9') && str_contains($plugin, "define('SPCRC_VERSION', '0.25.9')"), 'Plugin header and runtime constant must agree on the current 0.25.9 release.');
+expectCycle21(str_contains($readme, 'Stable tag: 0.25.9'), 'WordPress readme must expose the 0.25.9 stable tag.');
+expectCycle21(($sbom['packages'][0]['versionInfo'] ?? '') === '0.25.9', 'SPDX package version must agree on the current 0.25.9 release.');
 expectCycle21(str_contains($ci, 'php tests/cycle18-retention-concurrency.php'), 'Permanent CI must run Cycle 18.');
 expectCycle21(str_contains($ci, 'php tests/cycle19-privacy-retry-safety.php'), 'Permanent CI must run Cycle 19.');
 expectCycle21(str_contains($ci, 'php tests/cycle20-audit-gap-concurrency.php'), 'Permanent CI must run Cycle 20.');
 expectCycle21(str_contains($ci, 'php tests/cycle21-schema-release-closure.php'), 'Permanent CI must run Cycle 21.');
-expectCycle21(str_contains($manifest, 'Cycle 21 final four-round closure'), 'Source manifest must identify the fourth review/correction closure.');
-expectCycle21(str_contains($receipt, '**Review closure:** Cycle 21'), 'Release receipt must identify Cycle 21 as the current closure.');
+expectCycle21(str_contains($manifest, 'Historical Cycle 18–21 evidence'), 'Source manifest must preserve the historical Cycle 18–21 evidence lineage.');
+expectCycle21(str_contains($receipt, '**Review closure:** Cycle 21'), 'Historical 0.25.8 receipt must preserve Cycle 21 as its closure.');
 expectCycle21(str_contains($receipt, '**Schema version:** 0.25.5'), 'Corrective runtime release must truthfully retain schema version 0.25.5.');
 
 echo "PASS: {$assertions} Cycle 21 schema/release closure assertions\n";

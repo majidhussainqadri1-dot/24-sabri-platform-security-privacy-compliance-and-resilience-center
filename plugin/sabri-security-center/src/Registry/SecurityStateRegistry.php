@@ -4,8 +4,17 @@ declare(strict_types=1);
 
 namespace Sabri\Platform\Security\Registry;
 
+use Sabri\Platform\Security\Storage\AuditGapStore;
 use Sabri\Platform\Security\Storage\AuditLogger;
+use Sabri\Platform\Security\Support\AtomicOptionLock;
 use Sabri\Platform\Security\Support\Sanitizer;
+
+if (! class_exists(AuditGapStore::class, false)) {
+    require_once dirname(__DIR__) . '/Storage/AuditGapStore.php';
+}
+if (! class_exists(AtomicOptionLock::class, false)) {
+    require_once dirname(__DIR__) . '/Support/AtomicOptionLock.php';
+}
 
 final class SecurityStateRegistry
 {
@@ -112,7 +121,7 @@ final class SecurityStateRegistry
             ];
 
             $this->requests[$requestId] = $record;
-            if (! $this->boundAndPersist()) {
+            if (! $this->refreshLock($lockToken) || ! $this->boundAndPersist()) {
                 unset($this->requests[$requestId]);
                 do_action('spcrc/security_state_persist_failed', $record);
                 return false;
@@ -126,6 +135,11 @@ final class SecurityStateRegistry
                 ['request_id' => $requestId, 'state' => $state, 'expires_at' => $record['expires_at']]
             );
             if (is_wp_error($audit)) {
+                if (! $this->refreshLock($lockToken)) {
+                    $this->recordAuditGap($requestId, 'request_audit_failed_lock_lost');
+                    do_action('spcrc/security_state_audit_failed', $record, $audit);
+                    return false;
+                }
                 unset($this->requests[$requestId]);
                 if (! $this->persist()) {
                     $this->recordAuditGap($requestId, 'request_rollback_failed');
@@ -167,13 +181,13 @@ final class SecurityStateRegistry
 
         try {
             $this->reload();
-            if (! isset($this->requests[$requestId])) {
+            if (! isset($this->requests[$requestId]) || $this->hasAuditGap($requestId)) {
                 return false;
             }
 
             $record = $this->requests[$requestId];
             unset($this->requests[$requestId]);
-            if (! $this->persist()) {
+            if (! $this->refreshLock($lockToken) || ! $this->persist()) {
                 $this->requests[$requestId] = $record;
                 do_action('spcrc/security_state_persist_failed', $record);
                 return false;
@@ -187,6 +201,11 @@ final class SecurityStateRegistry
                 ['request_id' => $requestId, 'state' => $record['state']]
             );
             if (is_wp_error($audit)) {
+                if (! $this->refreshLock($lockToken)) {
+                    $this->recordAuditGap($requestId, 'resolution_audit_failed_lock_lost');
+                    do_action('spcrc/security_state_audit_failed', $record, $audit);
+                    return false;
+                }
                 $this->requests[$requestId] = $record;
                 if (! $this->persist()) {
                     $this->recordAuditGap($requestId, 'resolution_rollback_failed');
@@ -207,7 +226,11 @@ final class SecurityStateRegistry
     {
         $this->reload();
         $this->prune();
-        return $this->requests;
+        return array_filter(
+            $this->requests,
+            fn (array $request, string $requestId): bool => ! $this->hasAuditGap($requestId),
+            ARRAY_FILTER_USE_BOTH
+        );
     }
 
     /** @param mixed $current
@@ -246,7 +269,7 @@ final class SecurityStateRegistry
             if ($expiredIds === []) {
                 return;
             }
-            if (! $this->persist()) {
+            if (! $this->refreshLock($lockToken) || ! $this->persist()) {
                 $this->recordAuditGap('', 'expiry_persist_failed');
                 return;
             }
@@ -301,75 +324,51 @@ final class SecurityStateRegistry
 
     private function acquireLock(): string
     {
-        $token = function_exists('wp_generate_uuid4') ? wp_generate_uuid4() : bin2hex(random_bytes(16));
-        $now = time();
+        $lock = AtomicOptionLock::acquire(self::LOCK_OPTION, self::LOCK_TTL);
+        return is_wp_error($lock) ? '' : $lock;
+    }
 
-        if (function_exists('add_option')) {
-            $existing = get_option(self::LOCK_OPTION, []);
-            if (is_array($existing) && (int) ($existing['expires_at'] ?? 0) <= $now) {
-                delete_option(self::LOCK_OPTION);
-            }
-            $added = add_option(self::LOCK_OPTION, ['token' => $token, 'expires_at' => $now + self::LOCK_TTL], '', false);
-            return $added ? $token : '';
-        }
-
-        $existing = get_transient(self::LOCK_OPTION);
-        if ($existing !== false) {
-            return '';
-        }
-        return set_transient(self::LOCK_OPTION, $token, self::LOCK_TTL) ? $token : '';
+    private function refreshLock(string $token): bool
+    {
+        return AtomicOptionLock::refresh(self::LOCK_OPTION, $token, self::LOCK_TTL);
     }
 
     private function releaseLock(string $token): void
     {
-        if (function_exists('add_option')) {
-            $existing = get_option(self::LOCK_OPTION, []);
-            if (is_array($existing) && hash_equals((string) ($existing['token'] ?? ''), $token)) {
-                delete_option(self::LOCK_OPTION);
-            }
-            return;
+        if (! AtomicOptionLock::release(self::LOCK_OPTION, $token)) {
+            do_action('spcrc/security_state_lock_release_failed', $token);
         }
+    }
 
-        if (hash_equals((string) get_transient(self::LOCK_OPTION), $token)) {
-            delete_transient(self::LOCK_OPTION);
+    private function hasAuditGap(string $requestId): bool
+    {
+        $requestId = Sanitizer::uuid($requestId);
+        if ($requestId === '') {
+            return false;
         }
+        foreach (AuditGapStore::all(self::AUDIT_GAP_OPTION) as $gap) {
+            if (
+                Sanitizer::key($gap['entity_type'] ?? '', 80) === 'security_state_request'
+                && hash_equals(Sanitizer::text($gap['entity_id'] ?? '', 160), $requestId)
+            ) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private function recordAuditGap(string $requestId, string $reason): void
     {
         $safeRequestId = Sanitizer::uuid($requestId);
-        $gapId = $safeRequestId !== '' ? $safeRequestId : (function_exists('wp_generate_uuid4') ? wp_generate_uuid4() : bin2hex(random_bytes(16)));
-        $raw = get_option(self::AUDIT_GAP_OPTION, []);
-        $gaps = [];
-        if (is_array($raw)) {
-            $legacyRequestId = Sanitizer::uuid($raw['request_id'] ?? '');
-            if ($legacyRequestId !== '' || isset($raw['reason'])) {
-                $legacyId = $legacyRequestId !== '' ? $legacyRequestId : (function_exists('wp_generate_uuid4') ? wp_generate_uuid4() : bin2hex(random_bytes(16)));
-                $gaps[$legacyId] = [
-                    'request_id' => $legacyRequestId,
-                    'reason' => Sanitizer::key($raw['reason'] ?? 'legacy_audit_gap', 80),
-                    'recorded_at' => Sanitizer::isoTime($raw['recorded_at'] ?? ''),
-                ];
-            } else {
-                foreach ($raw as $id => $gap) {
-                    $safeId = Sanitizer::uuid($id);
-                    if ($safeId === '' || ! is_array($gap)) {
-                        continue;
-                    }
-                    $gaps[$safeId] = [
-                        'request_id' => Sanitizer::uuid($gap['request_id'] ?? ''),
-                        'reason' => Sanitizer::key($gap['reason'] ?? 'audit_gap', 80),
-                        'recorded_at' => Sanitizer::isoTime($gap['recorded_at'] ?? ''),
-                    ];
-                }
-            }
+        $recorded = AuditGapStore::record(
+            self::AUDIT_GAP_OPTION,
+            'security_state_request',
+            $safeRequestId !== '' ? $safeRequestId : 'batch-' . gmdate('YmdHis'),
+            $reason
+        );
+        if (! $recorded) {
+            do_action('spcrc/security_state_audit_gap_record_failed', $safeRequestId, $reason);
         }
-        $gaps[$gapId] = [
-            'request_id' => $safeRequestId,
-            'reason' => Sanitizer::key($reason, 80),
-            'recorded_at' => gmdate('c'),
-        ];
-        update_option(self::AUDIT_GAP_OPTION, $gaps, false);
         do_action('spcrc/security_state_audit_gap', $safeRequestId, $reason);
     }
 }

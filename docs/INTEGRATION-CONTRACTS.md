@@ -1,4 +1,4 @@
-# Foundation Integration Contracts — 0.25.8
+# Foundation Integration Contracts — 0.25.9
 
 ## Contract law
 

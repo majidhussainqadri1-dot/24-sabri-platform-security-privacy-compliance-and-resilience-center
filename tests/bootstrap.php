@@ -7,7 +7,7 @@ const MINUTE_IN_SECONDS = 60;
 const HOUR_IN_SECONDS = 3600;
 const DAY_IN_SECONDS = 86400;
 const ABSPATH = '/tmp/wordpress/';
-const SPCRC_VERSION = '0.25.8';
+const SPCRC_VERSION = '0.25.9';
 
 @mkdir(ABSPATH . 'wp-admin/includes', 0777, true);
 if (! file_exists(ABSPATH . 'wp-admin/includes/upgrade.php')) {
@@ -66,11 +66,16 @@ final class FakeWpRoles
 final class FakeWpdb
 {
     public string $prefix = 'wp_';
+    public string $options = 'wp_options';
     public bool $failInsert = false;
     public bool $failAuditInsert = false;
+    public bool $stealControlLockOnWrite = false;
+    public bool $failPrivacyVerificationUpdate = false;
+    public bool $failPrivacyFinalizeUpdate = false;
     public bool $zeroUpdate = false;
     public int $manifestInsertCount = 0;
     public int $manifestUpdateCount = 0;
+    public ?string $manifestConcurrentHash = null;
     public array $events = [];
     public array $privacy = [];
     public array $manifests = [];
@@ -189,7 +194,15 @@ final class FakeWpdb
         elseif (str_contains($table, 'spcrc_risks')) $this->risks[(string) $data['risk_uuid']] = $data;
         elseif (str_contains($table, 'spcrc_findings')) $this->findings[(string) $data['finding_uuid']] = $data;
         elseif (str_contains($table, 'spcrc_incidents')) $this->incidents[(string) $data['incident_uuid']] = $data;
-        elseif (str_contains($table, 'spcrc_controls')) $this->controls[(string) $data['control_key']] = $data;
+        elseif (str_contains($table, 'spcrc_controls')) {
+            $controlKey = (string) $data['control_key'];
+            $this->controls[$controlKey] = $data;
+            if ($this->stealControlLockOnWrite) {
+                $lock = 'spcrc_control_lock_' . substr(hash('sha256', $controlKey), 0, 32);
+                $GLOBALS['wp_options'][$lock] = ['token' => 'concurrent-owner', 'expires_at' => time() + 60];
+                $this->stealControlLockOnWrite = false;
+            }
+        }
         elseif (str_contains($table, 'spcrc_module_manifests')) {
             ++$this->manifestInsertCount;
             $key = (string) $data['module_key'];
@@ -242,20 +255,42 @@ final class FakeWpdb
             ++$this->manifestUpdateCount;
             $key = (string) $where['module_key'];
             if (! isset($this->manifests[$key])) return 0;
+            if ($this->manifestConcurrentHash !== null) {
+                $this->manifests[$key]['manifest_hash'] = $this->manifestConcurrentHash;
+                $this->manifestConcurrentHash = null;
+                return 0;
+            }
             if (isset($where['manifest_hash']) && ($this->manifests[$key]['manifest_hash'] ?? '') !== $where['manifest_hash']) return 0;
             $this->manifests[$key] = array_merge($this->manifests[$key], $data);
             return 1;
         }
         if (str_contains($table, 'spcrc_privacy_requests')) {
-            $uuid = (string) $where['request_uuid'];
+            $uuid = (string) ($where['request_uuid'] ?? '');
             if (! isset($this->privacy[$uuid])) return 0;
+            foreach ($where as $field => $value) if (($this->privacy[$uuid][$field] ?? null) != $value) return 0;
+            if ($this->failPrivacyVerificationUpdate && array_key_exists('verification_method', $data)) {
+                $this->failPrivacyVerificationUpdate = false;
+                $this->last_error = 'forced verification write failure';
+                return false;
+            }
+            if ($this->failPrivacyFinalizeUpdate && ($data['status'] ?? '') === 'recovery-required') {
+                $this->failPrivacyFinalizeUpdate = false;
+                $this->last_error = 'forced privacy compensation failure';
+                return false;
+            }
             $this->privacy[$uuid] = array_merge($this->privacy[$uuid], $data);
             return 1;
         }
         if (str_contains($table, 'spcrc_controls')) {
             $key = (string) $where['control_key'];
             if (! isset($this->controls[$key])) return 0;
+            foreach ($where as $field => $value) if (($this->controls[$key][$field] ?? null) != $value) return 0;
             $this->controls[$key] = array_merge($this->controls[$key], $data);
+            if ($this->stealControlLockOnWrite) {
+                $lock = 'spcrc_control_lock_' . substr(hash('sha256', $key), 0, 32);
+                $GLOBALS['wp_options'][$lock] = ['token' => 'concurrent-owner', 'expires_at' => time() + 60];
+                $this->stealControlLockOnWrite = false;
+            }
             return 1;
         }
         if (str_contains($table, 'spcrc_assurance_records')) {
@@ -304,6 +339,21 @@ final class FakeWpdb
     public function query(mixed $prepared): int|false
     {
         $query = is_array($prepared) ? (string) ($prepared['query'] ?? '') : (string) $prepared;
+        $args = is_array($prepared) ? (array) ($prepared['args'] ?? []) : [];
+        if (str_starts_with($query, 'UPDATE wp_options SET option_value')) {
+            [$newValue, $optionName, $expectedValue] = $args + [null, null, null];
+            if (! is_string($optionName) || ! array_key_exists($optionName, $GLOBALS['wp_options'])) return 0;
+            if (maybe_serialize($GLOBALS['wp_options'][$optionName]) !== $expectedValue) return 0;
+            $GLOBALS['wp_options'][$optionName] = maybe_unserialize((string) $newValue);
+            return 1;
+        }
+        if (str_starts_with($query, 'DELETE FROM wp_options')) {
+            [$optionName, $expectedValue] = $args + [null, null];
+            if (! is_string($optionName) || ! array_key_exists($optionName, $GLOBALS['wp_options'])) return 0;
+            if (maybe_serialize($GLOBALS['wp_options'][$optionName]) !== $expectedValue) return 0;
+            unset($GLOBALS['wp_options'][$optionName]);
+            return 1;
+        }
         if (str_contains($query, 'spcrc_governance_decisions')) {
             $count = 0;
             foreach ($this->governance as &$row) {
@@ -368,6 +418,9 @@ function __return_true(): bool { return true; }
 function sanitize_key(string $value): string { return substr(preg_replace('/[^a-z0-9_\-]/', '', strtolower($value)) ?? '', 0, 255); }
 function sanitize_text_field(string $value): string { return trim(preg_replace('/[\r\n\t]+/', ' ', strip_tags($value)) ?? ''); }
 function wp_json_encode(mixed $value, int $flags = 0): string|false { return json_encode($value, $flags); }
+function maybe_serialize(mixed $value): string { return is_array($value) || is_object($value) ? serialize($value) : (string) $value; }
+function maybe_unserialize(string $value): mixed { $decoded = @unserialize($value); return $decoded === false && $value !== 'b:0;' ? $value : $decoded; }
+function wp_cache_delete(string $key, string $group = ''): bool { return true; }
 function wp_generate_uuid4(): string { static $counter = 1; return sprintf('00000000-0000-4000-8000-%012d', $counter++); }
 function current_time(string $type, bool $gmt = false): string { return gmdate('Y-m-d H:i:s'); }
 function get_current_user_id(): int { return (int) $GLOBALS['current_user_id']; }

@@ -4,14 +4,14 @@ Tags: security, privacy, compliance, resilience, audit
 Requires at least: 6.5
 Tested up to: 7.0
 Requires PHP: 8.0
-Stable tag: 0.25.8
+Stable tag: 0.25.9
 License: GPLv2 or later
 
 Central governance and assurance control plane for the Sabri Social Homeopathy Platform.
 
 == Description ==
 
-Foundation 0.25.8 provides a private Security Center dashboard, bounded module manifests and audit events, risk/incident/control foundations, a private security-findings triage interface, durable and replay-resistant privacy-request orchestration, bounded retry policy and reconciliation operations, verified privacy intake, fail-closed upgrade integrity, advisory security-state requests, system checks, non-destructive repair, and sanitized REST status/Trust Center payloads.
+Foundation 0.25.9 provides a private Security Center dashboard, bounded module manifests and audit events, risk/incident/control foundations, a private security-findings triage interface, durable and replay-resistant privacy-request orchestration, bounded retry policy and reconciliation operations, verified privacy intake, fail-closed upgrade integrity, advisory security-state requests, system checks, non-destructive repair, and sanitized REST status/Trust Center payloads.
 
 It does not replace native-module authorization, File 00 identity, File 20 enforcement, hosting security, legal counsel, backups, or independent security testing.
 
@@ -27,6 +27,14 @@ It does not replace native-module authorization, File 00 identity, File 20 enfor
 8. Run Security Center checks and the non-destructive repair only when needed.
 
 == Changelog ==
+
+= 0.25.9 =
+* Corrected zero-row manifest heartbeats so concurrent canonical hash drift cannot be admitted into runtime memory.
+* Added exact-value atomic option locks for governance request admission, upgrades, retention, audit-gap mutations, security-state mutations and control upserts.
+* Added lease renewal, owner-only release, stale-lock reclamation and malformed-lock fail-closed behavior across coordination paths.
+* Hid security-state requests with unresolved audit evidence from enforcement consumers.
+* Corrected privacy verification compensation so failed recovery-state persistence creates a dedicated release-blocking audit gap.
+* Added eight complete review/correction cycles (22–29), 113 dedicated assertions, PHP 8.0/8.3 CI, updated checksums, SBOM and reproducible package evidence.
 
 = 0.25.8 =
 * Replaced the retention check-then-set transient with an atomic owner-token option lock, stale-lock recovery and contention failure controls.

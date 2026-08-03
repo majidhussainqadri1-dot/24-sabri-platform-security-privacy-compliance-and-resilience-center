@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 namespace {
-    define('SPCRC_VERSION', '0.25.8');
+    define('SPCRC_VERSION', '0.25.9');
     $GLOBALS['options'] = [];
     $GLOBALS['actions'] = [];
 
@@ -14,6 +14,33 @@ namespace {
         public function get_error_message(): string { return $this->message; }
     }
 
+    final class UpgradeWpdb
+    {
+        public string $options = 'wp_options';
+        public function prepare(string $query, mixed ...$args): array { return ['query' => $query, 'args' => $args]; }
+        public function query(mixed $prepared): int|false
+        {
+            $query = (string) ($prepared['query'] ?? '');
+            $args = (array) ($prepared['args'] ?? []);
+            if (str_starts_with($query, 'UPDATE wp_options SET option_value')) {
+                [$newValue, $name, $expected] = $args + [null, null, null];
+                if (! is_string($name) || ! array_key_exists($name, $GLOBALS['options'])) return 0;
+                if (maybe_serialize($GLOBALS['options'][$name]) !== $expected) return 0;
+                $GLOBALS['options'][$name] = maybe_unserialize((string) $newValue);
+                return 1;
+            }
+            if (str_starts_with($query, 'DELETE FROM wp_options')) {
+                [$name, $expected] = $args + [null, null];
+                if (! is_string($name) || ! array_key_exists($name, $GLOBALS['options'])) return 0;
+                if (maybe_serialize($GLOBALS['options'][$name]) !== $expected) return 0;
+                unset($GLOBALS['options'][$name]);
+                return 1;
+            }
+            return 0;
+        }
+    }
+    $GLOBALS['wpdb'] = new UpgradeWpdb();
+
     function get_option(string $key, mixed $default = false): mixed { return $GLOBALS['options'][$key] ?? $default; }
     function update_option(string $key, mixed $value, bool $autoload = true): bool { $GLOBALS['options'][$key] = $value; return true; }
     function add_option(string $key, mixed $value = '', string $deprecated = '', bool|string|null $autoload = null): bool { if (array_key_exists($key, $GLOBALS['options'])) return false; $GLOBALS['options'][$key] = $value; return true; }
@@ -21,6 +48,9 @@ namespace {
     function delete_option(string $key): bool { unset($GLOBALS['options'][$key]); return true; }
     function do_action(string $hook, mixed ...$args): void { $GLOBALS['actions'][] = [$hook, $args]; }
     function is_wp_error(mixed $value): bool { return $value instanceof WP_Error; }
+    function maybe_serialize(mixed $value): string { return is_array($value) || is_object($value) ? serialize($value) : (string) $value; }
+    function maybe_unserialize(string $value): mixed { $decoded = @unserialize($value); return $decoded === false && $value !== 'b:0;' ? $value : $decoded; }
+    function wp_cache_delete(string $key, string $group = ''): bool { return true; }
 }
 
 namespace Sabri\Platform\Security\Storage {
@@ -90,7 +120,7 @@ namespace Sabri\Platform\Security {
     RecoveryManager::$scheduleCalls = 0;
     $migrated = UpgradeManager::maybeUpgrade();
     expectUpgrade($migrated === true, 'Assurance schema migration must return explicit success.');
-    expectUpgrade(get_option('spcrc_version', '') === '0.25.8' && get_option('spcrc_schema_version', '') === '0.25.5', 'Corrective release must advance plugin and schema versions.');
+    expectUpgrade(get_option('spcrc_version', '') === '0.25.9' && get_option('spcrc_schema_version', '') === '0.25.5', 'Corrective release must advance plugin and schema versions.');
     expectUpgrade(Capabilities::$installCalls === 1 && RetentionManager::$scheduleCalls === 1 && RecoveryManager::$scheduleCalls === 1, 'Migration must verify complete runtime integrity.');
 
     RetentionManager::$result = false;

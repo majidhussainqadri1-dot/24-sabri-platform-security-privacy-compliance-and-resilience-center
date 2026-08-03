@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 namespace {
-    define('SPCRC_VERSION', '0.25.8');
+    define('SPCRC_VERSION', '0.25.9');
     define('SPCRC_PLUGIN_FILE', __FILE__);
     define('SPCRC_PLUGIN_DIR', dirname(__DIR__) . '/plugin/sabri-security-center/');
     define('SPCRC_PLUGIN_URL', 'https://example.test/plugins/sabri-security-center/');

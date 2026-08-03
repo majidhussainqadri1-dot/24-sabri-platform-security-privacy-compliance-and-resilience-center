@@ -36,22 +36,43 @@ function wp_generate_uuid4(): string { return '00000000-0000-4000-8000-000000000
 final class WP_Error { public function __construct(private string $code, private string $message) {} public function get_error_code(): string { return $this->code; } public function get_error_message(): string { return $this->message; } }
 function is_wp_error(mixed $value): bool { return $value instanceof WP_Error; }
 function do_action(string $hook, mixed ...$args): void {}
+function maybe_serialize(mixed $value): string { return is_array($value) || is_object($value) ? serialize($value) : (string) $value; }
+function maybe_unserialize(string $value): mixed { $decoded = @unserialize($value); return $decoded === false && $value !== 'b:0;' ? $value : $decoded; }
+function wp_cache_delete(string $key, string $group = ''): bool { return true; }
 
 final class RetentionWpdb
 {
     public string $prefix = 'wp_';
+    public string $options = 'wp_options';
     public bool $tableExists = true;
     public int $count = 1200;
     public array $queryResults = [3, 100];
     public array $queries = [];
 
     public function esc_like(string $value): string { return $value; }
-    public function prepare(string $query, mixed ...$args): string
+    public function prepare(string $query, mixed ...$args): mixed
     {
+        if (str_contains($query, 'wp_options')) return ['query' => $query, 'args' => $args];
         return vsprintf(str_replace(['%s', '%d'], ["'%s'", '%d'], $query), $args);
     }
-    public function query(string $query): int|false
+    public function query(mixed $prepared): int|false
     {
+        $query = is_array($prepared) ? (string) ($prepared['query'] ?? '') : (string) $prepared;
+        $args = is_array($prepared) ? (array) ($prepared['args'] ?? []) : [];
+        if (str_starts_with($query, 'UPDATE wp_options SET option_value')) {
+            [$newValue, $name, $expected] = $args + [null, null, null];
+            if (! is_string($name) || ! array_key_exists($name, $GLOBALS['options'])) return 0;
+            if (maybe_serialize($GLOBALS['options'][$name]) !== $expected) return 0;
+            $GLOBALS['options'][$name] = maybe_unserialize((string) $newValue);
+            return 1;
+        }
+        if (str_starts_with($query, 'DELETE FROM wp_options')) {
+            [$name, $expected] = $args + [null, null];
+            if (! is_string($name) || ! array_key_exists($name, $GLOBALS['options'])) return 0;
+            if (maybe_serialize($GLOBALS['options'][$name]) !== $expected) return 0;
+            unset($GLOBALS['options'][$name]);
+            return 1;
+        }
         $this->queries[] = $query;
         return array_shift($this->queryResults) ?? 0;
     }

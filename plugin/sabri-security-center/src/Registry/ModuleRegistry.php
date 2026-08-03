@@ -201,9 +201,17 @@ final class ModuleRegistry
                     ['%s'],
                     ['%s', '%s']
                 );
-                return $heartbeat === false
-                    ? new \WP_Error('spcrc_manifest_heartbeat_failed', 'Module manifest heartbeat could not be stored.')
-                    : true;
+                if ($heartbeat === false) {
+                    return new \WP_Error('spcrc_manifest_heartbeat_failed', 'Module manifest heartbeat could not be stored.');
+                }
+                if ($heartbeat === 1) {
+                    return true;
+                }
+
+                // A zero-row heartbeat is not success: a concurrent writer may
+                // have changed the manifest hash after the initial read. Re-read
+                // and accept only an identical, identity-bound manifest.
+                return $this->resolveConcurrentWrite($table, $manifest, $hash, 'heartbeat');
             }
 
             $written = $wpdb->update(
@@ -354,7 +362,7 @@ final class ModuleRegistry
             'contract_version' => '1.0.0',
             'canonical_data_owner' => 'File 24',
             'canonical_action_owner' => 'Native owners; File 24 assurance only',
-            'evidence_source' => 'release:file-24-0.25.8',
+            'evidence_source' => 'release:file-24-0.25.9',
             'degraded_behavior' => 'Native controls remain authoritative; privileged assurance writes fail closed.',
             'release_gate' => 'Staging, independent penetration test, restore drill and Founder production approval',
         ];

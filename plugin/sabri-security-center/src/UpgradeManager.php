@@ -7,6 +7,11 @@ namespace Sabri\Platform\Security;
 use Sabri\Platform\Security\Privacy\RecoveryManager;
 use Sabri\Platform\Security\Retention\RetentionManager;
 use Sabri\Platform\Security\Storage\Schema;
+use Sabri\Platform\Security\Support\AtomicOptionLock;
+
+if (! class_exists(AtomicOptionLock::class, false)) {
+    require_once __DIR__ . '/Support/AtomicOptionLock.php';
+}
 
 final class UpgradeManager
 {
@@ -47,12 +52,19 @@ final class UpgradeManager
         }
 
         $lockToken = self::acquireLock();
-        if ($lockToken === '') {
+        if (is_wp_error($lockToken)) {
+            $contended = in_array($lockToken->get_error_code(), ['spcrc_atomic_lock_contended'], true);
             $error = new \WP_Error(
-                'spcrc_upgrade_locked',
-                'Another File 24 upgrade is already in progress. Runtime remains blocked until it completes.'
+                $contended ? 'spcrc_upgrade_locked' : 'spcrc_upgrade_lock_unavailable',
+                $contended
+                    ? 'Another File 24 upgrade is already in progress. Runtime remains blocked until it completes.'
+                    : 'The File 24 upgrade lock could not be verified or acquired safely.'
             );
-            do_action('spcrc/upgrade_lock_contended', $installedSchema, Schema::VERSION);
+            if ($contended) {
+                do_action('spcrc/upgrade_lock_contended', $installedSchema, Schema::VERSION);
+            } else {
+                self::fail($error, $installedSchema);
+            }
             return $error;
         }
 
@@ -125,29 +137,16 @@ final class UpgradeManager
         return true;
     }
 
-    private static function acquireLock(): string
+    /** @return string|\WP_Error */
+    private static function acquireLock(): string|\WP_Error
     {
-        $now = time();
-        $existing = get_option(self::LOCK_OPTION, []);
-        if (is_array($existing) && (int) ($existing['expires_at'] ?? 0) <= $now) {
-            delete_option(self::LOCK_OPTION);
-        }
-
-        $token = function_exists('wp_generate_uuid4') ? wp_generate_uuid4() : bin2hex(random_bytes(16));
-        $added = add_option(
-            self::LOCK_OPTION,
-            ['token' => $token, 'expires_at' => $now + self::LOCK_TTL],
-            '',
-            false
-        );
-        return $added ? $token : '';
+        return AtomicOptionLock::acquire(self::LOCK_OPTION, self::LOCK_TTL);
     }
 
     private static function releaseLock(string $token): void
     {
-        $existing = get_option(self::LOCK_OPTION, []);
-        if (is_array($existing) && hash_equals((string) ($existing['token'] ?? ''), $token)) {
-            delete_option(self::LOCK_OPTION);
+        if (! AtomicOptionLock::release(self::LOCK_OPTION, $token)) {
+            do_action('spcrc/upgrade_lock_release_failed', $token);
         }
     }
 

@@ -10,14 +10,14 @@ if (! is_string($source)) {
 
 $assertions = [
     "private const LOCK_OPTION = 'spcrc_retention_lock'" => 'Retention lock must have one canonical option key.',
-    'private function acquireLock(): string|\\WP_Error' => 'Retention must expose a typed atomic lock acquisition path.',
-    'add_option(' => 'Retention lock must use WordPress atomic option insertion.',
-    "'expires_at' => \$now + self::LOCK_SECONDS" => 'Retention lock must carry a bounded expiry.',
-    "new \\WP_Error('spcrc_retention_locked'" => 'Lock contention must be distinguishable from storage failure.',
-    "new \\WP_Error('spcrc_retention_lock_unavailable'" => 'Lock storage failure must fail closed.',
+    'private function acquireLock(): string|\WP_Error' => 'Retention must expose a typed atomic lock acquisition path.',
+    'AtomicOptionLock::acquire(self::LOCK_OPTION, self::LOCK_SECONDS)' => 'Retention lock must use exact-value atomic acquisition.',
+    'AtomicOptionLock::refresh(self::LOCK_OPTION, $token, self::LOCK_SECONDS)' => 'Retention must renew ownership before destructive phases.',
+    "'spcrc_retention_locked'" => 'Lock contention must be distinguishable from storage failure.',
+    "'spcrc_retention_lock_unavailable'" => 'Lock storage failure must fail closed.',
     'private function releaseLock(string $token): void' => 'Retention must release only through a token-aware path.',
-    "hash_equals((string) (\$existing['token'] ?? ''), \$token)" => 'Retention lock release must verify ownership.',
-    'delete_option(self::LOCK_OPTION)' => 'Atomic option lock must be removed on release or unschedule.',
+    'AtomicOptionLock::release(self::LOCK_OPTION, $token)' => 'Retention lock release must verify exact ownership.',
+    "'retention_lock_lost'" => 'Lost ownership must stop further destructive retention work.',
     '$this->releaseLock($lock);' => 'Every run path must reach owner-aware lock release.',
 ];
 

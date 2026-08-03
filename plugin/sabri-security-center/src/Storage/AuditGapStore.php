@@ -4,7 +4,12 @@ declare(strict_types=1);
 
 namespace Sabri\Platform\Security\Storage;
 
+use Sabri\Platform\Security\Support\AtomicOptionLock;
 use Sabri\Platform\Security\Support\Sanitizer;
+
+if (! class_exists(AtomicOptionLock::class, false)) {
+    require_once dirname(__DIR__) . '/Support/AtomicOptionLock.php';
+}
 
 /**
  * Bounded operational evidence-gap registry.
@@ -32,6 +37,7 @@ final class AuditGapStore
         'privacy-recovery' => 'spcrc_privacy_recovery_audit_gap',
         'retention' => 'spcrc_retention_audit_gap',
         'admin' => 'spcrc_admin_audit_gap',
+        'security-state' => 'spcrc_security_state_audit_gap',
     ];
 
     /** @param array<string,mixed> $context */
@@ -84,6 +90,11 @@ final class AuditGapStore
             ];
             if (count($gaps) > self::MAX_GAPS) {
                 $gaps = array_slice($gaps, -self::MAX_GAPS, null, true);
+            }
+
+            if (! AtomicOptionLock::refresh(self::LOCK_OPTION, $lock, self::LOCK_TTL)) {
+                do_action('spcrc/audit_gap_lock_lost', $option, $entityType, $entityId, $reason);
+                return false;
             }
 
             $updated = update_option($option, $gaps, false);
@@ -171,6 +182,9 @@ final class AuditGapStore
             if (is_wp_error($authorizationAudit)) {
                 return new \WP_Error('spcrc_audit_gap_reconciliation_audit_failed', 'Reconciliation was not applied because authorization evidence could not be audited.');
             }
+            if (! AtomicOptionLock::refresh(self::LOCK_OPTION, $lock, self::LOCK_TTL)) {
+                return new \WP_Error('spcrc_audit_gap_lock_lost', 'Audit-gap ownership was lost before reconciliation could be committed.');
+            }
 
             unset($gaps[$gapId]);
             if ($gaps === []) {
@@ -241,34 +255,23 @@ final class AuditGapStore
     /** @return string|\WP_Error */
     private static function acquireLock(): string|\WP_Error
     {
-        if (! function_exists('add_option') || ! function_exists('get_option') || ! function_exists('delete_option')) {
-            return new \WP_Error('spcrc_audit_gap_lock_storage_unavailable', 'Atomic audit-gap lock storage is unavailable.');
+        $lock = AtomicOptionLock::acquire(self::LOCK_OPTION, self::LOCK_TTL);
+        if (! is_wp_error($lock)) {
+            return $lock;
         }
 
-        $token = function_exists('wp_generate_uuid4')
-            ? wp_generate_uuid4()
-            : hash('sha256', microtime(true) . '|' . mt_rand());
-        $lock = ['token' => $token, 'expires_at' => time() + self::LOCK_TTL];
-        if (add_option(self::LOCK_OPTION, $lock, '', false)) {
-            return $token;
-        }
-
-        $existing = get_option(self::LOCK_OPTION, null);
-        if (is_array($existing) && (int) ($existing['expires_at'] ?? 0) < time()) {
-            delete_option(self::LOCK_OPTION);
-            if (add_option(self::LOCK_OPTION, $lock, '', false)) {
-                return $token;
-            }
-        }
-
-        return new \WP_Error('spcrc_audit_gap_lock_contended', 'Another audit-gap mutation is already in progress.');
+        return new \WP_Error(
+            $lock->get_error_code() === 'spcrc_atomic_lock_contended'
+                ? 'spcrc_audit_gap_lock_contended'
+                : 'spcrc_audit_gap_lock_storage_unavailable',
+            $lock->get_error_message()
+        );
     }
 
     private static function releaseLock(string $token): void
     {
-        $existing = get_option(self::LOCK_OPTION, null);
-        if (is_array($existing) && hash_equals((string) ($existing['token'] ?? ''), $token)) {
-            delete_option(self::LOCK_OPTION);
+        if (! AtomicOptionLock::release(self::LOCK_OPTION, $token)) {
+            do_action('spcrc/audit_gap_lock_release_failed', $token);
         }
     }
 

@@ -4,8 +4,13 @@ declare(strict_types=1);
 
 namespace Sabri\Platform\Security\Privacy;
 
+use Sabri\Platform\Security\Storage\AuditGapStore;
 use Sabri\Platform\Security\Storage\PrivacyRequestRepository;
 use Sabri\Platform\Security\Support\Sanitizer;
+
+if (! class_exists(AuditGapStore::class, false)) {
+    require_once dirname(__DIR__) . '/Storage/AuditGapStore.php';
+}
 
 /**
  * Applies verification, destructive-operation, retry and callback policy
@@ -116,12 +121,39 @@ final class PrivacyRequestPolicy
         $requestUuid = Sanitizer::uuid($begin['request_uuid'] ?? '');
         $stored = $this->verification->persist($requestUuid, $validation);
         if (is_wp_error($stored)) {
-            $this->storage->finalize(
+            $compensated = $this->storage->finalize(
                 $requestUuid,
                 'recovery-required',
                 'dispatching',
                 'verification_evidence_storage_failed'
             );
+
+            if (is_wp_error($compensated)) {
+                AuditGapStore::record(
+                    'spcrc_privacy_audit_gap',
+                    'privacy_request',
+                    $requestUuid,
+                    'verification_compensation_failed',
+                    [
+                        'verification_error_code' => $stored->get_error_code(),
+                        'compensation_error_code' => $compensated->get_error_code(),
+                    ]
+                );
+                do_action('spcrc/privacy_verification_compensation_failed', $requestUuid, $stored, $compensated);
+                return new \WP_Error(
+                    'spcrc_privacy_verification_compensation_failed',
+                    'Verification evidence and the recovery-required compensation state could not be stored. The request is blocked pending reconciliation.'
+                );
+            }
+
+            AuditGapStore::record(
+                'spcrc_privacy_audit_gap',
+                'privacy_request',
+                $requestUuid,
+                'verification_evidence_storage_failed',
+                ['verification_error_code' => $stored->get_error_code()]
+            );
+            do_action('spcrc/privacy_verification_storage_failed', $requestUuid, $stored);
             return $stored;
         }
 
