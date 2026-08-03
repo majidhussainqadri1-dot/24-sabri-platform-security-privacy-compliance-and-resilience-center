@@ -6,9 +6,13 @@ namespace Sabri\Platform\Security\Retention;
 
 use Sabri\Platform\Security\Storage\AuditGapStore;
 use Sabri\Platform\Security\Storage\AuditLogger;
+use Sabri\Platform\Security\Support\AtomicOptionLock;
 
 if (! class_exists(AuditGapStore::class, false)) {
     require_once dirname(__DIR__) . '/Storage/AuditGapStore.php';
+}
+if (! class_exists(AtomicOptionLock::class, false)) {
+    require_once dirname(__DIR__) . '/Support/AtomicOptionLock.php';
 }
 
 final class RetentionManager
@@ -45,9 +49,9 @@ final class RetentionManager
         if (function_exists('wp_clear_scheduled_hook')) {
             wp_clear_scheduled_hook(self::CRON_HOOK);
         }
-        if (function_exists('delete_option')) {
-            delete_option(self::LOCK_OPTION);
-        }
+        // Do not delete an option-backed lock during deactivation: another
+        // request may still own a destructive retention run. Expired locks are
+        // reclaimed atomically by the next run; uninstall owns final cleanup.
         if (function_exists('delete_transient')) {
             delete_transient(self::LOCK_OPTION);
         }
@@ -77,6 +81,10 @@ final class RetentionManager
                 return $this->finish('failed', 0, 0, 'events_table_unavailable');
             }
 
+            if (! $this->refreshLock($lock)) {
+                return $this->finish('failed', 0, 0, 'retention_lock_lost');
+            }
+
             $cutoff = gmdate('Y-m-d H:i:s', time() - ($days * DAY_IN_SECONDS));
             $ageDeleted = $wpdb->query($wpdb->prepare(
                 "DELETE FROM {$table} WHERE created_at < %s ORDER BY id ASC LIMIT %d",
@@ -87,6 +95,10 @@ final class RetentionManager
                 return $this->finish('failed', 0, 0, 'age_retention_delete_failed');
             }
 
+            if (! $this->refreshLock($lock)) {
+                return $this->finish('failed', (int) $ageDeleted, 0, 'retention_lock_lost');
+            }
+
             $count = $wpdb->get_var("SELECT COUNT(*) FROM {$table}");
             if (! is_numeric($count)) {
                 return $this->finish('failed', (int) $ageDeleted, 0, 'event_count_failed');
@@ -95,6 +107,9 @@ final class RetentionManager
             $overflowDeleted = 0;
             $count = (int) $count;
             if ($count > $maximum) {
+                if (! $this->refreshLock($lock)) {
+                    return $this->finish('failed', (int) $ageDeleted, 0, 'retention_lock_lost');
+                }
                 $overflowDeleted = $wpdb->query($wpdb->prepare(
                     "DELETE FROM {$table} ORDER BY id ASC LIMIT %d",
                     min($batch, $count - $maximum)
@@ -113,57 +128,28 @@ final class RetentionManager
     /** @return string|\WP_Error */
     private function acquireLock(): string|\WP_Error
     {
-        $token = function_exists('wp_generate_uuid4') ? wp_generate_uuid4() : bin2hex(random_bytes(16));
-        $now = time();
-
-        if (function_exists('add_option')) {
-            $existing = get_option(self::LOCK_OPTION, null);
-            if (is_array($existing) && (int) ($existing['expires_at'] ?? 0) > $now) {
-                return new \WP_Error('spcrc_retention_locked', 'Another retention run is already active.');
-            }
-            if ($existing !== null && $existing !== false) {
-                delete_option(self::LOCK_OPTION);
-            }
-
-            $added = add_option(
-                self::LOCK_OPTION,
-                ['token' => $token, 'expires_at' => $now + self::LOCK_SECONDS],
-                '',
-                false
-            );
-            if ($added) {
-                return $token;
-            }
-
-            $raced = get_option(self::LOCK_OPTION, null);
-            if (is_array($raced) && (int) ($raced['expires_at'] ?? 0) > $now) {
-                return new \WP_Error('spcrc_retention_locked', 'Another retention run acquired the lock concurrently.');
-            }
-            return new \WP_Error('spcrc_retention_lock_unavailable', 'The retention lock could not be acquired.');
+        $lock = AtomicOptionLock::acquire(self::LOCK_OPTION, self::LOCK_SECONDS);
+        if (! is_wp_error($lock)) {
+            return $lock;
         }
 
-        if (get_transient(self::LOCK_OPTION) !== false) {
-            return new \WP_Error('spcrc_retention_locked', 'Another retention run is already active.');
-        }
-        if (! set_transient(self::LOCK_OPTION, $token, self::LOCK_SECONDS)) {
-            return new \WP_Error('spcrc_retention_lock_unavailable', 'The retention lock could not be acquired.');
-        }
-        return $token;
+        return new \WP_Error(
+            $lock->get_error_code() === 'spcrc_atomic_lock_contended'
+                ? 'spcrc_retention_locked'
+                : 'spcrc_retention_lock_unavailable',
+            $lock->get_error_message()
+        );
+    }
+
+    private function refreshLock(string $token): bool
+    {
+        return AtomicOptionLock::refresh(self::LOCK_OPTION, $token, self::LOCK_SECONDS);
     }
 
     private function releaseLock(string $token): void
     {
-        if (function_exists('add_option')) {
-            $existing = get_option(self::LOCK_OPTION, null);
-            if (is_array($existing) && hash_equals((string) ($existing['token'] ?? ''), $token)) {
-                delete_option(self::LOCK_OPTION);
-            }
-            return;
-        }
-
-        $existing = get_transient(self::LOCK_OPTION);
-        if (is_string($existing) && hash_equals($existing, $token)) {
-            delete_transient(self::LOCK_OPTION);
+        if (! AtomicOptionLock::release(self::LOCK_OPTION, $token)) {
+            do_action('spcrc/retention_lock_release_failed', $token);
         }
     }
 

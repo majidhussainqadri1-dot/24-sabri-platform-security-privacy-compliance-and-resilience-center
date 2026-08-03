@@ -4,10 +4,14 @@ declare(strict_types=1);
 
 namespace Sabri\Platform\Security\Storage;
 
+use Sabri\Platform\Security\Support\AtomicOptionLock;
 use Sabri\Platform\Security\Support\Sanitizer;
 
 if (! class_exists(AuditGapStore::class, false)) {
     require_once __DIR__ . '/AuditGapStore.php';
+}
+if (! class_exists(AtomicOptionLock::class, false)) {
+    require_once dirname(__DIR__) . '/Support/AtomicOptionLock.php';
 }
 
 /**
@@ -89,57 +93,70 @@ final class GovernanceRepository
             return new \WP_Error('spcrc_governance_expiry_invalid', 'Decision expiry must be in the future and no more than 30 days away.');
         }
 
-        $duplicate = $wpdb->get_var($wpdb->prepare(
-            "SELECT decision_uuid FROM {$wpdb->prefix}spcrc_governance_decisions WHERE decision_type = %s AND subject_key = %s AND status = 'pending' AND expires_at > %s LIMIT 1",
-            $type,
-            $subject,
-            $requestedAt
-        ));
-        if (is_string($duplicate) && Sanitizer::uuid($duplicate) !== '') {
-            return new \WP_Error('spcrc_governance_duplicate_pending', 'An active decision request already exists for this subject.');
+        $lockOption = 'spcrc_governance_request_lock_' . substr(hash('sha256', $type . '|' . $subject), 0, 32);
+        $lockToken = AtomicOptionLock::acquire($lockOption, 30);
+        if (is_wp_error($lockToken)) {
+            return new \WP_Error(
+                'spcrc_governance_request_locked',
+                'A governance request for this subject is being created concurrently. Refresh and try again.'
+            );
         }
 
-        $uuid = wp_generate_uuid4();
-        $inserted = $wpdb->insert(
-            $wpdb->prefix . 'spcrc_governance_decisions',
-            [
+        try {
+            $duplicate = $wpdb->get_var($wpdb->prepare(
+                "SELECT decision_uuid FROM {$wpdb->prefix}spcrc_governance_decisions WHERE decision_type = %s AND subject_key = %s AND status = 'pending' AND expires_at > %s LIMIT 1",
+                $type,
+                $subject,
+                $requestedAt
+            ));
+            if (is_string($duplicate) && Sanitizer::uuid($duplicate) !== '') {
+                return new \WP_Error('spcrc_governance_duplicate_pending', 'An active decision request already exists for this subject.');
+            }
+
+            $uuid = wp_generate_uuid4();
+            $inserted = $wpdb->insert(
+                $wpdb->prefix . 'spcrc_governance_decisions',
+                [
+                    'decision_uuid' => $uuid,
+                    'decision_type' => $type,
+                    'subject_key' => $subject,
+                    'module_key' => $module,
+                    'status' => 'pending',
+                    'requester_user_id' => $requester,
+                    'approver_user_id' => null,
+                    'evidence_ref' => $evidence,
+                    'rationale_hash' => hash('sha256', $rationale),
+                    'requested_at' => $requestedAt,
+                    'expires_at' => gmdate('Y-m-d H:i:s', $expiryTs),
+                    'decided_at' => null,
+                    'revoked_at' => null,
+                    'lock_version' => 0,
+                ],
+                ['%s', '%s', '%s', '%s', '%s', '%d', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%d']
+            );
+            if ($inserted === false) {
+                return new \WP_Error('spcrc_governance_write_failed', 'Governance decision request could not be stored.');
+            }
+
+            $audit = $this->audit?->record('governance_decision_requested', $module, 'pending', 'high', [
                 'decision_uuid' => $uuid,
                 'decision_type' => $type,
                 'subject_key' => $subject,
-                'module_key' => $module,
-                'status' => 'pending',
-                'requester_user_id' => $requester,
-                'approver_user_id' => null,
                 'evidence_ref' => $evidence,
-                'rationale_hash' => hash('sha256', $rationale),
-                'requested_at' => $requestedAt,
-                'expires_at' => gmdate('Y-m-d H:i:s', $expiryTs),
-                'decided_at' => null,
-                'revoked_at' => null,
-                'lock_version' => 0,
-            ],
-            ['%s', '%s', '%s', '%s', '%s', '%d', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%d']
-        );
-        if ($inserted === false) {
-            return new \WP_Error('spcrc_governance_write_failed', 'Governance decision request could not be stored.');
-        }
-
-        $audit = $this->audit?->record('governance_decision_requested', $module, 'pending', 'high', [
-            'decision_uuid' => $uuid,
-            'decision_type' => $type,
-            'subject_key' => $subject,
-            'evidence_ref' => $evidence,
-        ]);
-        if (is_wp_error($audit)) {
-            // Governance truth must not silently exist without its audit evidence.
-            $deleted = $wpdb->delete($wpdb->prefix . 'spcrc_governance_decisions', ['decision_uuid' => $uuid], ['%s']);
-            if ($deleted !== 1) {
-                $this->recordAuditGap($uuid, 'request_rollback_failed');
+            ]);
+            if (is_wp_error($audit)) {
+                // Governance truth must not silently exist without its audit evidence.
+                $deleted = $wpdb->delete($wpdb->prefix . 'spcrc_governance_decisions', ['decision_uuid' => $uuid], ['%s']);
+                if ($deleted !== 1) {
+                    $this->recordAuditGap($uuid, 'request_rollback_failed');
+                }
+                return new \WP_Error('spcrc_governance_audit_failed', 'Governance request was rolled back because audit evidence could not be stored.');
             }
-            return new \WP_Error('spcrc_governance_audit_failed', 'Governance request was rolled back because audit evidence could not be stored.');
-        }
 
-        return $uuid;
+            return $uuid;
+        } finally {
+            AtomicOptionLock::release($lockOption, $lockToken);
+        }
     }
 
     /** @param array<string,mixed> $context
