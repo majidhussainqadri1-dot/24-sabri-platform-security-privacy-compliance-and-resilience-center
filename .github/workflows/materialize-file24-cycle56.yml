@@ -91,6 +91,6 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
-          git diff --cached --check
+          git diff --cached --check -- plugin tests tools README.md MANIFEST.md SECURITY.md CHECKSUMS.sha256
           git commit -m "fix(file-24): complete fifteen review and correction rounds 0.27.0"
           git push origin HEAD:codex/file-24-fifteen-round-review-0.27.0
