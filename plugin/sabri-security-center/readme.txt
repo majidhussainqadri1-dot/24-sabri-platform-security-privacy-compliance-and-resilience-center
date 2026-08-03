@@ -4,14 +4,14 @@ Tags: security, privacy, compliance, resilience, audit
 Requires at least: 6.5
 Tested up to: 7.0
 Requires PHP: 8.0
-Stable tag: 0.25.7
+Stable tag: 0.25.8
 License: GPLv2 or later
 
 Central governance and assurance control plane for the Sabri Social Homeopathy Platform.
 
 == Description ==
 
-Foundation 0.25.7 provides a private Security Center dashboard, bounded module manifests and audit events, risk/incident/control foundations, a private security-findings triage interface, durable and replay-resistant privacy-request orchestration, bounded retry policy and reconciliation operations, verified privacy intake, fail-closed upgrade integrity, advisory security-state requests, system checks, non-destructive repair, and sanitized REST status/Trust Center payloads.
+Foundation 0.25.8 provides a private Security Center dashboard, bounded module manifests and audit events, risk/incident/control foundations, a private security-findings triage interface, durable and replay-resistant privacy-request orchestration, bounded retry policy and reconciliation operations, verified privacy intake, fail-closed upgrade integrity, advisory security-state requests, system checks, non-destructive repair, and sanitized REST status/Trust Center payloads.
 
 It does not replace native-module authorization, File 00 identity, File 20 enforcement, hosting security, legal counsel, backups, or independent security testing.
 
@@ -27,6 +27,14 @@ It does not replace native-module authorization, File 00 identity, File 20 enfor
 8. Run Security Center checks and the non-destructive repair only when needed.
 
 == Changelog ==
+
+= 0.25.8 =
+* Replaced the retention check-then-set transient with an atomic owner-token option lock, stale-lock recovery and contention failure controls.
+* Enforced privacy retry safety at the canonical storage boundary so uncertain destructive outcomes cannot be replayed by bypassing dispatcher policy.
+* Serialized audit-gap record and reconciliation mutations with an atomic expiring owner lock to prevent lost release blockers.
+* Expanded schema verification to every required column in all nine owned tables.
+* Corrected uninstall cleanup for option-backed upgrade, security-state, retention and audit-gap coordination locks while preserving durable evidence.
+* Added four complete review/correction cycles (18–21), permanent regression suites, PHP 8.0/8.3 CI execution, updated checksums, SBOM and deterministic package evidence.
 
 = 0.25.7 =
 * Added a bounded governance-decision registry with independent requester/approver identities, File 00 step-up, expiry, optimistic concurrency and exact subject binding.

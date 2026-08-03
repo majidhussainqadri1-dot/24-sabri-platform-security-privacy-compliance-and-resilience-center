@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 const SPCRC_PLUGIN_URL = 'https://example.test/wp-content/plugins/sabri-security-center/';
-const SPCRC_VERSION = '0.25.7';
+const SPCRC_VERSION = '0.25.8';
 
 $GLOBALS['enqueued_styles'] = [];
 function sanitize_key(string $value): string { return preg_replace('/[^a-z0-9_\-]/', '', strtolower($value)) ?? ''; }

@@ -1,4 +1,4 @@
-# Foundation Integration Contracts — 0.25.7
+# Foundation Integration Contracts — 0.25.8
 
 ## Contract law
 
@@ -71,7 +71,7 @@ A module must declare the requested operation and implement `spcrc/privacy_reque
 
 ## Native completion and bounded retry
 
-`spcrc/privacy_request_module_result` records bounded native completion callbacks. Completed and pending module operations are never replayed. Failed work is retryable only when the native result explicitly declares retry safety; deletion retry also requires fresh destructive confirmation.
+`spcrc/privacy_request_module_result` records bounded native completion callbacks. Completed and pending module operations are never replayed. Failed work is retryable only when the native result explicitly declares retry safety with the canonical `retry-safe-` code prefix; deletion retry also requires fresh destructive confirmation. This invariant is enforced again by `PrivacyRequestRepository::claimRetry()` so internal callers cannot bypass dispatcher policy.
 
 ## Stale-dispatch recovery
 

@@ -8,6 +8,19 @@ final class Schema
 {
     public const VERSION = '0.25.5';
 
+    /** @var array<string,string[]> */
+    private const REQUIRED_COLUMNS = [
+        'events' => ['id', 'event_uuid', 'event_type', 'module_key', 'actor_user_id', 'result', 'risk_level', 'correlation_id', 'context_json', 'created_at'],
+        'incidents' => ['id', 'incident_uuid', 'title', 'severity', 'status', 'owner_user_id', 'summary', 'evidence_ref', 'opened_at', 'updated_at', 'closed_at'],
+        'findings' => ['id', 'finding_uuid', 'module_key', 'title', 'severity', 'status', 'owner_user_id', 'due_at', 'evidence_ref', 'governance_decision_uuid', 'acceptance_expires_at', 'created_at', 'updated_at'],
+        'risks' => ['id', 'risk_uuid', 'module_key', 'title', 'likelihood', 'impact', 'inherent_score', 'status', 'treatment', 'owner_user_id', 'due_at', 'governance_decision_uuid', 'accepted_by_user_id', 'accepted_at', 'acceptance_expires_at', 'created_at', 'updated_at'],
+        'controls' => ['id', 'control_key', 'title', 'framework', 'status', 'owner_user_id', 'evidence_ref', 'last_tested_at', 'created_at', 'updated_at'],
+        'privacy' => ['id', 'request_uuid', 'requester_user_id', 'request_type', 'status', 'assigned_user_id', 'jurisdiction', 'due_at', 'verification_method', 'authority_basis', 'verification_reference', 'verified_by_user_id', 'verified_at', 'module_results_json', 'dispatch_attempts', 'lock_version', 'next_retry_at', 'last_error_code', 'completed_at', 'created_at', 'updated_at'],
+        'manifests' => ['id', 'module_key', 'module_version', 'manifest_hash', 'posture', 'manifest_json', 'last_seen_at'],
+        'governance' => ['id', 'decision_uuid', 'decision_type', 'subject_key', 'module_key', 'status', 'requester_user_id', 'approver_user_id', 'evidence_ref', 'rationale_hash', 'requested_at', 'expires_at', 'decided_at', 'revoked_at', 'lock_version'],
+        'assurance' => ['id', 'record_uuid', 'record_type', 'record_key', 'title', 'status', 'owner_user_id', 'jurisdiction', 'data_classes_json', 'evidence_ref', 'notes', 'reviewed_at', 'next_review_at', 'backup_completed_at', 'restore_tested_at', 'created_at', 'updated_at'],
+    ];
+
     /** @return bool|\WP_Error */
     public static function install(): bool|\WP_Error
     {
@@ -239,15 +252,9 @@ final class Schema
         }
 
         if (method_exists($wpdb, 'get_col')) {
-            $required = [
-                'risks' => ['governance_decision_uuid', 'accepted_by_user_id', 'accepted_at', 'acceptance_expires_at'],
-                'findings' => ['governance_decision_uuid', 'acceptance_expires_at'],
-                'incidents' => ['evidence_ref'],
-                'governance' => ['decision_uuid', 'decision_type', 'subject_key', 'status', 'requester_user_id', 'approver_user_id', 'evidence_ref', 'lock_version'],
-            ];
-            foreach ($required as $tableKey => $columns) {
+            foreach (self::REQUIRED_COLUMNS as $tableKey => $columns) {
                 $foundColumns = $wpdb->get_col("SHOW COLUMNS FROM {$tables[$tableKey]}", 0);
-                if (! is_array($foundColumns)) {
+                if (! is_array($foundColumns) || $foundColumns === []) {
                     return new \WP_Error('spcrc_schema_column_check_failed', sprintf('File 24 columns could not be inspected: %s', $tableKey));
                 }
                 foreach ($columns as $column) {

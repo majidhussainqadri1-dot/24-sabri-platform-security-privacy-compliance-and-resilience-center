@@ -49,6 +49,11 @@ jobs:
           php tests/cycle14-extraordinary.php
           php tests/cycle15-illuminative.php
           php tests/cycle16-closure.php
+          php tests/cycle17-illuminative.php
+          php tests/cycle18-retention-concurrency.php
+          php tests/cycle19-privacy-retry-safety.php
+          php tests/cycle20-audit-gap-concurrency.php
+          php tests/cycle21-schema-release-closure.php
 
       - name: Reject common secret material
         shell: bash
@@ -63,10 +68,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          grep -q 'Version:     0.25.7' plugin/sabri-security-center/sabri-security-center.php
-          grep -q "define('SPCRC_VERSION', '0.25.7')" plugin/sabri-security-center/sabri-security-center.php
+          grep -q 'Version:     0.25.8' plugin/sabri-security-center/sabri-security-center.php
+          grep -q "define('SPCRC_VERSION', '0.25.8')" plugin/sabri-security-center/sabri-security-center.php
           grep -q "public const VERSION = '0.25.5'" plugin/sabri-security-center/src/Storage/Schema.php
-          grep -q 'Stable tag: 0.25.7' plugin/sabri-security-center/readme.txt
+          grep -q 'Stable tag: 0.25.8' plugin/sabri-security-center/readme.txt
           grep -q 'spcrc_governance_decisions' plugin/sabri-security-center/src/Storage/Schema.php
           grep -q 'spcrc_approve_governance_decision' plugin/sabri-security-center/src/Capabilities.php
           grep -q 'spcrc_accept_critical_risk' plugin/sabri-security-center/src/Capabilities.php
@@ -87,13 +92,19 @@ jobs:
           grep -q 'spcrc_assurance_audit_failed' plugin/sabri-security-center/src/Storage/AssuranceRepository.php
           grep -q 'normalizeBackupEvidence' plugin/sabri-security-center/src/Storage/AssuranceRepository.php
           grep -q "'audit_gaps'" plugin/sabri-security-center/src/System/SystemCheck.php
+          grep -q "private const LOCK_OPTION = 'spcrc_audit_gap_store_lock'" plugin/sabri-security-center/src/Storage/AuditGapStore.php
+          grep -q "private const LOCK_OPTION = 'spcrc_retention_lock'" plugin/sabri-security-center/src/Retention/RetentionManager.php
+          grep -q "private const SAFE_CODE_PREFIX = 'retry-safe-'" plugin/sabri-security-center/src/Storage/PrivacyRequestRepository.php
+          grep -q 'private const REQUIRED_COLUMNS' plugin/sabri-security-center/src/Storage/Schema.php
+          grep -q "delete_option('spcrc_upgrade_lock')" plugin/sabri-security-center/uninstall.php
+          grep -q "delete_option('spcrc_audit_gap_store_lock')" plugin/sabri-security-center/uninstall.php
           ! grep -RInE --include='*.php' ':[[:space:]]*never\b' plugin tests
           ! grep -RInE --include='*.php' '(^|[^A-Za-z0-9_])true[[:space:]]*\|' plugin tests
           ! grep -RIn --include='*.php' 'array_is_list(' plugin tests
 
       - name: Verify SPDX and license inventory
         run: |
-          php -r '$d=json_decode(file_get_contents("plugin/sabri-security-center/SBOM.spdx.json"), true, 512, JSON_THROW_ON_ERROR); if (($d["spdxVersion"] ?? "") !== "SPDX-2.3" || ($d["packages"][0]["versionInfo"] ?? "") !== "0.25.7") { exit(1); }'
+          php -r '$d=json_decode(file_get_contents("plugin/sabri-security-center/SBOM.spdx.json"), true, 512, JSON_THROW_ON_ERROR); if (($d["spdxVersion"] ?? "") !== "SPDX-2.3" || ($d["packages"][0]["versionInfo"] ?? "") !== "0.25.8") { exit(1); }'
           grep -q 'GPL-2.0-or-later' plugin/sabri-security-center/LICENSES.md
 
       - name: Reject self-mutating workflows and staged source bundles
@@ -101,7 +112,9 @@ jobs:
         run: |
           set -euo pipefail
           test ! -d handoff
+          test ! -d cycle17
           test ! -f .github/workflows/materialize-file24-cycle12.yml
+          test ! -f .github/workflows/materialize-file24-cycle17.yml
           test ! -f .github/workflows/apply-cycle2.yml
           test ! -f tools/cycle2-source.ready
           ! find tools -maxdepth 1 -type f -name 'cycle2-bundle.part-*' -print -quit | grep -q .
@@ -109,7 +122,7 @@ jobs:
             exit 1
           fi
 
-      - name: Report Cycle 16 reviewed source hashes
+      - name: Report Cycle 21 reviewed source hashes
         run: |
           sha256sum \
             MANIFEST.md \
@@ -118,8 +131,15 @@ jobs:
             docs/EXTRAORDINARY-REVIEW-AND-CORRECTION-0.25.7-CYCLE-14.md \
             docs/ILLUMINATIVE-REVIEW-AND-CORRECTION-0.25.7-CYCLE-15.md \
             docs/FINAL-CLOSURE-REVIEW-AND-CORRECTION-0.25.7-CYCLE-16.md \
-            docs/REQUIREMENTS-TRACEABILITY-0.25.7.md \
-            docs/RELEASE-RECEIPT-0.25.7.md \
+            docs/ILLUMINATIVE-REVIEW-AND-CORRECTION-0.25.7-CYCLE-17.md \
+            docs/REVIEW-AND-CORRECTION-0.25.8-CYCLE-18.md \
+            docs/REVIEW-AND-CORRECTION-0.25.8-CYCLE-19.md \
+            docs/REVIEW-AND-CORRECTION-0.25.8-CYCLE-20.md \
+            docs/REVIEW-AND-CORRECTION-0.25.8-CYCLE-21.md \
+            docs/FOUR-ROUND-REVIEW-SUMMARY-0.25.8.md \
+            docs/REQUIREMENTS-TRACEABILITY-0.25.8.md \
+            docs/KNOWN-LIMITATIONS-0.25.8.md \
+            docs/RELEASE-RECEIPT-0.25.8.md \
             plugin/sabri-security-center/readme.txt \
             plugin/sabri-security-center/sabri-security-center.php \
             plugin/sabri-security-center/SBOM.spdx.json \
@@ -133,6 +153,9 @@ jobs:
             plugin/sabri-security-center/src/Integration/File00Adapter.php \
             plugin/sabri-security-center/src/Registry/ModuleRegistry.php \
             plugin/sabri-security-center/src/Registry/SecurityStateRegistry.php \
+            plugin/sabri-security-center/src/Privacy/RequestDispatcher.php \
+            plugin/sabri-security-center/src/Retention/RetentionManager.php \
+            plugin/sabri-security-center/src/Storage/PrivacyRequestRepository.php \
             plugin/sabri-security-center/src/Storage/AuditLogger.php \
             plugin/sabri-security-center/src/Storage/AuditGapStore.php \
             plugin/sabri-security-center/src/Storage/ControlRepository.php \
@@ -149,6 +172,11 @@ jobs:
             tests/cycle14-extraordinary.php \
             tests/cycle15-illuminative.php \
             tests/cycle16-closure.php \
+            tests/cycle17-illuminative.php \
+            tests/cycle18-retention-concurrency.php \
+            tests/cycle19-privacy-retry-safety.php \
+            tests/cycle20-audit-gap-concurrency.php \
+            tests/cycle21-schema-release-closure.php \
             tests/plugin-boot-cycle9.php \
             tests/run.php \
             tests/upgrade.php
@@ -179,7 +207,7 @@ jobs:
         if: matrix.php == '8.3'
         uses: actions/upload-artifact@v4
         with:
-          name: file-24-security-center-0.25.7
+          name: file-24-security-center-0.25.8
           path: |
             ${{ steps.package.outputs.path }}
             ${{ steps.package.outputs.path }}.sha256
@@ -192,12 +220,12 @@ jobs:
           set -euo pipefail
           mkdir -p /tmp/file24-source
           rsync -a --exclude='.git' --exclude='build' ./ /tmp/file24-source/
-          (cd /tmp && zip -X -q -r file24-source-snapshot-cycle16.zip file24-source)
+          (cd /tmp && zip -X -q -r file24-source-snapshot-cycle21.zip file24-source)
 
       - name: Upload sanitized source snapshot for corrective review
         if: matrix.php == '8.3'
         uses: actions/upload-artifact@v4
         with:
-          name: file-24-sanitized-source-snapshot-cycle16
-          path: /tmp/file24-source-snapshot-cycle16.zip
+          name: file-24-sanitized-source-snapshot-cycle21
+          path: /tmp/file24-source-snapshot-cycle21.zip
           if-no-files-found: error

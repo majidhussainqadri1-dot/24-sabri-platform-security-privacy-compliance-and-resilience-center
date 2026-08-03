@@ -1,6 +1,6 @@
 # Source Manifest
 
-Foundation corrective candidate 0.25.7 contains only public, sanitized source and documentation.
+Foundation four-round corrective candidate 0.25.8 contains only public, sanitized source and documentation.
 
 Sensitive operational material is intentionally excluded.
 
@@ -18,10 +18,19 @@ Sensitive operational material is intentionally excluded.
 - Cycle 14 extraordinary fresh review: `docs/EXTRAORDINARY-REVIEW-AND-CORRECTION-0.25.7-CYCLE-14.md`
 - Cycle 15 requested Alhami/Illuminative review: `docs/ILLUMINATIVE-REVIEW-AND-CORRECTION-0.25.7-CYCLE-15.md`
 - Cycle 16 final closure review: `docs/FINAL-CLOSURE-REVIEW-AND-CORRECTION-0.25.7-CYCLE-16.md`
+- Cycle 17 post-CI illuminative review: `docs/ILLUMINATIVE-REVIEW-AND-CORRECTION-0.25.7-CYCLE-17.md`
+- Cycle 18 retention-concurrency review: `docs/REVIEW-AND-CORRECTION-0.25.8-CYCLE-18.md`
+- Cycle 19 privacy-retry safety review: `docs/REVIEW-AND-CORRECTION-0.25.8-CYCLE-19.md`
+- Cycle 20 audit-gap concurrency review: `docs/REVIEW-AND-CORRECTION-0.25.8-CYCLE-20.md`
+- Cycle 21 final four-round closure: `docs/REVIEW-AND-CORRECTION-0.25.8-CYCLE-21.md`
+- Consolidated four-round summary: `docs/FOUR-ROUND-REVIEW-SUMMARY-0.25.8.md`
 - Bounded audit-gap registry: `plugin/sabri-security-center/src/Storage/AuditGapStore.php`
-- Requirements traceability: `docs/REQUIREMENTS-TRACEABILITY-0.25.7.md`
-- Known external evidence gates: `docs/KNOWN-LIMITATIONS-0.25.7.md`
-- Reviewed release receipt: `docs/RELEASE-RECEIPT-0.25.7.md`
+- Current requirements traceability: `docs/REQUIREMENTS-TRACEABILITY-0.25.8.md`
+- Historical 0.25.7 traceability: `docs/REQUIREMENTS-TRACEABILITY-0.25.7.md`
+- Current known external evidence gates: `docs/KNOWN-LIMITATIONS-0.25.8.md`
+- Historical 0.25.7 limitations: `docs/KNOWN-LIMITATIONS-0.25.7.md`
+- Current reviewed release receipt: `docs/RELEASE-RECEIPT-0.25.8.md`
+- Historical 0.25.7 receipt: `docs/RELEASE-RECEIPT-0.25.7.md`
 - Migration and rollback boundaries: `docs/MIGRATION.md`, `docs/ROLLBACK.md`
 - Foundation and adversarial contract tests: `tests/`
 - SPDX software bill of materials: `plugin/sabri-security-center/SBOM.spdx.json`

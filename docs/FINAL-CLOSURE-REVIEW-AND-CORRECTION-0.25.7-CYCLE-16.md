@@ -62,7 +62,7 @@ The prior check covered governance, security state, assurance, risk, finding, in
 
 - 57 PHP files linted successfully on the local review runtime.
 - 20 separate test programs passed.
-- Cycle 16 added 31 closure/adversarial assertions.
+- Cycle 16 added 40 closure/adversarial assertions.
 - PHP 8.0-only compatibility remains an explicit GitHub Actions matrix gate; the local runtime is not used as a substitute for that evidence.
 - Secret-pattern, metadata, source-contract, SPDX, checksum and deterministic-package gates are part of the permanent CI workflow.
 

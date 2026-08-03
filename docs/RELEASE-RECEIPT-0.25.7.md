@@ -3,14 +3,14 @@
 **Module:** Sabri Platform Security, Privacy, Compliance and Resilience Center
 **Foundation version:** 0.25.7
 **Schema version:** 0.25.5
-**Review closure:** Cycle 16
+**Review closure:** Cycle 17
 **Review date:** 03 August 2026 (Pakistan Standard Time)
 
 ## Verified local source evidence
 
 - 57 PHP files passed syntax lint on the local review runtime.
-- 20 separate regression, governance, privacy, failure-path and adversarial test programs passed.
-- Cycle 16 contributed 40 final closure assertions.
+- 21 separate regression, governance, privacy, failure-path, cross-runtime and adversarial test programs passed.
+- Cycle 16 contributed 40 final closure assertions; Cycle 17 added 15 post-CI compatibility and evidence-consistency assertions.
 - Secret-pattern, private-key, metadata, source-contract, PHP 8.0 surface, SPDX and license gates passed.
 - The installable plugin was built twice and the two ZIP files were byte-for-byte identical.
 - ZIP integrity and internal canonical plugin path checks passed.
