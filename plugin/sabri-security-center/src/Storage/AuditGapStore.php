@@ -32,6 +32,7 @@ final class AuditGapStore
         'finding-reopen' => 'spcrc_finding_reopen_audit_gap',
         'incident' => 'spcrc_incident_audit_gap',
         'control' => 'spcrc_control_audit_gap',
+        'assurance' => 'spcrc_assurance_audit_gap',
         'governance-batch' => 'spcrc_governance_batch_audit_gap',
         'privacy' => 'spcrc_privacy_audit_gap',
         'privacy-recovery' => 'spcrc_privacy_recovery_audit_gap',
@@ -81,6 +82,15 @@ final class AuditGapStore
                     $safeContext[$safeKey] = $safeValue;
                 }
             }
+            if (count($gaps) >= self::MAX_GAPS) {
+                // Never evict an unresolved evidence gap merely to admit a new
+                // one. Keeping the existing bounded set preserves the release
+                // blocker; silent eviction could make an unresolved failure
+                // disappear without reconciliation.
+                do_action('spcrc/audit_gap_capacity_exhausted', $option, $entityType, $entityId, $reason);
+                return false;
+            }
+
             $gaps[$gapId] = [
                 'entity_type' => $entityType,
                 'entity_id' => Sanitizer::containsSensitiveMaterial($entityId) ? '[REDACTED]' : $entityId,
@@ -88,9 +98,6 @@ final class AuditGapStore
                 'recorded_at' => gmdate('c'),
                 'context' => $safeContext,
             ];
-            if (count($gaps) > self::MAX_GAPS) {
-                $gaps = array_slice($gaps, -self::MAX_GAPS, null, true);
-            }
 
             if (! AtomicOptionLock::refresh(self::LOCK_OPTION, $lock, self::LOCK_TTL)) {
                 do_action('spcrc/audit_gap_lock_lost', $option, $entityType, $entityId, $reason);

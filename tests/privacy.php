@@ -47,6 +47,7 @@ function wp_generate_uuid4(): string
 }
 function current_time(string $type, bool $gmt = false): string { return '2026-07-31 15:00:00'; }
 function get_current_user_id(): int { return (int) $GLOBALS['current_user_id']; }
+function current_user_can(string $capability): bool { return $capability === 'spcrc_manage_privacy_requests'; }
 function get_userdata(int $userId): object|false { return ! empty($GLOBALS['privacy_users'][$userId]) ? (object) ['ID' => $userId] : false; }
 function absint(mixed $value): int { return abs((int) $value); }
 function is_wp_error(mixed $value): bool { return $value instanceof WP_Error; }

@@ -19,6 +19,7 @@ function sanitize_text_field(string $value): string { return trim(preg_replace('
 function absint(mixed $value): int { return abs((int) $value); }
 function current_time(string $type, bool $gmt = false): string { return gmdate('Y-m-d H:i:s'); }
 function get_current_user_id(): int { return (int) $GLOBALS['current_user_id']; }
+function current_user_can(string $capability): bool { return $capability === 'spcrc_manage_privacy_requests'; }
 function get_userdata(int $userId): object|false { return ! empty($GLOBALS['users'][$userId]) ? (object) ['ID' => $userId] : false; }
 function is_wp_error(mixed $value): bool { return $value instanceof WP_Error; }
 function apply_filters(string $hook, mixed $value, mixed ...$args): mixed
@@ -105,7 +106,7 @@ expectVerification(is_wp_error($email) && $email->get_error_code() === 'spcrc_pr
 $sessionUuid = '70000000-0000-4000-8000-000000000003';
 $GLOBALS['wpdb']->privacy[$sessionUuid] = verificationRow($sessionUuid, 7);
 $session = $store->persist($sessionUuid, evidence('authenticated-session', 'case:session-001', 99));
-expectVerification(is_wp_error($session) && $session->get_error_code() === 'spcrc_privacy_verification_proof_missing', 'Authenticated-session evidence must belong to the same current subject.');
+expectVerification(is_wp_error($session) && $session->get_error_code() === 'spcrc_privacy_verifier_forbidden', 'Authenticated-session evidence must belong to the same current subject and verifier.');
 
 $manualUuid = '70000000-0000-4000-8000-000000000004';
 $GLOBALS['wpdb']->privacy[$manualUuid] = verificationRow($manualUuid);

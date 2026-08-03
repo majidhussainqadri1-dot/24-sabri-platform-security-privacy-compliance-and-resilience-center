@@ -4,14 +4,14 @@ Tags: security, privacy, compliance, resilience, audit
 Requires at least: 6.5
 Tested up to: 7.0
 Requires PHP: 8.0
-Stable tag: 0.25.9
+Stable tag: 0.26.0
 License: GPLv2 or later
 
 Central governance and assurance control plane for the Sabri Social Homeopathy Platform.
 
 == Description ==
 
-Foundation 0.25.9 provides a private Security Center dashboard, bounded module manifests and audit events, risk/incident/control foundations, a private security-findings triage interface, durable and replay-resistant privacy-request orchestration, bounded retry policy and reconciliation operations, verified privacy intake, fail-closed upgrade integrity, advisory security-state requests, system checks, non-destructive repair, and sanitized REST status/Trust Center payloads.
+Foundation 0.26.0 provides a private Security Center dashboard, bounded module manifests and audit events, risk/incident/control foundations, a private security-findings triage interface, durable and replay-resistant privacy-request orchestration, bounded retry policy and reconciliation operations, verified privacy intake, fail-closed upgrade integrity, advisory security-state requests, system checks, non-destructive repair, and sanitized REST status/Trust Center payloads.
 
 It does not replace native-module authorization, File 00 identity, File 20 enforcement, hosting security, legal counsel, backups, or independent security testing.
 
@@ -27,6 +27,13 @@ It does not replace native-module authorization, File 00 identity, File 20 enfor
 8. Run Security Center checks and the non-destructive repair only when needed.
 
 == Changelog ==
+
+= 0.26.0 =
+* Added twelve fresh review/correction cycles (30–41) closing expired lease resurrection, lock-token failure, audit evidence loss, audit-gap capacity, timestamp ambiguity and governance expiry races.
+* Bound governance, risk and finding mutations to atomic expiry/version predicates and exact rollback identities.
+* Centralized assurance rollback gaps and required exact one-row rollback evidence.
+* Enforced authenticated privacy-verifier identity and capability before manual verification evidence is accepted.
+* Added 91 defect-specific assertions plus final twelve-round release-closure checks, PHP 8.0/8.3 CI, checksums, SBOM and deterministic package evidence.
 
 = 0.25.9 =
 * Corrected zero-row manifest heartbeats so concurrent canonical hash drift cannot be admitted into runtime memory.

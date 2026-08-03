@@ -37,6 +37,7 @@ function wp_json_encode(mixed $value, int $flags = 0): string|false { return jso
 function wp_generate_uuid4(): string { static $n = 1; return sprintf('60000000-0000-4000-8000-%012d', $n++); }
 function current_time(string $type, bool $gmt = false): string { return gmdate('Y-m-d H:i:s'); }
 function get_current_user_id(): int { return $GLOBALS['current_user_id']; }
+function current_user_can(string $capability): bool { return $capability === 'spcrc_manage_privacy_requests'; }
 function get_userdata(int $id): object|false { return ! empty($GLOBALS['users'][$id]) ? (object) ['ID' => $id] : false; }
 function absint(mixed $value): int { return abs((int) $value); }
 function is_wp_error(mixed $value): bool { return $value instanceof WP_Error; }

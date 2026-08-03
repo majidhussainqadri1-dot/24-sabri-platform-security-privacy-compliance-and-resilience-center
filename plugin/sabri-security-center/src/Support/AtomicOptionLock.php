@@ -23,9 +23,10 @@ final class AtomicOptionLock
             return new \WP_Error('spcrc_atomic_lock_storage_unavailable', 'Atomic option-lock storage is unavailable.');
         }
 
-        $token = function_exists('wp_generate_uuid4')
-            ? wp_generate_uuid4()
-            : bin2hex(random_bytes(16));
+        $token = self::generateToken();
+        if (is_wp_error($token)) {
+            return $token;
+        }
         $replacement = ['token' => $token, 'expires_at' => time() + $ttl];
         if (add_option($option, $replacement, '', false)) {
             return $token;
@@ -58,7 +59,14 @@ final class AtomicOptionLock
         }
 
         $existing = get_option($option, null);
-        if (! self::validPayload($existing) || ! hash_equals((string) $existing['token'], $token)) {
+        if (
+            ! self::validPayload($existing)
+            || ! hash_equals((string) $existing['token'], $token)
+            || (int) $existing['expires_at'] <= time()
+        ) {
+            // An expired lease has ended. The former owner must not resurrect it,
+            // because another worker may already have observed the lock as stale
+            // and begun a compare-and-swap takeover.
             return false;
         }
 
@@ -91,6 +99,28 @@ final class AtomicOptionLock
         }
 
         return self::compareAndDelete($option, $existing);
+    }
+
+
+    /** @return string|\WP_Error */
+    private static function generateToken(): string|\WP_Error
+    {
+        try {
+            if (function_exists('wp_generate_uuid4')) {
+                $uuid = strtolower(trim((string) wp_generate_uuid4()));
+                if (preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/', $uuid) === 1) {
+                    return $uuid;
+                }
+            }
+
+            return bin2hex(random_bytes(16));
+        } catch (\Throwable $error) {
+            do_action('spcrc/atomic_lock_token_generation_failed', get_class($error));
+            return new \WP_Error(
+                'spcrc_atomic_lock_token_unavailable',
+                'A cryptographically strong coordination-lock token could not be generated.'
+            );
+        }
     }
 
     private static function validPayload(mixed $payload): bool

@@ -33,6 +33,8 @@ final class GovernanceRepository
     private const STATUSES = ['pending', 'approved', 'rejected', 'expired', 'revoked'];
     private const MAX_LIFETIME = 2592000;
     private const AUDIT_GAP_OPTION = 'spcrc_governance_audit_gap';
+    private const AUDIT_GAP_LOCK_OPTION = 'spcrc_governance_audit_gap_lock';
+    private const AUDIT_GAP_LOCK_TTL = 30;
 
     public function __construct(private ?AuditLogger $audit = null)
     {
@@ -113,6 +115,13 @@ final class GovernanceRepository
                 return new \WP_Error('spcrc_governance_duplicate_pending', 'An active decision request already exists for this subject.');
             }
 
+            if (! AtomicOptionLock::refresh($lockOption, $lockToken, 30)) {
+                return new \WP_Error(
+                    'spcrc_governance_request_lock_lost',
+                    'Governance request ownership was lost before the request could be stored.'
+                );
+            }
+
             $uuid = wp_generate_uuid4();
             $inserted = $wpdb->insert(
                 $wpdb->prefix . 'spcrc_governance_decisions',
@@ -134,8 +143,23 @@ final class GovernanceRepository
                 ],
                 ['%s', '%s', '%s', '%s', '%s', '%d', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%d']
             );
-            if ($inserted === false) {
-                return new \WP_Error('spcrc_governance_write_failed', 'Governance decision request could not be stored.');
+            if ($inserted !== 1) {
+                return new \WP_Error('spcrc_governance_write_failed', 'Governance decision request could not be stored exactly once.');
+            }
+
+            if (! AtomicOptionLock::refresh($lockOption, $lockToken, 30)) {
+                $deleted = $wpdb->delete(
+                    $wpdb->prefix . 'spcrc_governance_decisions',
+                    ['decision_uuid' => $uuid, 'status' => 'pending'],
+                    ['%s', '%s']
+                );
+                if ($deleted !== 1) {
+                    $this->recordAuditGap($uuid, 'request_lock_lost_rollback_failed');
+                }
+                return new \WP_Error(
+                    'spcrc_governance_request_lock_lost_after_write',
+                    'Governance request ownership was lost after storage; the request was rolled back before audit admission.'
+                );
             }
 
             $audit = $this->audit?->record('governance_decision_requested', $module, 'pending', 'high', [
@@ -155,7 +179,9 @@ final class GovernanceRepository
 
             return $uuid;
         } finally {
-            AtomicOptionLock::release($lockOption, $lockToken);
+            if (! AtomicOptionLock::release($lockOption, $lockToken)) {
+                do_action('spcrc/governance_request_lock_release_failed', $type, $subject);
+            }
         }
     }
 
@@ -214,26 +240,25 @@ final class GovernanceRepository
         }
 
         $now = current_time('mysql', true);
-        $updated = $wpdb->update(
-            $wpdb->prefix . 'spcrc_governance_decisions',
-            [
-                'status' => $status,
-                'approver_user_id' => $approver,
-                'decided_at' => $now,
-                'lock_version' => $expectedLock + 1,
-            ],
-            [
-                'decision_uuid' => $decisionUuid,
-                'status' => 'pending',
-                'lock_version' => $expectedLock,
-            ],
-            ['%s', '%d', '%s', '%d'],
-            ['%s', '%s', '%d']
-        );
+        $updated = $wpdb->query($wpdb->prepare(
+            "UPDATE {$wpdb->prefix}spcrc_governance_decisions SET status = %s, approver_user_id = %d, decided_at = %s, lock_version = %d WHERE decision_uuid = %s AND status = 'pending' AND lock_version = %d AND expires_at > %s",
+            $status,
+            $approver,
+            $now,
+            $expectedLock + 1,
+            $decisionUuid,
+            $expectedLock,
+            $now
+        ));
         if ($updated === false) {
             return new \WP_Error('spcrc_governance_decision_write_failed', 'Governance decision could not be stored.');
         }
         if ($updated !== 1) {
+            $current = $this->get($decisionUuid);
+            if (is_array($current) && ($current['status'] ?? '') === 'pending' && strtotime((string) ($current['expires_at'] ?? '') . ' UTC') <= time()) {
+                $this->expireOne($decisionUuid, (int) ($current['lock_version'] ?? 0));
+                return new \WP_Error('spcrc_governance_expired', 'The governance request expired before the decision was committed.');
+            }
             return new \WP_Error('spcrc_governance_concurrent_change', 'Governance decision changed concurrently.');
         }
 
@@ -285,7 +310,19 @@ final class GovernanceRepository
     public function hasAuditGap(string $decisionUuid): bool
     {
         $decisionUuid = Sanitizer::uuid($decisionUuid);
-        return $decisionUuid !== '' && isset($this->auditGaps()[$decisionUuid]);
+        if ($decisionUuid === '' || isset($this->auditGaps()[$decisionUuid])) {
+            return $decisionUuid !== '';
+        }
+
+        foreach (AuditGapStore::all('spcrc_governance_batch_audit_gap') as $gap) {
+            if (
+                Sanitizer::key($gap['entity_type'] ?? '', 80) === 'governance_decision'
+                && hash_equals(Sanitizer::text($gap['entity_id'] ?? '', 160), $decisionUuid)
+            ) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** @param array<string,mixed> $context
@@ -329,32 +366,53 @@ final class GovernanceRepository
             return new \WP_Error('spcrc_governance_note_invalid', 'A bounded, non-sensitive reconciliation note is required.');
         }
 
-        $audit = $this->audit?->record(
-            'governance_audit_gap_reconciled',
-            (string) ($row['module_key'] ?? 'file-24-security-center'),
-            'reconciled',
-            'critical',
-            [
-                'decision_uuid' => $decisionUuid,
-                'decision_type' => $row['decision_type'] ?? '',
-                'subject_key' => $row['subject_key'] ?? '',
-                'stored_status' => $row['status'] ?? '',
-                'reconciliation_note_hash' => hash('sha256', $note),
-                'step_up_reference_hash' => hash('sha256', $stepUpRef),
-            ]
-        );
-        if (is_wp_error($audit)) {
-            return new \WP_Error('spcrc_governance_reconciliation_audit_failed', 'The reconciliation audit event could not be stored.');
+        $gapLock = AtomicOptionLock::acquire(self::AUDIT_GAP_LOCK_OPTION, self::AUDIT_GAP_LOCK_TTL);
+        if (is_wp_error($gapLock)) {
+            return new \WP_Error(
+                'spcrc_governance_reconciliation_locked',
+                'Governance audit-gap evidence is being changed concurrently. Refresh and try again.'
+            );
         }
 
-        $gaps = $this->auditGaps();
-        unset($gaps[$decisionUuid]);
-        if (! $this->persistAuditGaps($gaps)) {
-            return new \WP_Error('spcrc_governance_reconciliation_state_failed', 'The audit gap state could not be cleared safely.');
-        }
+        try {
+            $gaps = $this->auditGaps();
+            if (! isset($gaps[$decisionUuid])) {
+                return new \WP_Error('spcrc_governance_audit_gap_not_found', 'The governance audit gap changed before reconciliation.');
+            }
 
-        do_action('spcrc/governance_audit_gap_reconciled', $decisionUuid, $actor);
-        return true;
+            $audit = $this->audit?->record(
+                'governance_audit_gap_reconciled',
+                (string) ($row['module_key'] ?? 'file-24-security-center'),
+                'reconciled',
+                'critical',
+                [
+                    'decision_uuid' => $decisionUuid,
+                    'decision_type' => $row['decision_type'] ?? '',
+                    'subject_key' => $row['subject_key'] ?? '',
+                    'stored_status' => $row['status'] ?? '',
+                    'reconciliation_note_hash' => hash('sha256', $note),
+                    'step_up_reference_hash' => hash('sha256', $stepUpRef),
+                ]
+            );
+            if (is_wp_error($audit)) {
+                return new \WP_Error('spcrc_governance_reconciliation_audit_failed', 'The reconciliation audit event could not be stored.');
+            }
+            if (! AtomicOptionLock::refresh(self::AUDIT_GAP_LOCK_OPTION, $gapLock, self::AUDIT_GAP_LOCK_TTL)) {
+                return new \WP_Error('spcrc_governance_reconciliation_lock_lost', 'Governance audit-gap ownership was lost before reconciliation could be committed.');
+            }
+
+            unset($gaps[$decisionUuid]);
+            if (! $this->persistAuditGaps($gaps)) {
+                return new \WP_Error('spcrc_governance_reconciliation_state_failed', 'The audit gap state could not be cleared safely.');
+            }
+
+            do_action('spcrc/governance_audit_gap_reconciled', $decisionUuid, $actor);
+            return true;
+        } finally {
+            if (! AtomicOptionLock::release(self::AUDIT_GAP_LOCK_OPTION, $gapLock)) {
+                do_action('spcrc/governance_audit_gap_lock_release_failed', $decisionUuid);
+            }
+        }
     }
 
     /** @return array<int,array<string,mixed>> */
@@ -425,18 +483,52 @@ final class GovernanceRepository
         return $gaps;
     }
 
-    private function recordAuditGap(string $decisionUuid, string $reason): void
+    private function recordAuditGap(string $decisionUuid, string $reason): bool
     {
         $decisionUuid = Sanitizer::uuid($decisionUuid);
-        if ($decisionUuid === '') {
-            return;
+        $reason = Sanitizer::key($reason, 80);
+        if ($decisionUuid === '' || $reason === '') {
+            return false;
         }
-        $gaps = $this->auditGaps();
-        $gaps[$decisionUuid] = [
-            'reason' => Sanitizer::key($reason, 80),
-            'recorded_at' => gmdate('c'),
-        ];
-        $this->persistAuditGaps($gaps);
+
+        $gapLock = AtomicOptionLock::acquire(self::AUDIT_GAP_LOCK_OPTION, self::AUDIT_GAP_LOCK_TTL);
+        if (is_wp_error($gapLock)) {
+            return $this->recordFallbackAuditGap($decisionUuid, $reason, 'specific_gap_lock_unavailable');
+        }
+
+        try {
+            $gaps = $this->auditGaps();
+            $gaps[$decisionUuid] = [
+                'reason' => $reason,
+                'recorded_at' => gmdate('c'),
+            ];
+            if (! AtomicOptionLock::refresh(self::AUDIT_GAP_LOCK_OPTION, $gapLock, self::AUDIT_GAP_LOCK_TTL)) {
+                return $this->recordFallbackAuditGap($decisionUuid, $reason, 'specific_gap_lock_lost');
+            }
+            if (! $this->persistAuditGaps($gaps)) {
+                return $this->recordFallbackAuditGap($decisionUuid, $reason, 'specific_gap_write_failed');
+            }
+            return true;
+        } finally {
+            if (! AtomicOptionLock::release(self::AUDIT_GAP_LOCK_OPTION, $gapLock)) {
+                do_action('spcrc/governance_audit_gap_lock_release_failed', $decisionUuid);
+            }
+        }
+    }
+
+    private function recordFallbackAuditGap(string $decisionUuid, string $reason, string $failure): bool
+    {
+        $recorded = AuditGapStore::record(
+            'spcrc_governance_batch_audit_gap',
+            'governance_decision',
+            $decisionUuid,
+            $failure,
+            ['original_reason' => $reason]
+        );
+        if (! $recorded) {
+            do_action('spcrc/governance_audit_gap_record_failed', $decisionUuid, $reason, $failure);
+        }
+        return $recorded;
     }
 
     /** @param array<string,array<string,string>> $gaps */

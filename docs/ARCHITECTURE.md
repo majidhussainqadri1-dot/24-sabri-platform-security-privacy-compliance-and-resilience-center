@@ -1,4 +1,4 @@
-# Architecture — Foundation 0.25.9
+# Architecture — Foundation 0.26.0
 
 ## Core law
 
@@ -90,3 +90,8 @@ The package declares PHP 8.0 minimum support. Production and test code therefore
 ## Eight-round concurrency and compensation closure (0.25.9)
 
 Cycles 22–29 standardize exact-value option locks, lease renewal and owner-only release across governance admission, upgrade, retention, audit-gap, security-state and control mutations. Manifest heartbeat admission now proves canonical identity after a zero-row write. Privacy verification compensation is checked and creates bounded release-blocking evidence when recovery state cannot be persisted.
+
+
+## Twelve-round atomicity and evidence closure (0.26.0)
+
+Cycles 30–41 add fail-closed expired-lease handling, cryptographically validated lock-token generation, exact audit-write evidence, non-evicting bounded gap capacity, strict absolute timestamps, governance lease and expiry binding, optimistic concurrency for risk/finding state, centrally managed assurance rollback gaps and authenticated privacy-verifier authority. These controls preserve native ownership and do not claim external staging or operational acceptance.

@@ -40,6 +40,12 @@ final class PrivacyVerificationStore
                 'A valid verifying operator is required before dispatch.'
             );
         }
+        if (! $this->verifierAuthorized($requestContext, $safe)) {
+            return new \WP_Error(
+                'spcrc_privacy_verifier_forbidden',
+                'The verifying actor is not authorized to attest this privacy verification method.'
+            );
+        }
         if (! $this->evidenceConfirmed($requestContext, $safe)) {
             return new \WP_Error(
                 'spcrc_privacy_verification_proof_missing',
@@ -200,6 +206,45 @@ final class PrivacyVerificationStore
         return preg_match('/^[a-z][a-z0-9-]{1,30}:[A-Za-z0-9][A-Za-z0-9._\/-]{3,167}$/', $reference) === 1
             ? $reference
             : '';
+    }
+
+
+    /** @param array<string,mixed> $request
+     *  @param array<string,mixed> $evidence
+     */
+    private function verifierAuthorized(array $request, array $evidence): bool
+    {
+        $method = (string) $evidence['verification_method'];
+        $basis = (string) $evidence['authority_basis'];
+        $requesterUserId = absint($request['requester_user_id'] ?? 0);
+        $verifiedBy = absint($evidence['verified_by_user_id'] ?? 0);
+        $actor = get_current_user_id();
+
+        if ($method === 'authenticated-session') {
+            return $actor > 0 && $requesterUserId === $actor && $verifiedBy === $actor;
+        }
+
+        $operatorAuthorized = $actor > 0
+            && $verifiedBy === $actor
+            && current_user_can('spcrc_manage_privacy_requests');
+        if ($method === 'manual-document-review') {
+            return $operatorAuthorized;
+        }
+
+        if ($operatorAuthorized) {
+            return true;
+        }
+
+        return Sanitizer::boolean(apply_filters(
+            'spcrc/privacy_verifier_authorized',
+            false,
+            $actor,
+            $verifiedBy,
+            $method,
+            $basis,
+            $requesterUserId,
+            (string) $evidence['verification_reference']
+        ));
     }
 
     /** @param array<string,mixed> $request

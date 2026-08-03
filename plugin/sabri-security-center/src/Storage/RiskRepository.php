@@ -132,9 +132,9 @@ final class RiskRepository
                 'acceptance_expires_at' => $acceptanceExpiresAt,
                 'updated_at' => $now,
             ],
-            ['risk_uuid' => $riskUuid, 'status' => $expectedStatus],
+            ['risk_uuid' => $riskUuid, 'status' => $expectedStatus, 'updated_at' => (string) ($row['updated_at'] ?? '')],
             ['%s', '%s', '%s', '%d', '%s', '%s', '%s'],
-            ['%s', '%s']
+            ['%s', '%s', '%s']
         );
         if ($updated === false) {
             return new \WP_Error('spcrc_risk_acceptance_write_failed', 'Risk acceptance could not be stored.');
@@ -158,7 +158,16 @@ final class RiskRepository
                     'acceptance_expires_at' => $row['acceptance_expires_at'] ?? null,
                     'updated_at' => $row['updated_at'] ?? $now,
                 ],
-                ['risk_uuid' => $riskUuid, 'status' => 'accepted']
+                [
+                    'risk_uuid' => $riskUuid,
+                    'status' => 'accepted',
+                    'treatment' => 'accept',
+                    'governance_decision_uuid' => $decisionUuid,
+                    'accepted_by_user_id' => get_current_user_id(),
+                    'accepted_at' => $now,
+                    'acceptance_expires_at' => $acceptanceExpiresAt,
+                    'updated_at' => $now,
+                ]
             );
             if ($rolledBack !== 1) {
                 AuditGapStore::record('spcrc_risk_audit_gap', 'risk_uuid', $riskUuid, 'acceptance_rollback_failed');

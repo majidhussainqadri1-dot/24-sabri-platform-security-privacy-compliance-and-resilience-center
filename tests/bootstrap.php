@@ -7,7 +7,7 @@ const MINUTE_IN_SECONDS = 60;
 const HOUR_IN_SECONDS = 3600;
 const DAY_IN_SECONDS = 86400;
 const ABSPATH = '/tmp/wordpress/';
-const SPCRC_VERSION = '0.25.9';
+const SPCRC_VERSION = '0.26.0';
 
 @mkdir(ABSPATH . 'wp-admin/includes', 0777, true);
 if (! file_exists(ABSPATH . 'wp-admin/includes/upgrade.php')) {
@@ -28,6 +28,7 @@ $GLOBALS['current_user_caps'] = array_fill_keys([
     'spcrc_manage_risks',
     'spcrc_manage_incidents',
     'spcrc_manage_assurance',
+    'spcrc_manage_privacy_requests',
     'spcrc_request_governance_decision',
     'spcrc_manage_security_settings',
     'spcrc_run_security_assessments',
@@ -69,7 +70,15 @@ final class FakeWpdb
     public string $options = 'wp_options';
     public bool $failInsert = false;
     public bool $failAuditInsert = false;
+    public bool $zeroAuditInsert = false;
     public bool $stealControlLockOnWrite = false;
+    public bool $stealGovernanceLockOnInsert = false;
+    public bool $expireGovernanceBeforeDecisionUpdate = false;
+    public bool $stealRiskVersionOnUpdate = false;
+    public bool $mutateAcceptedRiskBeforeRollback = false;
+    public bool $stealFindingVersionOnUpdate = false;
+    public bool $mutateFindingBeforeRollback = false;
+    public bool $zeroAssuranceDelete = false;
     public bool $failPrivacyVerificationUpdate = false;
     public bool $failPrivacyFinalizeUpdate = false;
     public bool $zeroUpdate = false;
@@ -189,6 +198,7 @@ final class FakeWpdb
     public function insert(string $table, array $data, array $formats = []): int|false
     {
         if ($this->failInsert || ($this->failAuditInsert && str_contains($table, 'spcrc_security_events'))) { $this->last_error = 'forced failure'; return false; }
+        if ($this->zeroAuditInsert && str_contains($table, 'spcrc_security_events')) { $this->zeroAuditInsert = false; return 0; }
         if (str_contains($table, 'spcrc_security_events')) $this->events[] = $data;
         elseif (str_contains($table, 'spcrc_privacy_requests')) $this->privacy[(string) $data['request_uuid']] = $data;
         elseif (str_contains($table, 'spcrc_risks')) $this->risks[(string) $data['risk_uuid']] = $data;
@@ -212,6 +222,11 @@ final class FakeWpdb
             $key = (string) $data['decision_uuid'];
             if (isset($this->governance[$key])) return false;
             $this->governance[$key] = $data;
+            if ($this->stealGovernanceLockOnInsert) {
+                $lock = 'spcrc_governance_request_lock_' . substr(hash('sha256', (string) $data['decision_type'] . '|' . (string) $data['subject_key']), 0, 32);
+                $GLOBALS['wp_options'][$lock] = ['token' => 'concurrent-owner', 'expires_at' => time() + 60];
+                $this->stealGovernanceLockOnInsert = false;
+            }
         } elseif (str_contains($table, 'spcrc_assurance_records')) {
             $id = (string) $data['record_type'] . ':' . (string) $data['record_key'];
             if (isset($this->assurance[$id])) return false;
@@ -234,14 +249,30 @@ final class FakeWpdb
         if (str_contains($table, 'spcrc_risks')) {
             $uuid = (string) ($where['risk_uuid'] ?? '');
             if (! isset($this->risks[$uuid])) return 0;
-            if (isset($where['status']) && ($this->risks[$uuid]['status'] ?? '') !== $where['status']) return 0;
+            if ($this->stealRiskVersionOnUpdate && ($data['status'] ?? '') === 'accepted') {
+                $this->risks[$uuid]['updated_at'] = gmdate('Y-m-d H:i:s', time() + 1);
+                $this->stealRiskVersionOnUpdate = false;
+            }
+            if ($this->mutateAcceptedRiskBeforeRollback && ($data['status'] ?? '') !== 'accepted' && ($this->risks[$uuid]['status'] ?? '') === 'accepted') {
+                $this->risks[$uuid]['accepted_at'] = gmdate('Y-m-d H:i:s', time() + 2);
+                $this->mutateAcceptedRiskBeforeRollback = false;
+            }
+            foreach ($where as $field => $value) if (($this->risks[$uuid][$field] ?? null) != $value) return 0;
             $this->risks[$uuid] = array_merge($this->risks[$uuid], $data);
             return 1;
         }
         if (str_contains($table, 'spcrc_findings')) {
             $uuid = (string) ($where['finding_uuid'] ?? '');
             if (! isset($this->findings[$uuid])) return 0;
-            if (isset($where['status']) && ($this->findings[$uuid]['status'] ?? '') !== $where['status']) return 0;
+            if ($this->stealFindingVersionOnUpdate && ($data['status'] ?? '') !== ($this->findings[$uuid]['status'] ?? '')) {
+                $this->findings[$uuid]['updated_at'] = gmdate('Y-m-d H:i:s', time() + 1);
+                $this->stealFindingVersionOnUpdate = false;
+            }
+            if ($this->mutateFindingBeforeRollback && ($data['status'] ?? '') === 'open' && ($this->findings[$uuid]['status'] ?? '') !== 'open') {
+                $this->findings[$uuid]['updated_at'] = gmdate('Y-m-d H:i:s', time() + 2);
+                $this->mutateFindingBeforeRollback = false;
+            }
+            foreach ($where as $field => $value) if (($this->findings[$uuid][$field] ?? null) != $value) return 0;
             $this->findings[$uuid] = array_merge($this->findings[$uuid], $data);
             return 1;
         }
@@ -311,6 +342,10 @@ final class FakeWpdb
             return 1;
         }
         if (str_contains($table, 'spcrc_assurance_records')) {
+            if ($this->zeroAssuranceDelete) {
+                $this->zeroAssuranceDelete = false;
+                return 0;
+            }
             $recordUuid = (string) ($where['record_uuid'] ?? '');
             foreach ($this->assurance as $id => $row) {
                 if (($row['record_uuid'] ?? '') === $recordUuid) {
@@ -352,6 +387,26 @@ final class FakeWpdb
             if (! is_string($optionName) || ! array_key_exists($optionName, $GLOBALS['wp_options'])) return 0;
             if (maybe_serialize($GLOBALS['wp_options'][$optionName]) !== $expectedValue) return 0;
             unset($GLOBALS['wp_options'][$optionName]);
+            return 1;
+        }
+        if (str_contains($query, 'spcrc_governance_decisions') && str_contains($query, "SET status = %s")) {
+            [$status, $approver, $decidedAt, $newLock, $uuid, $expectedLock, $now] = $args + [null, null, null, null, null, null, null];
+            $uuid = (string) $uuid;
+            if (! isset($this->governance[$uuid])) return 0;
+            if ($this->expireGovernanceBeforeDecisionUpdate) {
+                $this->governance[$uuid]['expires_at'] = gmdate('Y-m-d H:i:s', time() - 1);
+                $this->expireGovernanceBeforeDecisionUpdate = false;
+            }
+            $row = $this->governance[$uuid];
+            if (($row['status'] ?? '') !== 'pending') return 0;
+            if ((int) ($row['lock_version'] ?? -1) !== (int) $expectedLock) return 0;
+            if ((string) ($row['expires_at'] ?? '') <= (string) $now) return 0;
+            $this->governance[$uuid] = array_merge($row, [
+                'status' => (string) $status,
+                'approver_user_id' => (int) $approver,
+                'decided_at' => (string) $decidedAt,
+                'lock_version' => (int) $newLock,
+            ]);
             return 1;
         }
         if (str_contains($query, 'spcrc_governance_decisions')) {
@@ -417,11 +472,11 @@ function do_action(string $hook, mixed ...$args): void
 function __return_true(): bool { return true; }
 function sanitize_key(string $value): string { return substr(preg_replace('/[^a-z0-9_\-]/', '', strtolower($value)) ?? '', 0, 255); }
 function sanitize_text_field(string $value): string { return trim(preg_replace('/[\r\n\t]+/', ' ', strip_tags($value)) ?? ''); }
-function wp_json_encode(mixed $value, int $flags = 0): string|false { return json_encode($value, $flags); }
+function wp_json_encode(mixed $value, int $flags = 0): string|false { if (! empty($GLOBALS['wp_json_encode_fail'])) return false; return json_encode($value, $flags); }
 function maybe_serialize(mixed $value): string { return is_array($value) || is_object($value) ? serialize($value) : (string) $value; }
 function maybe_unserialize(string $value): mixed { $decoded = @unserialize($value); return $decoded === false && $value !== 'b:0;' ? $value : $decoded; }
 function wp_cache_delete(string $key, string $group = ''): bool { return true; }
-function wp_generate_uuid4(): string { static $counter = 1; return sprintf('00000000-0000-4000-8000-%012d', $counter++); }
+function wp_generate_uuid4(): string { if (array_key_exists('wp_uuid_override', $GLOBALS)) return (string) $GLOBALS['wp_uuid_override']; static $counter = 1; return sprintf('00000000-0000-4000-8000-%012d', $counter++); }
 function current_time(string $type, bool $gmt = false): string { return gmdate('Y-m-d H:i:s'); }
 function get_current_user_id(): int { return (int) $GLOBALS['current_user_id']; }
 function current_user_can(string $capability): bool { return ! empty($GLOBALS['current_user_caps'][$capability]); }
