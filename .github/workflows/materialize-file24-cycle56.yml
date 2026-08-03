@@ -49,7 +49,8 @@ jobs:
           set -euo pipefail
           echo "dcc19b5c326957fade5d291243cbd759ded6e5229fdf18f1df74bc916f08399c  handoff-cycle56/part-00.b64part" | sha256sum -c -
           echo "1144d7779fc0c6ee41396352b3c2bf570bab427e4717b6388c8df947a20e5766  handoff-cycle56/part-01.b64part" | sha256sum -c -
-          echo "459fe65451f358ec17dffcbeedd2dd6510435db69fe36c8bb73f35236eef83ab  handoff-cycle56/part-02.b64part" | sha256sum -c -
+          echo "8494822497035131ca57ec8a5d8b0026e39da7d561cd7a2388640045fa6cc93a  handoff-cycle56/part-020.b64part" | sha256sum -c -
+          echo "d1cdbcf5d32d9c8ff9f5bed65a31acff987974cc2af12f73e13f5f61b7ebd72f  handoff-cycle56/part-021.b64part" | sha256sum -c -
           echo "8867f6e16f12ecc505cbceb9cd4a8bacb38178df37949f9d3a3bf3742cb27261  handoff-cycle56/part-03.b64part" | sha256sum -c -
           echo "09517ea19f1dc36c5838006ad0ead081de340ca02ef8e65b73e59649c9ce9683  handoff-cycle56/part-04.b64part" | sha256sum -c -
           echo "d3b4add6e0a80728b6e36de285e690f105ceb8084173ea3d611db97b03809e30  handoff-cycle56/part-05.b64part" | sha256sum -c -
