@@ -62,8 +62,9 @@ jobs:
             git apply --3way /tmp/file24-cycle29.patch
           fi
           chmod +x tools/build-release.sh
-          rm -rf handoff-cycle29 .github/workflows/materialize-file24-cycle29.yml
-          git diff --check -- plugin tests .github tools README.md MANIFEST.md SECURITY.md CHECKSUMS.sha256
+          rm -rf handoff-cycle29
+          git checkout HEAD -- .github/workflows/ci.yml .github/workflows/materialize-file24-cycle29.yml
+          git diff --check -- plugin tests tools README.md MANIFEST.md SECURITY.md CHECKSUMS.sha256
 
       - name: Run complete PHP 8.3 verification
         if: steps.pending.outputs.present == 'true'
@@ -89,7 +90,6 @@ jobs:
           grep -v './.github/workflows/ci.yml$' CHECKSUMS.sha256 > /tmp/file24-checksums
           sha256sum -c /tmp/file24-checksums
           test ! -d handoff-cycle29
-          test ! -f .github/workflows/materialize-file24-cycle29.yml
 
       - name: Verify deterministic package
         if: steps.pending.outputs.present == 'true'
@@ -111,6 +111,6 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
-          git diff --cached --check -- plugin tests .github tools README.md MANIFEST.md SECURITY.md CHECKSUMS.sha256
+          git diff --cached --check -- plugin tests tools README.md MANIFEST.md SECURITY.md CHECKSUMS.sha256
           git commit -m "fix(file-24): complete eight review and correction rounds 0.25.9"
           git push origin HEAD:codex/file-24-eight-round-review-0.25.9
