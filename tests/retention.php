@@ -33,6 +33,13 @@ function get_transient(string $key): mixed { return $GLOBALS['transients'][$key]
 function set_transient(string $key, mixed $value, int $expiration): bool { $GLOBALS['transients'][$key] = $value; return true; }
 function delete_transient(string $key): bool { unset($GLOBALS['transients'][$key]); return true; }
 function wp_generate_uuid4(): string { return '00000000-0000-4000-8000-000000000001'; }
+
+function sanitize_key(string $value): string { return substr(preg_replace('/[^a-z0-9_\-]/', '', strtolower($value)) ?? '', 0, 255); }
+function sanitize_text_field(string $value): string { return trim(preg_replace('/[\r\n\t]+/', ' ', strip_tags($value)) ?? ''); }
+function wp_json_encode(mixed $value, int $flags = 0): string|false { return json_encode($value, $flags); }
+function wp_salt(string $scheme = 'auth'): string { return 'retention-test-salt-' . $scheme; }
+function current_time(string $type, bool $gmt = false): string { return '2026-08-03 12:00:00'; }
+function get_current_user_id(): int { return 7; }
 final class WP_Error { public function __construct(private string $code, private string $message) {} public function get_error_code(): string { return $this->code; } public function get_error_message(): string { return $this->message; } }
 function is_wp_error(mixed $value): bool { return $value instanceof WP_Error; }
 function do_action(string $hook, mixed ...$args): void {}
@@ -55,6 +62,7 @@ final class RetentionWpdb
         if (str_contains($query, 'wp_options')) return ['query' => $query, 'args' => $args];
         return vsprintf(str_replace(['%s', '%d'], ["'%s'", '%d'], $query), $args);
     }
+    public function insert(string $table, array $data, array $formats = []): int|false { return 1; }
     public function query(mixed $prepared): int|false
     {
         $query = is_array($prepared) ? (string) ($prepared['query'] ?? '') : (string) $prepared;

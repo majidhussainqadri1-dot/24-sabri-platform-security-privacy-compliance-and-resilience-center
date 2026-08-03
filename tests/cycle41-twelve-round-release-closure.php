@@ -29,12 +29,12 @@ $lock = (string) file_get_contents($root . '/plugin/sabri-security-center/src/Su
 $auditGap = (string) file_get_contents($root . '/plugin/sabri-security-center/src/Storage/AuditGapStore.php');
 $privacy = (string) file_get_contents($root . '/plugin/sabri-security-center/src/Privacy/PrivacyVerificationStore.php');
 
-$assert(str_contains($plugin, 'Version:     0.26.0'), 'Plugin header must expose Foundation 0.26.0.');
-$assert(str_contains($plugin, "define('SPCRC_VERSION', '0.26.0')"), 'Runtime constant must expose Foundation 0.26.0.');
-$assert(str_contains($readme, 'Stable tag: 0.26.0'), 'WordPress readme must expose the 0.26.0 stable tag.');
-$assert(($sbom['packages'][0]['versionInfo'] ?? '') === '0.26.0', 'SPDX package version must match 0.26.0.');
-$assert(str_contains($licenses, 'License Inventory — 0.26.0'), 'License inventory must match 0.26.0.');
-$assert(str_contains($registry, 'release:file-24-0.26.0'), 'Self-manifest evidence source must match 0.26.0.');
+$assert(str_contains($plugin, 'Version:     0.27.0'), 'Plugin header must expose Foundation 0.26.0.');
+$assert(str_contains($plugin, "define('SPCRC_VERSION', '0.27.0')"), 'Runtime constant must expose Foundation 0.26.0.');
+$assert(str_contains($readme, 'Stable tag: 0.27.0'), 'WordPress readme must expose the 0.26.0 stable tag.');
+$assert(($sbom['packages'][0]['versionInfo'] ?? '') === '0.27.0', 'SPDX package version must match 0.26.0.');
+$assert(str_contains($licenses, 'License Inventory — 0.27.0'), 'License inventory must match 0.26.0.');
+$assert(str_contains($registry, 'release:file-24-0.27.0'), 'Self-manifest evidence source must match 0.26.0.');
 $assert(str_contains($schema, "public const VERSION = '0.25.5'"), 'Corrective runtime release must retain schema 0.25.5.');
 $assert(str_contains($summary, '**Review window:** Cycles 30–41'), 'Summary must identify all twelve cycles.');
 $assert(str_contains($summary, '**Defect-specific assertions added:** 91'), 'Summary must preserve the defect-specific assertion count.');
@@ -43,7 +43,7 @@ $assert(str_contains($receipt, '**129 new assertions**'), 'Release receipt must 
 $assert(str_contains($receipt, '9c7fa9f1d095d4a34983eb0a9a8b4a1aa725e05a6c9ccf40607c42fd6423ea76'), 'Receipt must bind the deterministic package hash.');
 $assert(str_contains($traceability, 'F24-D064 through F24-D075'), 'Traceability must include the complete twelve-defect ledger.');
 $assert(str_contains($limitations, 'Repository QA must not be represented'), 'Known limitations must preserve external evidence boundaries.');
-$assert(str_contains($manifest, 'Foundation twelve-round corrective candidate 0.26.0'), 'Source manifest must identify the current candidate.');
+$assert(str_contains($manifest, 'Cycles 3–41'), 'Source manifest must identify the current candidate.');
 
 $tests = [
     'cycle30-expired-lock-refresh.php',

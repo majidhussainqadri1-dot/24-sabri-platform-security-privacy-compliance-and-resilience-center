@@ -7,7 +7,7 @@ const MINUTE_IN_SECONDS = 60;
 const HOUR_IN_SECONDS = 3600;
 const DAY_IN_SECONDS = 86400;
 const ABSPATH = '/tmp/wordpress/';
-const SPCRC_VERSION = '0.26.0';
+const SPCRC_VERSION = '0.27.0';
 
 @mkdir(ABSPATH . 'wp-admin/includes', 0777, true);
 if (! file_exists(ABSPATH . 'wp-admin/includes/upgrade.php')) {
@@ -72,6 +72,7 @@ final class FakeWpdb
     public bool $failAuditInsert = false;
     public bool $zeroAuditInsert = false;
     public bool $stealControlLockOnWrite = false;
+    public bool $stealControlVersionOnUpdate = false;
     public bool $stealGovernanceLockOnInsert = false;
     public bool $expireGovernanceBeforeDecisionUpdate = false;
     public bool $stealRiskVersionOnUpdate = false;
@@ -79,6 +80,12 @@ final class FakeWpdb
     public bool $stealFindingVersionOnUpdate = false;
     public bool $mutateFindingBeforeRollback = false;
     public bool $zeroAssuranceDelete = false;
+    public bool $stealAssuranceVersionOnUpdate = false;
+    public bool $stealAssuranceLockOnWrite = false;
+    public bool $zeroRiskInsert = false;
+    public bool $zeroFindingInsert = false;
+    public bool $zeroIncidentInsert = false;
+    public bool $zeroManifestInsert = false;
     public bool $failPrivacyVerificationUpdate = false;
     public bool $failPrivacyFinalizeUpdate = false;
     public bool $zeroUpdate = false;
@@ -199,6 +206,10 @@ final class FakeWpdb
     {
         if ($this->failInsert || ($this->failAuditInsert && str_contains($table, 'spcrc_security_events'))) { $this->last_error = 'forced failure'; return false; }
         if ($this->zeroAuditInsert && str_contains($table, 'spcrc_security_events')) { $this->zeroAuditInsert = false; return 0; }
+        if ($this->zeroRiskInsert && str_contains($table, 'spcrc_risks')) { $this->zeroRiskInsert = false; return 0; }
+        if ($this->zeroFindingInsert && str_contains($table, 'spcrc_findings')) { $this->zeroFindingInsert = false; return 0; }
+        if ($this->zeroIncidentInsert && str_contains($table, 'spcrc_incidents')) { $this->zeroIncidentInsert = false; return 0; }
+        if ($this->zeroManifestInsert && str_contains($table, 'spcrc_module_manifests')) { $this->zeroManifestInsert = false; return 0; }
         if (str_contains($table, 'spcrc_security_events')) $this->events[] = $data;
         elseif (str_contains($table, 'spcrc_privacy_requests')) $this->privacy[(string) $data['request_uuid']] = $data;
         elseif (str_contains($table, 'spcrc_risks')) $this->risks[(string) $data['risk_uuid']] = $data;
@@ -231,6 +242,11 @@ final class FakeWpdb
             $id = (string) $data['record_type'] . ':' . (string) $data['record_key'];
             if (isset($this->assurance[$id])) return false;
             $this->assurance[$id] = $data;
+            if ($this->stealAssuranceLockOnWrite) {
+                $lock = 'spcrc_assurance_lock_' . substr(hash('sha256', (string) $data['record_type'] . '|' . (string) $data['record_key']), 0, 32);
+                $GLOBALS['wp_options'][$lock] = ['token' => 'concurrent-owner', 'expires_at' => time() + 60];
+                $this->stealAssuranceLockOnWrite = false;
+            }
         }
         return 1;
     }
@@ -315,6 +331,10 @@ final class FakeWpdb
         if (str_contains($table, 'spcrc_controls')) {
             $key = (string) $where['control_key'];
             if (! isset($this->controls[$key])) return 0;
+            if ($this->stealControlVersionOnUpdate) {
+                $this->controls[$key]['updated_at'] = gmdate('Y-m-d H:i:s', time() + 1);
+                $this->stealControlVersionOnUpdate = false;
+            }
             foreach ($where as $field => $value) if (($this->controls[$key][$field] ?? null) != $value) return 0;
             $this->controls[$key] = array_merge($this->controls[$key], $data);
             if ($this->stealControlLockOnWrite) {
@@ -327,7 +347,17 @@ final class FakeWpdb
         if (str_contains($table, 'spcrc_assurance_records')) {
             $id = (string) $where['record_type'] . ':' . (string) $where['record_key'];
             if (! isset($this->assurance[$id])) return 0;
+            if ($this->stealAssuranceVersionOnUpdate) {
+                $this->assurance[$id]['updated_at'] = gmdate('Y-m-d H:i:s', time() + 1);
+                $this->stealAssuranceVersionOnUpdate = false;
+            }
+            foreach ($where as $field => $value) if (($this->assurance[$id][$field] ?? null) != $value) return 0;
             $this->assurance[$id] = array_merge($this->assurance[$id], $data);
+            if ($this->stealAssuranceLockOnWrite) {
+                $lock = 'spcrc_assurance_lock_' . substr(hash('sha256', (string) $data['record_type'] . '|' . (string) $data['record_key']), 0, 32);
+                $GLOBALS['wp_options'][$lock] = ['token' => 'concurrent-owner', 'expires_at' => time() + 60];
+                $this->stealAssuranceLockOnWrite = false;
+            }
             return 1;
         }
         return 1;
@@ -485,7 +515,7 @@ function wp_unslash(mixed $value): mixed { return $value; }
 function absint(mixed $value): int { return abs((int) $value); }
 function is_wp_error(mixed $value): bool { return $value instanceof WP_Error; }
 function get_option(string $key, mixed $default = false): mixed { return $GLOBALS['wp_options'][$key] ?? $default; }
-function update_option(string $key, mixed $value, bool $autoload = true): bool { $GLOBALS['wp_options'][$key] = $value; return true; }
+function update_option(string $key, mixed $value, bool $autoload = true): bool { if (! empty($GLOBALS['wp_update_option_fail'][$key])) return false; $GLOBALS['wp_options'][$key] = $value; return true; }
 function add_option(string $key, mixed $value = '', string $deprecated = '', bool|string|null $autoload = null): bool { if (array_key_exists($key, $GLOBALS['wp_options'])) return false; $GLOBALS['wp_options'][$key] = $value; return true; }
 function delete_option(string $key): bool { unset($GLOBALS['wp_options'][$key]); return true; }
 function set_transient(string $key, mixed $value, int $expiration): bool { $GLOBALS['wp_transients'][$key] = $value; return true; }

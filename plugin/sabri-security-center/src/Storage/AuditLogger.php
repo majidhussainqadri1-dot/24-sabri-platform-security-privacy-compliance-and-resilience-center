@@ -5,6 +5,14 @@ declare(strict_types=1);
 namespace Sabri\Platform\Security\Storage;
 
 use Sabri\Platform\Security\Support\Sanitizer;
+use Sabri\Platform\Security\Support\SecureIdentifier;
+
+if (! class_exists(Sanitizer::class, false)) {
+    require_once dirname(__DIR__) . '/Support/Sanitizer.php';
+}
+if (! class_exists(SecureIdentifier::class, false)) {
+    require_once dirname(__DIR__) . '/Support/SecureIdentifier.php';
+}
 
 final class AuditLogger
 {
@@ -34,9 +42,19 @@ final class AuditLogger
             return new \WP_Error('spcrc_invalid_audit_event', 'Audit event type and module key are required.');
         }
 
-        $eventUuid = wp_generate_uuid4();
+        $eventUuid = SecureIdentifier::uuid4('audit-event');
+        if (is_wp_error($eventUuid)) {
+            do_action('spcrc/security_event_failed', $eventUuid, [
+                'event_type' => $eventType,
+                'module_key' => $moduleKey,
+                'risk_level' => $riskLevel,
+            ]);
+            return $eventUuid;
+        }
         $safeContext = $this->redact($context);
-        $json = wp_json_encode($safeContext, JSON_UNESCAPED_SLASHES);
+        $json = function_exists('wp_json_encode')
+            ? wp_json_encode($safeContext, JSON_UNESCAPED_SLASHES)
+            : json_encode($safeContext, JSON_UNESCAPED_SLASHES);
         if (! is_string($json)) {
             $error = new \WP_Error(
                 'spcrc_audit_context_encode_failed',
@@ -133,6 +151,11 @@ final class AuditLogger
                 continue;
             }
 
+            if (preg_match('/(^|_)(email|email_address|phone|phone_number|mobile|mobile_number|address|postal_address|guardian_contact)($|_)/', $normalized) === 1) {
+                $safe[$key] = $this->pseudonymize((string) $value, 'contact');
+                continue;
+            }
+
             if (is_array($value)) {
                 $safe[$key] = $this->redact($value, $depth + 1);
             } elseif (is_string($value)) {
@@ -168,7 +191,8 @@ final class AuditLogger
             return '';
         }
 
-        return 'sha256:' . hash_hmac('sha256', $value, wp_salt('auth') . '|' . $purpose);
+        $salt = function_exists('wp_salt') ? wp_salt('auth') : hash('sha256', __FILE__);
+        return 'sha256:' . hash_hmac('sha256', $value, $salt . '|' . $purpose);
     }
 
     private function correlationId(): string
@@ -181,6 +205,7 @@ final class AuditLogger
             return $incoming;
         }
 
-        return wp_generate_uuid4();
+        $generated = SecureIdentifier::uuid4('correlation');
+        return is_wp_error($generated) ? 'correlation-unavailable' : $generated;
     }
 }

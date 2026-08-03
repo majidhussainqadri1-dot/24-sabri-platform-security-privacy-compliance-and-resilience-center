@@ -1,4 +1,4 @@
-# Architecture — Foundation 0.26.0
+# Architecture — Foundation 0.27.0
 
 ## Core law
 
@@ -95,3 +95,7 @@ Cycles 22–29 standardize exact-value option locks, lease renewal and owner-onl
 ## Twelve-round atomicity and evidence closure (0.26.0)
 
 Cycles 30–41 add fail-closed expired-lease handling, cryptographically validated lock-token generation, exact audit-write evidence, non-evicting bounded gap capacity, strict absolute timestamps, governance lease and expiry binding, optimistic concurrency for risk/finding state, centrally managed assurance rollback gaps and authenticated privacy-verifier authority. These controls preserve native ownership and do not claim external staging or operational acceptance.
+
+## Fifteen-round integrity closure (0.27.0)
+
+Foundation 0.27.0 adds non-evicting state/gap capacity, validated secure identifiers, contact-data pseudonymization, same-origin manifest routes, governance fallback gaps, exact create semantics, retention evidence proof, optimistic control/assurance concurrency and module-bound privacy callbacks with fresh deletion-retry step-up.

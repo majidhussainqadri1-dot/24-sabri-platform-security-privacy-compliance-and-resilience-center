@@ -97,6 +97,7 @@ $GLOBALS['current_user_caps']['spcrc_approve_governance_decision'] = true;
 add_filter('spcrc/verify_step_up_assurance', static fn (bool $ok, int $userId, string $purpose, string $reference): bool => $reference === 'assertion:cycle14', 10, 4);
 $sameRequester = $governance->reconcileAuditGap($decision, [
     'step_up_reference' => 'assertion:cycle14',
+    'evidence_ref' => 'vault:cycle14-reconciliation',
     'note' => 'Reconciliation attempt.',
 ]);
 expectCycle14(is_wp_error($sameRequester) && $sameRequester->get_error_code() === 'spcrc_governance_reconciliation_separation_failed', 'Original requester must not reconcile an audit gap.');
@@ -104,6 +105,7 @@ $GLOBALS['current_user_id'] = 8;
 $GLOBALS['wpdb']->failAuditInsert = true;
 $failedReconciliation = $governance->reconcileAuditGap($decision, [
     'step_up_reference' => 'assertion:cycle14',
+    'evidence_ref' => 'vault:cycle14-reconciliation',
     'note' => 'Independent reconciliation attempt.',
 ]);
 expectCycle14(is_wp_error($failedReconciliation) && $failedReconciliation->get_error_code() === 'spcrc_governance_reconciliation_audit_failed', 'Audit-gap reconciliation must fail if its own audit write fails.');
@@ -111,6 +113,7 @@ expectCycle14($governance->hasAuditGap($decision), 'Failed reconciliation must n
 $GLOBALS['wpdb']->failAuditInsert = false;
 expectCycle14($governance->reconcileAuditGap($decision, [
     'step_up_reference' => 'assertion:cycle14',
+    'evidence_ref' => 'vault:cycle14-reconciliation',
     'note' => 'Independent reconciliation completed after audit recovery.',
 ]) === true, 'Recovered reconciliation must succeed.');
 expectCycle14(! $governance->hasAuditGap($decision), 'Successful reconciliation must clear the exact gap.');

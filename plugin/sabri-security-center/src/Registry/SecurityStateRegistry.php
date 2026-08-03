@@ -8,12 +8,16 @@ use Sabri\Platform\Security\Storage\AuditGapStore;
 use Sabri\Platform\Security\Storage\AuditLogger;
 use Sabri\Platform\Security\Support\AtomicOptionLock;
 use Sabri\Platform\Security\Support\Sanitizer;
+use Sabri\Platform\Security\Support\SecureIdentifier;
 
 if (! class_exists(AuditGapStore::class, false)) {
     require_once dirname(__DIR__) . '/Storage/AuditGapStore.php';
 }
 if (! class_exists(AtomicOptionLock::class, false)) {
     require_once dirname(__DIR__) . '/Support/AtomicOptionLock.php';
+}
+if (! class_exists(SecureIdentifier::class, false)) {
+    require_once dirname(__DIR__) . '/Support/SecureIdentifier.php';
 }
 
 final class SecurityStateRegistry
@@ -38,6 +42,7 @@ final class SecurityStateRegistry
 
     /** @var array<string,array<string,mixed>> */
     private array $requests = [];
+    private bool $normalizationChanged = false;
 
     public function __construct(private ModuleRegistry $modules, private AuditLogger $audit)
     {
@@ -108,7 +113,11 @@ final class SecurityStateRegistry
                 }
             }
 
-            $requestId = wp_generate_uuid4();
+            $requestId = SecureIdentifier::uuid4('security-state-request');
+            if (is_wp_error($requestId)) {
+                do_action('spcrc/security_state_identifier_failed', $moduleKey, $state, $requestId->get_error_code());
+                return false;
+            }
             $record = [
                 'request_id' => $requestId,
                 'module_key' => $moduleKey,
@@ -245,7 +254,47 @@ final class SecurityStateRegistry
     private function reload(): void
     {
         $stored = get_option(self::OPTION, []);
-        $this->requests = is_array($stored) ? $stored : [];
+        $raw = is_array($stored) ? $stored : [];
+        $normalized = [];
+        foreach ($raw as $id => $request) {
+            if (! is_array($request)) {
+                continue;
+            }
+            $requestId = Sanitizer::uuid($request['request_id'] ?? $id);
+            $moduleKey = Sanitizer::key($request['module_key'] ?? '', 120);
+            $state = Sanitizer::key($request['state'] ?? '', 40);
+            $reason = Sanitizer::text($request['reason'] ?? '', 500);
+            $requestedAt = Sanitizer::isoTime($request['requested_at'] ?? '');
+            $expiresAt = Sanitizer::isoTime($request['expires_at'] ?? '');
+            $status = Sanitizer::key($request['status'] ?? '', 40);
+            $requestedBy = absint($request['requested_by'] ?? 0);
+            if (
+                $requestId === ''
+                || $moduleKey === ''
+                || ! $this->modules->has($moduleKey)
+                || ! in_array($state, self::ALLOWED_STATES, true)
+                || $reason === ''
+                || Sanitizer::containsSensitiveMaterial($reason)
+                || $requestedAt === ''
+                || $expiresAt === ''
+                || $status !== 'open'
+                || $requestedBy < 1
+            ) {
+                continue;
+            }
+            $normalized[$requestId] = [
+                'request_id' => $requestId,
+                'module_key' => $moduleKey,
+                'state' => $state,
+                'reason' => $reason,
+                'requested_by' => $requestedBy,
+                'requested_at' => $requestedAt,
+                'expires_at' => $expiresAt,
+                'status' => 'open',
+            ];
+        }
+        $this->normalizationChanged = $raw !== $normalized;
+        $this->requests = $normalized;
     }
 
     private function prune(bool $persist = true): void
@@ -265,8 +314,9 @@ final class SecurityStateRegistry
 
         try {
             $this->reload();
+            $normalizedChanged = $this->normalizationChanged;
             $expiredIds = $this->pruneInMemory();
-            if ($expiredIds === []) {
+            if (! $normalizedChanged && $expiredIds === []) {
                 return;
             }
             if (! $this->refreshLock($lockToken) || ! $this->persist()) {
@@ -306,8 +356,10 @@ final class SecurityStateRegistry
     private function boundAndPersist(): bool
     {
         if (count($this->requests) > self::MAX_REQUESTS) {
-            uasort($this->requests, static fn (array $a, array $b): int => strcmp((string) $a['requested_at'], (string) $b['requested_at']));
-            $this->requests = array_slice($this->requests, -self::MAX_REQUESTS, null, true);
+            // An unresolved security-state request is operational evidence and
+            // must never be silently evicted to admit a newer request.
+            do_action('spcrc/security_state_capacity_exhausted', count($this->requests));
+            return false;
         }
         return $this->persist();
     }

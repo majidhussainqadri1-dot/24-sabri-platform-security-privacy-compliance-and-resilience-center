@@ -202,10 +202,7 @@ final class PrivacyVerificationStore
 
     private function opaqueReference(mixed $value): string
     {
-        $reference = Sanitizer::text($value, 200);
-        return preg_match('/^[a-z][a-z0-9-]{1,30}:[A-Za-z0-9][A-Za-z0-9._\/-]{3,167}$/', $reference) === 1
-            ? $reference
-            : '';
+        return Sanitizer::opaqueReference($value);
     }
 
 

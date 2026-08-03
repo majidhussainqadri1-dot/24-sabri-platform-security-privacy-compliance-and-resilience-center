@@ -1,0 +1,8 @@
+<?php
+declare(strict_types=1);
+require_once __DIR__ . '/bootstrap.php';require_once dirname(__DIR__) . '/plugin/sabri-security-center/src/Support/Sanitizer.php';require_once dirname(__DIR__) . '/plugin/sabri-security-center/src/Registry/ModuleRegistry.php';
+use Sabri\Platform\Security\Registry\ModuleRegistry;
+$n=0;function c46(bool $v,string $m):void{global $n;++$n;if(!$v){fwrite(STDERR,"FAIL: $m\n");exit(1);}}
+$r=new ModuleRegistry();$base=['module_key'=>'cycle46','name'=>'Cycle 46','version'=>'1.0.0','owner'=>'Owner','data_classes'=>['C1'],'public_routes'=>['/safe'],'private_routes'=>['/private']];
+c46(is_wp_error($r->validate(array_replace($base,['public_routes'=>['https://evil.example/path']]))),'External manifest routes must be rejected.');c46(is_wp_error($r->validate(array_replace($base,['private_routes'=>['//evil.example/path']]))),'Protocol-relative routes must be rejected.');c46(is_wp_error($r->validate(array_replace($base,['public_routes'=>['/safe?token=secret']]))),'Query-bearing manifest routes must be rejected.');c46(is_wp_error($r->validate(array_replace($base,['last_security_test'=>gmdate('c',time()+3600)]))),'Future test evidence must be rejected.');c46(is_wp_error($r->validate(array_replace($base,['owner'=>'admin@example.com']))),'Sensitive identity text must be rejected.');$GLOBALS['wpdb']->zeroManifestInsert=true;c46(!$r->register($base),'Zero-row manifest insert must not be accepted as durable success.');c46(!$r->has('cycle46'),'Failed durable manifest insert must not enter runtime memory.');c46($r->register($base),'Exact one-row manifest insert must succeed.');c46($r->has('cycle46'),'Durably stored manifest must become available.');
+echo "PASS: $n Cycle 46 manifest boundary assertions\n";

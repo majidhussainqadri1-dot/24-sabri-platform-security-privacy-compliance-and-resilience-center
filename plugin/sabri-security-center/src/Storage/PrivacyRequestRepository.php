@@ -4,7 +4,12 @@ declare(strict_types=1);
 
 namespace Sabri\Platform\Security\Storage;
 
+if (! class_exists(SecureIdentifier::class, false)) {
+    require_once dirname(__DIR__) . '/Support/SecureIdentifier.php';
+}
+
 use Sabri\Platform\Security\Support\Sanitizer;
+use Sabri\Platform\Security\Support\SecureIdentifier;
 
 final class PrivacyRequestRepository
 {
@@ -41,7 +46,10 @@ final class PrivacyRequestRepository
 
         $requestUuid = Sanitizer::uuid($request['request_uuid'] ?? '');
         if ($requestUuid === '') {
-            $requestUuid = wp_generate_uuid4();
+            $requestUuid = SecureIdentifier::uuid4('privacy-request');
+            if (is_wp_error($requestUuid)) {
+                return $requestUuid;
+            }
         }
 
         $requestType = Sanitizer::key($request['request_type'] ?? '', 40);
