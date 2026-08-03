@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - codex/file-24-eight-round-review-0.25.9
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: write
