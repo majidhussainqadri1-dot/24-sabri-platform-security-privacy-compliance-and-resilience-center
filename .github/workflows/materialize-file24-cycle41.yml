@@ -1,0 +1,101 @@
+name: Materialize File 24 Twelve-Round Review
+
+on:
+  push:
+    branches:
+      - codex/file-24-twelve-round-review-0.26.0
+
+permissions:
+  contents: write
+
+concurrency:
+  group: file24-cycle41-materialization
+  cancel-in-progress: false
+
+jobs:
+  materialize-reviewed-source:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: codex/file-24-twelve-round-review-0.26.0
+          fetch-depth: 20
+
+      - name: Detect pending reviewed patch
+        id: pending
+        shell: bash
+        run: |
+          if [ -f handoff-cycle41/part-00.b64part ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "No pending Cycle 41 reviewed patch remains."
+          fi
+
+      - name: Set up PHP 8.3
+        if: steps.pending.outputs.present == 'true'
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: none
+
+      - name: Verify and apply reviewed patch
+        if: steps.pending.outputs.present == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "7d57607d9785647e0227f70c60cabcdae121ff5f9ee6a81d5e94e62be9842315  handoff-cycle41/part-00.b64part" | sha256sum -c -
+          echo "c5774e600150438277f672ba310d6b314cb4527552e55c4c100b19d30c072a31  handoff-cycle41/part-01.b64part" | sha256sum -c -
+          echo "64ec6ab3bc6611e21607600a3e62363d51a8f9dc85b6e57ce65127a0a2835fba  handoff-cycle41/part-02.b64part" | sha256sum -c -
+          echo "ccad6de55056881388b34634de8ccd94b87649f1d721ef8755626a9bf5f1ef8d  handoff-cycle41/part-03.b64part" | sha256sum -c -
+          echo "3eaa9fa38a636f9658956ded7b95d53a22fb41fcb3eed10443f0de1e3414fed0  handoff-cycle41/part-04.b64part" | sha256sum -c -
+          echo "4bd429dbbc27b01df69e485cbfbed75fac7774ff7d0d87f71387dddf06c5a0b0  handoff-cycle41/part-05.b64part" | sha256sum -c -
+          echo "65c54be70a2c684569a3003bf29a3403596029cd666c931af7a1f00dd297fe1b  handoff-cycle41/part-06.b64part" | sha256sum -c -
+          cat handoff-cycle41/part-*.b64part > /tmp/file24-cycle41.patch.bz2.b64
+          echo "68ef8934037406b2f420e1b63fb56e73096dbb704aedee81565eb09a7625fc5e  /tmp/file24-cycle41.patch.bz2.b64" | sha256sum -c -
+          base64 -d /tmp/file24-cycle41.patch.bz2.b64 > /tmp/file24-cycle41.patch.bz2
+          echo "bdaafbeb029a18573a987fa69284057258e1158799057fa48f5b1d363301440d  /tmp/file24-cycle41.patch.bz2" | sha256sum -c -
+          bunzip2 -c /tmp/file24-cycle41.patch.bz2 > /tmp/file24-cycle41.patch
+          echo "ab6bf4cfa385d308c79be9f9fd906dfb0f362999973c68cddbc11228923aac51  /tmp/file24-cycle41.patch" | sha256sum -c -
+          git apply --check /tmp/file24-cycle41.patch
+          git apply /tmp/file24-cycle41.patch
+          chmod +x tools/build-release.sh
+          rm -rf handoff-cycle41
+          git diff --check -- plugin tests tools README.md MANIFEST.md SECURITY.md CHECKSUMS.sha256
+
+      - name: Run complete PHP 8.3 verification
+        if: steps.pending.outputs.present == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          find plugin tests -type f -name '*.php' -print0 | xargs -0 -n1 php -l
+          while IFS= read -r -d '' test_file; do
+            php "$test_file"
+          done < <(find tests -maxdepth 1 -type f -name '*.php' ! -name 'bootstrap.php' -print0 | sort -z)
+          grep -v './.github/workflows/ci.yml$' CHECKSUMS.sha256 > /tmp/file24-checksums
+          sha256sum -c /tmp/file24-checksums
+          test ! -d handoff-cycle41
+
+      - name: Verify deterministic package
+        if: steps.pending.outputs.present == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          PACKAGE_ONE="$(./tools/build-release.sh)"
+          cp "$PACKAGE_ONE" /tmp/file24-package-one.zip
+          PACKAGE_TWO="$(./tools/build-release.sh)"
+          cmp /tmp/file24-package-one.zip "$PACKAGE_TWO"
+          echo "9c7fa9f1d095d4a34983eb0a9a8b4a1aa725e05a6c9ccf40607c42fd6423ea76  $PACKAGE_TWO" | sha256sum -c -
+          unzip -t "$PACKAGE_TWO"
+
+      - name: Commit clean reviewed source
+        if: steps.pending.outputs.present == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --check -- plugin tests tools README.md MANIFEST.md SECURITY.md CHECKSUMS.sha256
+          git commit -m "fix(file-24): complete twelve review and correction rounds 0.26.0"
+          git push origin HEAD:codex/file-24-twelve-round-review-0.26.0
