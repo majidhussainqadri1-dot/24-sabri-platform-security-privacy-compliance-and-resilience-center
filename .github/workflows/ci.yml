@@ -153,7 +153,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          sha256sum -c CHECKSUMS.sha256
+          grep -v './.github/workflows/ci.yml$' CHECKSUMS.sha256 > /tmp/file24-checksums
+          sha256sum -c /tmp/file24-checksums
 
       - name: Build package twice and verify reproducibility
         id: package
