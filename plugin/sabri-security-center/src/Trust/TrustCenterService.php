@@ -52,10 +52,10 @@ final class TrustCenterService
             }
             $owner = absint($existing['owner_user_id'] ?? 0);
             if ($owner < 1) {
-                return new \WP_Error('spcrc_trust_claim_author_invalid', 'A verified public claim requires an attributable draft author.');
+                return new \WP_Error('spcrc_trust_claim_author_invalid', 'A verified public claim requires an attributable draft author or latest material editor.');
             }
             if ($owner === $actor) {
-                return new \WP_Error('spcrc_trust_claim_self_approval_forbidden', 'The claim author cannot approve the same public claim.');
+                return new \WP_Error('spcrc_trust_claim_self_approval_forbidden', 'The claim author or latest material editor cannot approve the same public claim.');
             }
             if ($expectedVersion < 1) {
                 return new \WP_Error('spcrc_trust_claim_expected_version_required', 'Trust claim approval requires the exact current draft version.');
@@ -94,7 +94,10 @@ final class TrustCenterService
             return new \WP_Error('spcrc_trust_certification_independence_missing', 'Certification claims require independent evidence declared in the reviewed draft.');
         }
 
-        $ownerUserId = is_array($existing)
+        // A draft's owner is its latest material author/editor. Otherwise an
+        // editor could rewrite another person's draft, preserve the old owner,
+        // and then approve their own new wording under a false two-person trail.
+        $ownerUserId = $status === 'verified'
             ? absint($existing['owner_user_id'] ?? 0)
             : $actor;
         $payload = $status === 'verified'
