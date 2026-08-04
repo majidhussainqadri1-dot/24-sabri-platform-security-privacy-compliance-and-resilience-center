@@ -15,6 +15,13 @@ final class GovernanceController
 {
     private const NAMESPACE = 'sabri-security/v1';
 
+    /** @var string[] */
+    private const RESTRICTED_READ_TYPES = [
+        'consent', 'legal-hold', 'processing-activity', 'vulnerability',
+        'secret-metadata', 'key-metadata', 'deletion-ledger', 'alert',
+        'remote-evidence', 'incident-action', 'upload-assurance', 'private-delivery',
+    ];
+
     public function __construct(private GovernedArtifactRegistry $artifacts)
     {
     }
@@ -35,7 +42,7 @@ final class GovernanceController
             [
                 'methods' => 'GET',
                 'callback' => [$this, 'listArtifacts'],
-                'permission_callback' => static fn (): bool => current_user_can('spcrc_view_overview'),
+                'permission_callback' => [$this, 'canList'],
             ],
             [
                 'methods' => 'POST',
@@ -50,23 +57,49 @@ final class GovernanceController
         ]);
     }
 
+    public function canList(mixed $request): bool
+    {
+        $type = Sanitizer::key($this->param($request, 'artifact_type'), 60);
+        if ($type === '') {
+            return current_user_can('spcrc_view_forensic_metadata');
+        }
+        if (! in_array($type, GovernedArtifactRegistry::types(), true)) {
+            return false;
+        }
+        if (in_array($type, self::RESTRICTED_READ_TYPES, true)) {
+            return current_user_can(self::requiredCapability($type))
+                || current_user_can('spcrc_view_forensic_metadata');
+        }
+        return current_user_can('spcrc_view_overview');
+    }
+
     public function canSave(mixed $request): bool
     {
         $type = Sanitizer::key($this->param($request, 'artifact_type'), 60);
-        return $type !== '' && current_user_can(GovernedArtifactRegistry::capability($type));
+        return $type !== ''
+            && in_array($type, GovernedArtifactRegistry::types(), true)
+            && current_user_can(self::requiredCapability($type));
     }
 
     public function types(): \WP_REST_Response
     {
         $data = [];
         foreach (GovernedArtifactRegistry::types() as $type) {
-            $data[] = ['type' => $type, 'statuses' => GovernedArtifactRegistry::statuses($type), 'capability' => GovernedArtifactRegistry::capability($type)];
+            $data[] = [
+                'type' => $type,
+                'statuses' => GovernedArtifactRegistry::statuses($type),
+                'capability' => self::requiredCapability($type),
+                'restricted_read' => in_array($type, self::RESTRICTED_READ_TYPES, true),
+            ];
         }
         return $this->privateResponse(['types' => $data]);
     }
 
-    public function listArtifacts(mixed $request): \WP_REST_Response
+    public function listArtifacts(mixed $request): \WP_REST_Response|\WP_Error
     {
+        if (! $this->canList($request)) {
+            return new \WP_Error('spcrc_governance_read_forbidden', 'This governed artifact domain requires additional authority.');
+        }
         $type = Sanitizer::key($this->param($request, 'artifact_type'), 60);
         $limit = max(1, min(100, absint($this->param($request, 'limit') ?: 50)));
         return $this->privateResponse(['artifacts' => $this->artifacts->recent($type !== '' ? $type : null, $limit)]);
@@ -74,6 +107,9 @@ final class GovernanceController
 
     public function saveArtifact(mixed $request): \WP_REST_Response|\WP_Error
     {
+        if (! $this->canSave($request)) {
+            return new \WP_Error('spcrc_governance_write_forbidden', 'This governed artifact domain requires additional authority.');
+        }
         $data = $this->allParams($request);
         $data['owner_user_id'] = get_current_user_id();
         $result = $this->artifacts->save($data, absint($data['expected_version'] ?? 0));
@@ -117,5 +153,12 @@ final class GovernanceController
             return is_array($params) ? $params : [];
         }
         return is_array($request) ? $request : [];
+    }
+
+    private static function requiredCapability(string $type): string
+    {
+        return $type === 'key-metadata'
+            ? 'spcrc_manage_key_metadata'
+            : GovernedArtifactRegistry::capability($type);
     }
 }
