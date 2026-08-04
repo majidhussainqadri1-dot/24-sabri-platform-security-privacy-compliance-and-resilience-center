@@ -28,7 +28,12 @@ final class RateLimiter
             return new \WP_Error('spcrc_rate_limit_identity_invalid', 'Rate-limit scope and identifier are required.');
         }
 
-        $bucket = substr(hash_hmac('sha256', $scope . '|' . $identifier, $this->salt()), 0, 40);
+        $salt = $this->salt();
+        if (is_wp_error($salt)) {
+            return $salt;
+        }
+
+        $bucket = substr(hash_hmac('sha256', $scope . '|' . $identifier, $salt), 0, 40);
         $option = 'spcrc_rate_' . $bucket;
         $lock = 'spcrc_rate_lock_' . $bucket;
         $token = AtomicOptionLock::acquire($lock, 15);
@@ -85,16 +90,30 @@ final class RateLimiter
         if ($scope === '' || $identifier === '') {
             return false;
         }
-        $bucket = substr(hash_hmac('sha256', $scope . '|' . $identifier, $this->salt()), 0, 40);
+
+        $salt = $this->salt();
+        if (is_wp_error($salt)) {
+            return false;
+        }
+
+        $bucket = substr(hash_hmac('sha256', $scope . '|' . $identifier, $salt), 0, 40);
         return delete_option('spcrc_rate_' . $bucket);
     }
 
-    private function salt(): string
+    /** @return string|\WP_Error */
+    private function salt(): string|\WP_Error
     {
         $salt = defined('AUTH_SALT') ? (string) AUTH_SALT : '';
-        if ($salt === '') {
-            $salt = (string) apply_filters('spcrc/rate_limit_pseudonymization_key', '');
+        if ($salt === '' && function_exists('wp_salt')) {
+            $salt = (string) wp_salt('auth');
         }
-        return $salt !== '' ? $salt : hash('sha256', home_url() . '|spcrc-rate-limit');
+        if ($salt === '') {
+            $candidate = apply_filters('spcrc/rate_limit_pseudonymization_key', '');
+            $salt = is_string($candidate) ? trim($candidate) : '';
+        }
+        if (strlen($salt) < 16) {
+            return new \WP_Error('spcrc_rate_limit_key_unavailable', 'A private pseudonymization key is required before rate limiting can run.');
+        }
+        return $salt;
     }
 }
