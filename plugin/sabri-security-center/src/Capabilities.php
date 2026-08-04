@@ -43,20 +43,17 @@ final class Capabilities
     }
 
     /**
-     * WordPress administrators receive only bounded read access automatically.
-     * Operational File 24 duties must be delegated explicitly to separate roles
-     * or users so that a generic site-administration role is not also the
-     * Security Administrator, Privacy Officer, Incident Commander, Backup
-     * Operator and Auditor by default.
+     * The native WordPress administrator is the bounded bootstrap Security
+     * Administrator so File 24 remains operable after activation. Privacy,
+     * incident command, backup/restore, audit, governance approval, critical
+     * risk acceptance and key-custody powers are deliberately excluded and
+     * require explicit, reviewable delegation.
      *
      * @return string[]
      */
     public static function autoGranted(): array
     {
-        return [
-            'spcrc_view_overview',
-            'spcrc_view_module_posture',
-        ];
+        return self::dutyBundles()['security_administrator'];
     }
 
     /** @return array<string,string[]> */
@@ -64,16 +61,20 @@ final class Capabilities
     {
         return [
             'security_administrator' => [
+                'spcrc_view_overview',
+                'spcrc_view_module_posture',
                 'spcrc_manage_controls',
                 'spcrc_manage_findings',
                 'spcrc_manage_risks',
                 'spcrc_view_security_events',
+                'spcrc_request_governance_decision',
                 'spcrc_run_security_assessments',
                 'spcrc_manage_security_settings',
                 'spcrc_manage_policies',
                 'spcrc_manage_assets',
                 'spcrc_manage_vulnerabilities',
                 'spcrc_manage_integrations',
+                'spcrc_manage_trust_center',
                 'spcrc_manage_performance',
                 'spcrc_manage_release_gates',
                 'spcrc_manage_training',
@@ -90,11 +91,24 @@ final class Capabilities
             'backup_operator' => [
                 'spcrc_manage_assurance',
                 'spcrc_manage_resilience',
+                'spcrc_run_restore_operations',
             ],
             'auditor' => [
                 'spcrc_view_overview',
                 'spcrc_view_module_posture',
                 'spcrc_view_forensic_metadata',
+            ],
+            'governance_approver' => [
+                'spcrc_approve_governance_decision',
+            ],
+            'critical_risk_acceptor' => [
+                'spcrc_accept_critical_risk',
+            ],
+            'key_custodian' => [
+                'spcrc_manage_key_metadata',
+            ],
+            'critical_incident_closer' => [
+                'spcrc_close_critical_incidents',
             ],
         ];
     }
@@ -107,10 +121,10 @@ final class Capabilities
         }
 
         $snapshot = self::snapshotRole($administrator);
-        $readOnly = array_fill_keys(self::autoGranted(), true);
+        $desired = array_fill_keys(self::autoGranted(), true);
 
         foreach (self::all() as $capability) {
-            $shouldHave = isset($readOnly[$capability]);
+            $shouldHave = isset($desired[$capability]);
             $hasCapability = self::roleHasCapability($administrator, $capability);
 
             if ($shouldHave && ! $hasCapability) {
@@ -199,9 +213,9 @@ final class Capabilities
     }
 
     /**
-     * File 24 deliberately does not auto-grant operational security capabilities
-     * to the Founder or any other identity label. Delegation must be explicit,
-     * reviewable and reversible through WordPress roles/capabilities.
+     * File 24 deliberately does not auto-grant approval, acceptance, privacy,
+     * incident-command, restore, audit or key-custody powers to the Founder or
+     * any identity label. Delegation remains explicit and reversible.
      */
     public static function register(): void
     {
