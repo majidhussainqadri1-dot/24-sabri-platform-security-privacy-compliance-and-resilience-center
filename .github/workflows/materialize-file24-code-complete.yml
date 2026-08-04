@@ -28,7 +28,7 @@ jobs:
         id: pending
         shell: bash
         run: |
-          if [ -f handoff-code-complete/part-00.b64part ]; then
+          if [ -f handoff-code-complete-v3/part-00.b64part ]; then
             echo "present=true" >> "$GITHUB_OUTPUT"
           else
             echo "present=false" >> "$GITHUB_OUTPUT"
@@ -47,16 +47,31 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cat handoff-code-complete/part-*.b64part > /tmp/file24-code-complete.patch.bz2.b64
+
+          echo "e8bad8c47cacab021c34f12717fb23924b4596c052909b9fd84c68113b2e6480  handoff-code-complete-v3/part-00.b64part" | sha256sum -c -
+          echo "50b1f972a928c9490095fcc0ab4134a30e8670b419ec3348d849f4450712d078  handoff-code-complete-v3/part-01.b64part" | sha256sum -c -
+          echo "2d5bb176bf0691205aea63927c48dd8b07438bac998e925bbe0536e7a4e92f58  handoff-code-complete-v3/part-02.b64part" | sha256sum -c -
+          echo "64e13de9dffbfc4f0afaa5cda54f5efdcfb292c6caa8b84bb66810ff1b986c59  handoff-code-complete-v3/part-03.b64part" | sha256sum -c -
+          echo "486e7074e1795dd9f135d96cb11af7a0e7dad80da3b545207a441dd498ba6c53  handoff-code-complete-v3/part-04-05.b64part" | sha256sum -c -
+          echo "662efb3b6443daf894ed84a03321eb84383ee012726afbd2889512a5da8d3cbc  handoff-code-complete-v3/part-06.b64part" | sha256sum -c -
+          echo "c7db325109af6ed904b96c0604bbeb644caecf63ca75a45567cf031db2648963  handoff-code-complete-v3/part-07.b64part" | sha256sum -c -
+          echo "4a3d9829f8c99c53508071eeace2e14467a0bbe9d1e0ea79c6037175bc18c585  handoff-code-complete-v3/part-08.b64part" | sha256sum -c -
+          echo "1152cca5b1d89092ef9e8bb84c014e9390fc91f75432dc78d2ad14cc63465201  handoff-code-complete-v3/part-09.b64part" | sha256sum -c -
+
+          cat handoff-code-complete-v3/part-*.b64part > /tmp/file24-code-complete.patch.bz2.b64
+          echo "8fbb90c2cf8fc8a9eb85b2d7503339309d7b9b58040e4443fa0e9b1ef1430f2  /tmp/file24-code-complete.patch.bz2.b64" | sha256sum -c -
           base64 -d /tmp/file24-code-complete.patch.bz2.b64 > /tmp/file24-code-complete.patch.bz2
+          echo "80cf0fc71e7e28e94a3e0379cea5380b901baa63176908929e9093be0c760aab  /tmp/file24-code-complete.patch.bz2" | sha256sum -c -
           bunzip2 -c /tmp/file24-code-complete.patch.bz2 > /tmp/file24-code-complete.patch
+          echo "39a97ab3df1387fbe4aeb2579e49a8c46fd67af2fe0ae79567bdf8e46fb889e8  /tmp/file24-code-complete.patch" | sha256sum -c -
+
           git apply --check /tmp/file24-code-complete.patch
           git apply /tmp/file24-code-complete.patch
-          rm -rf handoff-code-complete
+          rm -rf handoff-code-complete handoff-code-complete-v3
           chmod +x tools/build-release.sh
 
           PHP_COUNT="$(find plugin tests -type f -name '*.php' | wc -l)"
-          test "$PHP_COUNT" -ge 176
+          test "$PHP_COUNT" -eq 176
           find plugin tests -type f -name '*.php' -print0 | xargs -0 -n1 php -l
 
           TEST_COUNT=0
@@ -64,15 +79,18 @@ jobs:
             php "$test_file"
             TEST_COUNT=$((TEST_COUNT + 1))
           done < <(find tests -maxdepth 1 -type f -name '*.php' ! -name 'bootstrap.php' -print0 | sort -z)
-          test "$TEST_COUNT" -ge 108
+          test "$TEST_COUNT" -eq 108
+
+          grep -q "define('SPCRC_VERSION', '0.99.0')" plugin/sabri-security-center/sabri-security-center.php
+          grep -q 'Stable tag: 0.99.0' plugin/sabri-security-center/readme.txt
+          php -r '$d=json_decode(file_get_contents("docs/SOURCE-MANIFEST-0.99.0.json"), true, 512, JSON_THROW_ON_ERROR); if (($d["verification"]["requirements"] ?? 0) !== 100 || ($d["verification"]["integration_records"] ?? 0) !== 26 || ($d["verification"]["governed_domains"] ?? 0) !== 28 || ($d["verification"]["new_assertions"] ?? 0) !== 146) { exit(1); }'
 
           PACKAGE_ONE="$(./tools/build-release.sh)"
           cp "$PACKAGE_ONE" /tmp/file24-package-one.zip
           PACKAGE_TWO="$(./tools/build-release.sh)"
           cmp /tmp/file24-package-one.zip "$PACKAGE_TWO"
+          echo "95d0d69d517996896b1396447dcee8ed1eed9a56a5531ad26d9e2ea19c8920db  $PACKAGE_TWO" | sha256sum -c -
           unzip -t "$PACKAGE_TWO"
-          grep -q "define('SPCRC_VERSION', '0.99.0')" plugin/sabri-security-center/sabri-security-center.php
-          php -r '$d=json_decode(file_get_contents("docs/SOURCE-MANIFEST-0.99.0.json"), true, 512, JSON_THROW_ON_ERROR); if (($d["verification"]["requirements"] ?? 0) !== 100) { exit(1); }'
 
           git checkout HEAD -- .github/workflows/materialize-file24-code-complete.yml
 
@@ -84,5 +102,6 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
+          git diff --cached --check -- plugin tests tools README.md SECURITY.md docs
           git commit -m "feat(file-24): implement complete repository coding candidate 0.99.0"
           git push origin HEAD:codex/file-24-full-code-complete-0.99.0
