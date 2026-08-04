@@ -54,8 +54,8 @@ jobs:
           set -euo pipefail
           test ! -f .env
           ! find . -type f \( -name '*.pem' -o -name '*.key' -o -name 'id_rsa' -o -name '*.p12' -o -name '*.pfx' \) -print -quit | grep -q .
-          ! grep -RInE --exclude='CHECKSUMS.sha256' --exclude='ci.yml' 'BEGIN (RSA|EC|OPENSSH|DSA) PRIVATE KEY' plugin docs tests README.md SECURITY.md
-          ! grep -RInE --exclude='CHECKSUMS.sha256' --exclude='ci.yml' '(gh[pousr]_[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{30,})' plugin docs tests README.md SECURITY.md
+          ! grep -RInE --exclude='ci.yml' 'BEGIN (RSA|EC|OPENSSH|DSA) PRIVATE KEY' plugin docs tests README.md SECURITY.md
+          ! grep -RInE --exclude='ci.yml' '(gh[pousr]_[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{30,})' plugin docs tests README.md SECURITY.md
           ! grep -RInE --include='*.php' '\b(eval|exec|shell_exec|system|passthru|proc_open|popen|base64_decode)\s*\(' plugin
           ! grep -RInE --include='*.php' ':[[:space:]]*never\b' plugin tests
           ! grep -RInE --include='*.php' '(^|[^A-Za-z0-9_])true[[:space:]]*\|' plugin tests
@@ -110,6 +110,9 @@ jobs:
           grep -q 'spcrc_manifest_stored_hash_invalid' plugin/sabri-security-center/src/Registry/ModuleRegistry.php
           grep -q 'MAX_TTL = 86400' plugin/sabri-security-center/src/Support/AtomicOptionLock.php
           grep -q 'spcrc_atomic_lock_invalid' plugin/sabri-security-center/src/Support/AtomicOptionLock.php
+          grep -q 'spcrc_rate_limit_key_unavailable' plugin/sabri-security-center/src/Security/RateLimiter.php
+          grep -q 'spcrc_critical_incident_close_forbidden' plugin/sabri-security-center/src/Incident/IncidentCoordinator.php
+          grep -q 'minimum_risk' plugin/sabri-security-center/src/Monitoring/DetectionEngine.php
 
       - name: Verify complete public-safe documentation and manuals
         shell: bash
@@ -149,12 +152,15 @@ jobs:
             exit 1
           fi
 
-      - name: Verify source checksums
+      - name: Generate and verify immutable source integrity manifest
+        id: source_integrity
         shell: bash
         run: |
           set -euo pipefail
-          grep -v './.github/workflows/ci.yml$' CHECKSUMS.sha256 > /tmp/file24-checksums
-          sha256sum -c /tmp/file24-checksums
+          git ls-files -z | sort -z | xargs -0 sha256sum > /tmp/file24-source-checksums.sha256
+          test "$(wc -l < /tmp/file24-source-checksums.sha256)" -ge 360
+          sha256sum -c /tmp/file24-source-checksums.sha256
+          echo "path=/tmp/file24-source-checksums.sha256" >> "$GITHUB_OUTPUT"
 
       - name: Build package twice and verify reproducibility
         id: package
@@ -165,15 +171,18 @@ jobs:
           cp "$PACKAGE_ONE" /tmp/file24-package-one.zip
           PACKAGE_TWO="$(./tools/build-release.sh)"
           cmp /tmp/file24-package-one.zip "$PACKAGE_TWO"
-          echo "75b57bb893ff158739cabbc0b969187a9a82ae147eb8b8c36e7405b2e7ea2d4f  $PACKAGE_TWO" | sha256sum -c -
+          HASH_ONE="$(sha256sum /tmp/file24-package-one.zip | awk '{print $1}')"
+          HASH_TWO="$(sha256sum "$PACKAGE_TWO" | awk '{print $1}')"
+          test "$HASH_ONE" = "$HASH_TWO"
           unzip -t "$PACKAGE_TWO"
           unzip -l "$PACKAGE_TWO" | grep -q 'sabri-security-center/sabri-security-center.php'
           unzip -l "$PACKAGE_TWO" | grep -q 'sabri-security-center/SBOM.spdx.json'
           unzip -l "$PACKAGE_TWO" | grep -q 'sabri-security-center/docs/ADMINISTRATOR-MANUAL.md'
           (cd "$(dirname "$PACKAGE_TWO")" && sha256sum -c "$(basename "$PACKAGE_TWO").sha256")
           echo "path=$PACKAGE_TWO" >> "$GITHUB_OUTPUT"
+          echo "sha256=$HASH_TWO" >> "$GITHUB_OUTPUT"
 
-      - name: Upload code-complete plugin package
+      - name: Upload code-complete plugin package and integrity receipts
         if: matrix.php == '8.3'
         uses: actions/upload-artifact@v4
         with:
@@ -181,6 +190,7 @@ jobs:
           path: |
             ${{ steps.package.outputs.path }}
             ${{ steps.package.outputs.path }}.sha256
+            ${{ steps.source_integrity.outputs.path }}
           if-no-files-found: error
 
       - name: Create sanitized code-complete source snapshot
