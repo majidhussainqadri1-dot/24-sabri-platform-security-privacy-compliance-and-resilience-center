@@ -80,15 +80,21 @@ final class Capabilities
                 'spcrc_manage_training',
             ],
             'privacy_officer' => [
+                'spcrc_view_overview',
+                'spcrc_view_module_posture',
                 'spcrc_manage_privacy_requests',
                 'spcrc_manage_compliance',
                 'spcrc_manage_vendors',
             ],
             'incident_commander' => [
+                'spcrc_view_overview',
+                'spcrc_view_module_posture',
                 'spcrc_view_security_events',
                 'spcrc_manage_incidents',
             ],
             'backup_operator' => [
+                'spcrc_view_overview',
+                'spcrc_view_module_posture',
                 'spcrc_manage_assurance',
                 'spcrc_manage_resilience',
                 'spcrc_run_restore_operations',
@@ -99,15 +105,20 @@ final class Capabilities
                 'spcrc_view_forensic_metadata',
             ],
             'governance_approver' => [
+                'spcrc_view_overview',
                 'spcrc_approve_governance_decision',
             ],
             'critical_risk_acceptor' => [
+                'spcrc_view_overview',
                 'spcrc_accept_critical_risk',
             ],
             'key_custodian' => [
+                'spcrc_view_overview',
                 'spcrc_manage_key_metadata',
             ],
             'critical_incident_closer' => [
+                'spcrc_view_overview',
+                'spcrc_view_security_events',
                 'spcrc_close_critical_incidents',
             ],
         ];
