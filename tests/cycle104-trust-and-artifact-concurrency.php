@@ -66,6 +66,17 @@ $unexpectedVersion = $registry->save([
 cycleReviewAssert(is_wp_error($unexpectedVersion) && $unexpectedVersion->get_error_code() === 'spcrc_artifact_unexpected_version', 'A new artifact must not claim a pre-existing version.');
 
 $trust = new TrustCenterService($registry);
+$GLOBALS['current_user_id'] = 0;
+$GLOBALS['current_user_caps']['spcrc_manage_trust_center'] = true;
+$unattributed = $trust->saveClaim([
+    'claim_type' => 'security-overview',
+    'claim_key' => 'unattributed-security-overview',
+    'title' => 'Unattributed security overview',
+    'status' => 'draft',
+]);
+cycleReviewAssert(is_wp_error($unattributed) && $unattributed->get_error_code() === 'spcrc_trust_claim_actor_invalid', 'Trust claims must never be created by an unattributed actor.');
+
+$GLOBALS['current_user_id'] = 7;
 unset($GLOBALS['current_user_caps']['spcrc_manage_trust_center'], $GLOBALS['current_user_caps']['spcrc_approve_governance_decision']);
 $forbidden = $trust->saveClaim([
     'claim_type' => 'security-overview',
@@ -116,19 +127,43 @@ $unapproved = $trust->saveClaim([
 cycleReviewAssert(is_wp_error($unapproved) && $unapproved->get_error_code() === 'spcrc_trust_claim_approval_forbidden', 'A second actor still requires explicit approval authority.');
 
 $GLOBALS['current_user_caps']['spcrc_approve_governance_decision'] = true;
-$approved = $trust->saveClaim([
-    'claim_type' => 'security-overview',
+$identityMutation = $trust->saveClaim([
+    'claim_type' => 'certification',
     'claim_key' => 'security-overview',
-    'title' => 'Security overview',
-    'summary' => 'Evidence-gated public security information.',
     'status' => 'verified',
     'expected_version' => 1,
     'evidence_ref' => 'evidence:trust-001',
     'reviewed_at' => gmdate('c'),
     'expires_at' => gmdate('c', time() + DAY_IN_SECONDS),
 ]);
-cycleReviewAssert(! is_wp_error($approved), 'A distinct authorized approver must be able to verify the evidence-backed claim.');
-cycleReviewAssert(count($trust->publicClaims()) === 1, 'Exactly one approved unexpired claim must be publicly projected.');
+cycleReviewAssert(is_wp_error($identityMutation) && $identityMutation->get_error_code() === 'spcrc_trust_claim_identity_changed', 'An approver must not change claim identity.');
+
+$contentMutation = $trust->saveClaim([
+    'claim_type' => 'security-overview',
+    'claim_key' => 'security-overview',
+    'title' => 'Security overview',
+    'summary' => 'A stronger unreviewed claim.',
+    'status' => 'verified',
+    'expected_version' => 1,
+    'evidence_ref' => 'evidence:trust-001',
+    'reviewed_at' => gmdate('c'),
+    'expires_at' => gmdate('c', time() + DAY_IN_SECONDS),
+]);
+cycleReviewAssert(is_wp_error($contentMutation) && $contentMutation->get_error_code() === 'spcrc_trust_claim_content_changed', 'An approver must not rewrite claim content during approval.');
+
+$approved = $trust->saveClaim([
+    'claim_type' => 'security-overview',
+    'claim_key' => 'security-overview',
+    'status' => 'verified',
+    'expected_version' => 1,
+    'evidence_ref' => 'evidence:trust-001',
+    'reviewed_at' => gmdate('c'),
+    'expires_at' => gmdate('c', time() + DAY_IN_SECONDS),
+]);
+cycleReviewAssert(! is_wp_error($approved), 'A distinct authorized approver must be able to verify the unchanged evidence-backed claim.');
+$publishedClaims = $trust->publicClaims();
+cycleReviewAssert(count($publishedClaims) === 1, 'Exactly one approved unexpired claim must be publicly projected.');
+cycleReviewAssert(($publishedClaims[0]['summary'] ?? '') === 'Evidence-gated public security information.', 'Approval must publish the reviewed draft summary without mutation.');
 
 add_filter('spcrc/public_trust_payload', static function (array $payload): array {
     $payload['claims'][] = [
