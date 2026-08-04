@@ -83,7 +83,7 @@ jobs:
 
           grep -q "define('SPCRC_VERSION', '0.99.0')" plugin/sabri-security-center/sabri-security-center.php
           grep -q 'Stable tag: 0.99.0' plugin/sabri-security-center/readme.txt
-          php -r '$d=json_decode(file_get_contents("docs/SOURCE-MANIFEST-0.99.0.json"), true, 512, JSON_THROW_ON_ERROR); if (($d["verification"]["requirements"] ?? 0) !== 100 || ($d["verification"]["integration_records"] ?? 0) !== 26 || ($d["verification"]["governed_domains"] ?? 0) !== 28 || ($d["verification"]["new_assertions"] ?? 0) !== 146) { exit(1); }'
+          php -r '$d=json_decode(file_get_contents("docs/SOURCE-MANIFEST-0.99.0.json"), true, 512, JSON_THROW_ON_ERROR); if (($d["governing_requirements"]["count"] ?? 0) !== 100 || ($d["integration_files"]["count"] ?? 0) !== 26 || ($d["governed_logical_domains"] ?? 0) !== 28 || ($d["verification"]["code_complete_assertions"] ?? 0) !== 146) { exit(1); }'
 
           PACKAGE_ONE="$(./tools/build-release.sh)"
           cp "$PACKAGE_ONE" /tmp/file24-package-one.zip
