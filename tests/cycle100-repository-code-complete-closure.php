@@ -59,7 +59,7 @@ foreach ($manuals as $manual) c100(is_file($root . '/plugin/sabri-security-cente
 $ci = (string) file_get_contents($root . '/.github/workflows/ci.yml');
 c100(str_contains($ci, 'cycle100-repository-code-complete-closure.php') || str_contains($ci, 'find tests -maxdepth 1'), 'Permanent CI must run repository closure test.');
 c100(str_contains($ci, 'git ls-files -z') && str_contains($ci, 'file24-source-checksums.sha256') && str_contains($ci, 'sha256sum -c'), 'CI must generate and verify an immutable source-integrity manifest from the checked-out commit.');
-c100(! str_contains($ci, 'git push') && ! str_contains($ci, 'contents: write'), 'Repository verification must never mutate or push into the reviewed source branch.');
+c100(str_contains($ci, "permissions:\n  contents: read") && ! str_contains($ci, 'github-actions[bot]'), 'Repository verification must have read-only contents permission and no source-branch commit identity.');
 c100(! is_file($root . '/.github/workflows/finalize-file24-checksums.yml'), 'Self-mutating checksum finalizer must remain absent.');
 c100(is_executable($root . '/tools/build-release.sh'), 'Deterministic build tool must remain executable.');
 
