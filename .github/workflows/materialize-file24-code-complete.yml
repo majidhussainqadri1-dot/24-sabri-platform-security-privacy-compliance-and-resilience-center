@@ -59,11 +59,11 @@ jobs:
           echo "1152cca5b1d89092ef9e8bb84c014e9390fc91f75432dc78d2ad14cc63465201  handoff-code-complete-v3/part-09.b64part" | sha256sum -c -
 
           cat handoff-code-complete-v3/part-*.b64part > /tmp/file24-code-complete.patch.bz2.b64
-          echo "8fbb90c2cf8fc8a9eb85b2d7503339309d7b9b58040e4443fa0e9b1ef1430f2  /tmp/file24-code-complete.patch.bz2.b64" | sha256sum -c -
+          echo "8ec789dbb7a139669d81ff135c37e831d834731f04a162ad4cf562a5c7835c97  /tmp/file24-code-complete.patch.bz2.b64" | sha256sum -c -
           base64 -d /tmp/file24-code-complete.patch.bz2.b64 > /tmp/file24-code-complete.patch.bz2
-          echo "80cf0fc71e7e28e94a3e0379cea5380b901baa63176908929e9093be0c760aab  /tmp/file24-code-complete.patch.bz2" | sha256sum -c -
+          echo "876ba109a5f6ce47fbf3c2be28d819b02dc39e81712e571679881c6169ef4eae  /tmp/file24-code-complete.patch.bz2" | sha256sum -c -
           bunzip2 -c /tmp/file24-code-complete.patch.bz2 > /tmp/file24-code-complete.patch
-          echo "39a97ab3df1387fbe4aeb2579e49a8c46fd67af2fe0ae79567bdf8e46fb889e8  /tmp/file24-code-complete.patch" | sha256sum -c -
+          echo "6db5b0eb85a73846acaa4b2e8a89f82f1ca01b2f8066b5ee26243f7acc44ac4e  /tmp/file24-code-complete.patch" | sha256sum -c -
 
           git apply --check /tmp/file24-code-complete.patch
           git apply /tmp/file24-code-complete.patch
