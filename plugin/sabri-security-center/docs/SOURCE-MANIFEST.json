@@ -1,0 +1,50 @@
+{
+  "product": "File 24 Security, Privacy, Compliance and Resilience Center",
+  "runtime_version": "0.99.0",
+  "schema_version": "0.25.5",
+  "production_target": "1.0.0",
+  "governing_requirements": {
+    "first": "F24-R001",
+    "last": "F24-R100",
+    "count": 100,
+    "repository_coding_complete": true
+  },
+  "integration_files": {
+    "first": 0,
+    "last": 25,
+    "count": 26
+  },
+  "governed_logical_domains": 28,
+  "release_phases": {
+    "first": "24A",
+    "last": "24L",
+    "count": 12
+  },
+  "verification": {
+    "php_files_minimum": 176,
+    "test_programs_minimum": 108,
+    "code_complete_assertions": 146,
+    "php_versions": [
+      "8.0",
+      "8.3"
+    ]
+  },
+  "source_roots": [
+    "plugin/sabri-security-center",
+    "tests",
+    "docs",
+    "tools",
+    ".github/workflows"
+  ],
+  "installable_root": "sabri-security-center",
+  "build_tool": "tools/build-release.sh",
+  "checksum_ledger": "CHECKSUMS.sha256",
+  "public_safe_only": true,
+  "private_operations_material_bundled": false,
+  "external_gates_deferred": [
+    "staging-accepted",
+    "independent-assurance",
+    "live-deployed",
+    "operational"
+  ]
+}

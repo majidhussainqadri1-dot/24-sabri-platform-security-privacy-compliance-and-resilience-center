@@ -1,48 +1,47 @@
-# Sabri Platform Security, Privacy, Compliance and Resilience Center
+# File 24 — Sabri Platform Security, Privacy, Compliance and Resilience Center
 
-File 24 is the central security-governance and assurance plane for the Sabri Social Homeopathy Platform. Native modules retain authentication, authorization and canonical data ownership.
+File 24 is the cross-platform security-governance and assurance plane for the Sabri Social Homeopathy Platform. Native modules retain their own authentication, authorization, data, safety and business truth.
 
-## Foundation scope — forty-round corrective candidate 0.28.0
+## Current release identity
 
-This reviewed Foundation establishes and re-verifies:
+- Runtime: **0.99.0 — Repository Code-Complete Candidate**
+- Schema: **0.25.5**
+- Production target: **1.0.0**, only after the full external Definition of Done
+- Requirements: **F24-R001–F24-R100 repository-implemented**
 
-- a versioned module-security manifest registry with persisted identity binding, guarded writes and zero-row concurrency verification;
-- a private role-aware Security Center with separately gated governance request, approval and reconciliation surfaces;
-- bounded security-event and audit-gap storage with recursive redaction and external-event hooks;
-- audit-atomic risk, incident, finding and control workflows with governed, expiring risk acceptance;
-- exact-value atomic option locks with owner tokens, bounded leases, stale reclamation and owner-only release;
-- a bounded Assurance Registry for compliance applicability, vendor review and backup/restore evidence metadata;
-- verified, replay-resistant privacy orchestration with storage-bound retry safety and compensation-failure evidence;
-- fail-closed activation/runtime boot, nine-table schema verification, upgrade locking and downgrade prevention;
-- non-destructive repair that verifies schema, capabilities, schedules and version state;
-- File 00 and File 20 adapters without duplicating their authority;
-- sanitized private status and public Trust Center REST payloads;
-- reproducible packaging, source checksums, SPDX SBOM, license inventory and PHP 8.0/8.3 CI gates.
+This status means the approved repository-coding scope is implemented, reviewed, testable and packageable. It does **not** mean Hostinger staging acceptance, independent certification, penetration-test acceptance, restore-drill acceptance, live deployment or operational acceptance.
 
-File 24 does **not** replace File 00 identity, native-module authorization, File 20 shell enforcement, hosting security, a WAF, a SIEM, legal counsel, a backup engine, immutable off-site evidence or independent penetration testing.
+## Implemented repository scope
 
-## Assurance boundary
+- module manifests, security states and Files 00–25 integration contracts;
+- control, risk, finding, vulnerability, incident, governance and assurance registries;
+- versioned policy hierarchy, exceptions and release gates;
+- File 00 membership and File 02 credential-authentication assurance without alternate identity ownership;
+- REST/AJAX/webhook authorization, same-origin/SSRF policy, rate limiting, idempotency and replay protection;
+- upload quarantine/scanner contracts and short-lived one-time private-delivery grants;
+- privacy requests, verification, recovery, data inventory, processing activities, consent, legal holds, international-transfer metadata and deletion replay;
+- vendor/compliance/backup evidence, BIA, recovery objectives, continuity plans and drill findings;
+- detection alerts, remote-evidence queue, performance measurements, incident command and evidence-gated Trust Center data;
+- capability-protected wp-admin fallback, private REST APIs, security headers and truthful seven-status reporting;
+- public-safe architecture, RTM, schema/threat/integration manifests, manuals, SBOM, license inventory, checksums and deterministic build tooling.
 
-The Assurance Registry stores bounded status metadata and opaque references only. It must never contain raw contracts, credentials, secrets, backup locations, identity documents, forensic payloads, patient records or private incident playbooks.
+## Public/private boundary
 
-A compliance entry records applicability status; it is not an automatic legal-compliance claim. Backup status may be `verified` only when successful-backup evidence, a later restore-test timestamp and an opaque private evidence reference are present.
+This public repository must never contain production secrets, key inventory, detailed vulnerabilities, risk or incident evidence, vendor contracts, backup locations, private playbooks, patient records, messages, identity documents or production logs. Repository records use bounded metadata and opaque references to a separately protected operations store.
 
-## Repository safety
-
-This public repository contains sanitized source and documentation only. Live vulnerabilities, detailed risk registers, forensic evidence, vendor contracts, backup locations, keys, secrets and incident playbooks belong in approved private operational systems.
-
-## Development status
-
-Audit or compensation failures create bounded, independently keyed release blockers rather than being overwritten or silently treated as success. Generic operational gaps can be reconciled only through a private capability-, nonce-, File 00 step-up-, evidence- and audit-gated workflow.
-
-The 0.28.0 implementation is a reviewed Foundation candidate and is not production-ready. Automated checks do not replace real WordPress/MySQL activation, migration and rollback, Hostinger staging, live File 00/File 20 integration, accessibility/browser acceptance, restore drills, provider validation, abuse testing, legal review or independent penetration testing.
-
-## Build and QA
+## Build and complete repository QA
 
 ```bash
 find plugin tests -type f -name '*.php' -print0 | xargs -0 -n1 php -l
-while IFS= read -r -d '' test_file; do php "$test_file"; done < <(find tests -maxdepth 1 -type f -name '*.php' ! -name 'bootstrap.php' -print0 | sort -z)
+while IFS= read -r -d '' test_file; do
+  php "$test_file"
+done < <(find tests -maxdepth 1 -type f -name '*.php' ! -name 'bootstrap.php' -print0 | sort -z)
+sha256sum -c CHECKSUMS.sha256
 ./tools/build-release.sh
 ```
 
-The installable package and SHA-256 receipt are created under `build/`.
+The build creates an installable ZIP and SHA-256 receipt under `build/`.
+
+## External gates deliberately deferred
+
+Real Hostinger WordPress/MySQL activation and upgrade, live companion contracts, providers, backup restore, rollback rehearsal, browser/RTL/accessibility acceptance, independent penetration testing, legal applicability, Founder staging acceptance, production deployment and operational SLOs remain separate evidence-gated work.

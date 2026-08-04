@@ -2,22 +2,26 @@
 
 ## Supported version
 
-The project is currently in foundation development. No release should be treated as production-ready until staging acceptance, independent security review, restore testing, and Founder approval are complete.
+`0.99.0` is the current repository code-complete candidate. It is not production `1.0.0` and must not be described as independently certified, unhackable, universally compliant, staging-accepted, live-deployed or operationally accepted without the corresponding evidence.
 
-## Reporting a vulnerability
+## Private vulnerability reporting
 
-Do not disclose exploitable details in public issues or pull requests. Use the repository owner's private GitHub security-reporting channel or another privately agreed channel.
+Do not disclose exploitable details in public issues, pull requests or commits. Use the repository owner's private GitHub security-reporting channel or another explicitly approved private channel.
 
 Include:
 
 - affected version and component;
-- reproducible steps;
-- impact assessment;
-- proof of concept with sensitive data removed;
-- suggested remediation, when known.
+- reproducible steps with sensitive material removed;
+- impact and preconditions;
+- private proof-of-concept reference;
+- suggested remediation and retest information, when available.
 
-Never include passwords, tokens, identity documents, patient data, private messages, production database extracts, or encryption keys.
+Never submit passwords, API keys, OAuth/provider tokens, identity documents, patient data, private messages, production database extracts, backup locations, stream keys, encryption keys or detailed internal playbooks.
 
-## Foundation 0.28.0 public-safe hardening
+## Public repository boundary
 
-The current candidate adds bounded cryptographic coordination, audit semantic integrity, durable audit-gap capacity evidence, manifest hash/route hardening, attributable and step-up-gated security states, verified activation/upgrade evidence, required-index checks, schedule integrity, mutually exclusive privacy recovery and method-specific verification freshness. Sensitive operations evidence remains private.
+Public-safe material includes source, tests, sanitized architecture, public SBOM, licenses, checksums, disclosure guidance and evidence-free workflow descriptions. Detailed vulnerabilities, risk/incident evidence, pentest reports, vendor contracts, key inventory, backup topology, credentials and private operational procedures belong in a separately protected encrypted store and should be referenced only by opaque identifiers.
+
+## Security model
+
+File 24 provides governance, assurance, privacy orchestration, incident coordination and resilience evidence. It does not replace File 00 membership/identity assurance, File 02 authentication, native-module authorization, File 20 shell behavior, hosting controls, a WAF, legal counsel, backup infrastructure or independent testing. File 24 unavailability must never create an authorization bypass.

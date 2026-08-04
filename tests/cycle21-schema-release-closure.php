@@ -83,9 +83,9 @@ $ci = (string) file_get_contents($root . '/.github/workflows/ci.yml');
 $manifest = (string) file_get_contents($root . '/MANIFEST.md');
 $receipt = (string) file_get_contents($root . '/docs/RELEASE-RECEIPT-0.25.8.md');
 
-expectCycle21(str_contains($plugin, 'Version:     0.28.0') && str_contains($plugin, "define('SPCRC_VERSION', '0.28.0')"), 'Plugin header and runtime constant must agree on the current 0.28.0 release.');
-expectCycle21(str_contains($readme, 'Stable tag: 0.28.0'), 'WordPress readme must expose the 0.28.0 stable tag.');
-expectCycle21(($sbom['packages'][0]['versionInfo'] ?? '') === '0.28.0', 'SPDX package version must agree on the current 0.28.0 release.');
+expectCycle21(str_contains($plugin, 'Version:     0.99.0') && str_contains($plugin, "define('SPCRC_VERSION', '0.99.0')"), 'Plugin header and runtime constant must agree on the current 0.99.0 release.');
+expectCycle21(str_contains($readme, 'Stable tag: 0.99.0'), 'WordPress readme must expose the 0.99.0 stable tag.');
+expectCycle21(($sbom['packages'][0]['versionInfo'] ?? '') === '0.99.0', 'SPDX package version must agree on the current 0.99.0 release.');
 expectCycle21((str_contains($ci, 'php tests/cycle18-retention-concurrency.php') || str_contains($ci, 'find tests -maxdepth 1')), 'Permanent CI must run Cycle 18.');
 expectCycle21((str_contains($ci, 'php tests/cycle19-privacy-retry-safety.php') || str_contains($ci, 'find tests -maxdepth 1')), 'Permanent CI must run Cycle 19.');
 expectCycle21((str_contains($ci, 'php tests/cycle20-audit-gap-concurrency.php') || str_contains($ci, 'find tests -maxdepth 1')), 'Permanent CI must run Cycle 20.');

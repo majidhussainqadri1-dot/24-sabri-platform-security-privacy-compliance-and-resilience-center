@@ -25,12 +25,12 @@ $manifest = (string) file_get_contents($root . '/MANIFEST.md');
 $ci = (string) file_get_contents($root . '/.github/workflows/ci.yml');
 $historicalReceipt = (string) file_get_contents($root . '/docs/RELEASE-RECEIPT-0.25.8.md');
 
-$assert(str_contains($plugin, 'Version:     0.28.0'), 'Plugin header must expose the current post-0.25.9 release.');
-$assert(str_contains($plugin, "define('SPCRC_VERSION', '0.28.0')"), 'Runtime constant must expose the current post-0.25.9 release.');
-$assert(str_contains($readme, 'Stable tag: 0.28.0'), 'WordPress readme must expose the 0.25.9 stable tag.');
-$assert(($sbom['packages'][0]['versionInfo'] ?? '') === '0.28.0', 'SPDX package version must match 0.25.9.');
-$assert(str_contains($licenses, 'License Inventory — 0.28.0'), 'License inventory must match 0.25.9.');
-$assert(str_contains($registry, 'release:file-24-0.28.0'), 'Self manifest evidence source must match 0.25.9.');
+$assert(str_contains($plugin, 'Version:     0.99.0'), 'Plugin header must expose the current post-0.25.9 release.');
+$assert(str_contains($plugin, "define('SPCRC_VERSION', '0.99.0')"), 'Runtime constant must expose the current post-0.25.9 release.');
+$assert(str_contains($readme, 'Stable tag: 0.99.0'), 'WordPress readme must expose the 0.25.9 stable tag.');
+$assert(($sbom['packages'][0]['versionInfo'] ?? '') === '0.99.0', 'SPDX package version must match 0.25.9.');
+$assert(str_contains($licenses, 'License Inventory — 0.99.0'), 'License inventory must match 0.25.9.');
+$assert(str_contains($registry, 'release:file-24-0.99.0'), 'Self manifest evidence source must match 0.25.9.');
 $assert(str_contains($summary, 'Cycles 22–29'), 'Eight-round summary must identify the reviewed cycle range.');
 $assert(str_contains($summary, '**113 assertions**'), 'Eight-round summary must state the complete new evidence count.');
 $assert(str_contains($receipt, '**Review closure:** Cycle 29'), 'Release receipt must identify Cycle 29 closure.');

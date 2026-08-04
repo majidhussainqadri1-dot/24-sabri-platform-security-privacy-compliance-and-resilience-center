@@ -29,12 +29,12 @@ $lock = (string) file_get_contents($root . '/plugin/sabri-security-center/src/Su
 $auditGap = (string) file_get_contents($root . '/plugin/sabri-security-center/src/Storage/AuditGapStore.php');
 $privacy = (string) file_get_contents($root . '/plugin/sabri-security-center/src/Privacy/PrivacyVerificationStore.php');
 
-$assert(str_contains($plugin, 'Version:     0.28.0'), 'Plugin header must expose Foundation 0.26.0.');
-$assert(str_contains($plugin, "define('SPCRC_VERSION', '0.28.0')"), 'Runtime constant must expose Foundation 0.26.0.');
-$assert(str_contains($readme, 'Stable tag: 0.28.0'), 'WordPress readme must expose the 0.26.0 stable tag.');
-$assert(($sbom['packages'][0]['versionInfo'] ?? '') === '0.28.0', 'SPDX package version must match 0.26.0.');
-$assert(str_contains($licenses, 'License Inventory — 0.28.0'), 'License inventory must match 0.26.0.');
-$assert(str_contains($registry, 'release:file-24-0.28.0'), 'Self-manifest evidence source must match 0.26.0.');
+$assert(str_contains($plugin, 'Version:     0.99.0'), 'Plugin header must expose Foundation 0.26.0.');
+$assert(str_contains($plugin, "define('SPCRC_VERSION', '0.99.0')"), 'Runtime constant must expose Foundation 0.26.0.');
+$assert(str_contains($readme, 'Stable tag: 0.99.0'), 'WordPress readme must expose the 0.26.0 stable tag.');
+$assert(($sbom['packages'][0]['versionInfo'] ?? '') === '0.99.0', 'SPDX package version must match 0.26.0.');
+$assert(str_contains($licenses, 'License Inventory — 0.99.0'), 'License inventory must match 0.26.0.');
+$assert(str_contains($registry, 'release:file-24-0.99.0'), 'Self-manifest evidence source must match 0.26.0.');
 $assert(str_contains($schema, "public const VERSION = '0.25.5'"), 'Corrective runtime release must retain schema 0.25.5.');
 $assert(str_contains($summary, '**Review window:** Cycles 30–41'), 'Summary must identify all twelve cycles.');
 $assert(str_contains($summary, '**Defect-specific assertions added:** 91'), 'Summary must preserve the defect-specific assertion count.');
