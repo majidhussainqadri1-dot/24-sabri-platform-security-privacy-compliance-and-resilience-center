@@ -15,6 +15,7 @@ final class TrustCenterService
         'rights-request', 'cookie-information', 'approved-subprocessor',
         'accessibility-commitment', 'certification',
     ];
+    private const CLOCK_SKEW_SECONDS = 300;
 
     public function __construct(private GovernedArtifactRegistry $artifacts)
     {
@@ -72,6 +73,16 @@ final class TrustCenterService
             if ($evidenceRef === '' || $expiresAt === '' || $reviewedAt === '') {
                 return new \WP_Error('spcrc_trust_claim_evidence_missing', 'Verified public claims require evidence, a completed review and an expiry.');
             }
+            $now = time();
+            $reviewedTimestamp = strtotime($reviewedAt);
+            $expiresTimestamp = strtotime($expiresAt);
+            if ($reviewedTimestamp === false || $expiresTimestamp === false
+                || $reviewedTimestamp > $now + self::CLOCK_SKEW_SECONDS
+                || $expiresTimestamp <= $now
+                || $expiresTimestamp <= $reviewedTimestamp
+            ) {
+                return new \WP_Error('spcrc_trust_claim_time_window_invalid', 'Verified public claims require a completed non-future review and a future expiry after that review.');
+            }
         } elseif (! current_user_can('spcrc_manage_trust_center')) {
             return new \WP_Error('spcrc_trust_claim_forbidden', 'Trust Center claims require explicit management authority.');
         }
@@ -121,6 +132,7 @@ final class TrustCenterService
     public function publicClaims(): array
     {
         $claims = [];
+        $now = time();
         foreach ($this->artifacts->recent('trust-claim', 100) as $record) {
             if (($record['status'] ?? '') !== 'verified' || ($record['classification'] ?? '') !== 'C0') {
                 continue;
@@ -132,7 +144,14 @@ final class TrustCenterService
             }
             $reviewed = Sanitizer::isoTime($record['reviewed_at'] ?? '');
             $expires = Sanitizer::isoTime($record['expires_at'] ?? '');
-            if ($reviewed === '' || $expires === '' || strtotime($expires) <= time()) {
+            $evidenceRef = Sanitizer::opaqueReference($record['evidence_ref'] ?? '');
+            $reviewedTimestamp = $reviewed === '' ? false : strtotime($reviewed);
+            $expiresTimestamp = $expires === '' ? false : strtotime($expires);
+            if ($evidenceRef === '' || $reviewedTimestamp === false || $expiresTimestamp === false
+                || $reviewedTimestamp > $now + self::CLOCK_SKEW_SECONDS
+                || $expiresTimestamp <= $now
+                || $expiresTimestamp <= $reviewedTimestamp
+            ) {
                 continue;
             }
             $owner = absint($record['owner_user_id'] ?? 0);
