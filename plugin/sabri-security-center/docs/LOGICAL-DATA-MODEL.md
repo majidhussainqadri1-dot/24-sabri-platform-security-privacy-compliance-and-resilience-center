@@ -6,7 +6,7 @@ The schema intentionally keeps nine canonical, query-intensive domains in dedica
 
 ## Bounded governed artifact registry
 
-Lower-volume governance metadata uses a bounded, lock-protected, audit-bound logical registry with 27 domain types: policies, exceptions, assets, data inventory, processing activities, consent, legal holds, vulnerabilities, external dependencies, secret/key metadata, continuity/BIA/recovery/drills, trust claims, performance objectives, release gates, training, integrations, security tests, deletion ledger, alerts, remote evidence, incident actions, upload assurance and private delivery.
+Lower-volume governance metadata uses a bounded, lock-protected, audit-bound logical registry with 28 domain types: policies, exceptions, assets, data inventory, processing activities, consent, legal holds, vulnerabilities, external dependencies, secret/key metadata, continuity/BIA/recovery/drills, trust claims, performance objectives, release gates, training, integrations, security tests, deletion ledger, alerts, remote evidence, jobs, incident actions, upload assurance and private delivery.
 
 ## Ownership constraints
 
