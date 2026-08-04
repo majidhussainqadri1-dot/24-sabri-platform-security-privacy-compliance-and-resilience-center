@@ -43,6 +43,8 @@ final class UpgradeManager
             return $error;
         }
 
+        $capabilitySnapshot = self::capabilitySnapshot();
+
         if ($installedSchema === Schema::VERSION && $installedPlugin === SPCRC_VERSION) {
             $schemaIntegrity = Schema::verify();
             if (is_wp_error($schemaIntegrity)) {
@@ -50,7 +52,7 @@ final class UpgradeManager
                 return $schemaIntegrity;
             }
 
-            $integrity = self::ensureRuntimeIntegrity($installedSchema);
+            $integrity = self::ensureRuntimeIntegrity($installedSchema, $capabilitySnapshot);
             if (is_wp_error($integrity)) {
                 return $integrity;
             }
@@ -93,7 +95,7 @@ final class UpgradeManager
                 return $error;
             }
 
-            $integrity = self::ensureRuntimeIntegrity($installedSchema);
+            $integrity = self::ensureRuntimeIntegrity($installedSchema, $capabilitySnapshot);
             if (is_wp_error($integrity)) {
                 return $integrity;
             }
@@ -104,6 +106,7 @@ final class UpgradeManager
                 (string) get_option('spcrc_schema_version', '') !== Schema::VERSION
                 || (string) get_option('spcrc_version', '') !== SPCRC_VERSION
             ) {
+                self::rollbackCapabilities($capabilitySnapshot, 'version_state');
                 $error = new \WP_Error(
                     'spcrc_upgrade_version_state_failed',
                     'File 24 upgrade version state could not be verified.'
@@ -117,6 +120,7 @@ final class UpgradeManager
             do_action('spcrc/upgraded', $installedSchema, Schema::VERSION, $installedPlugin, SPCRC_VERSION);
             return true;
         } catch (\Throwable $exception) {
+            self::rollbackCapabilities($capabilitySnapshot, 'exception');
             $error = new \WP_Error('spcrc_upgrade_exception', 'File 24 upgrade failed unexpectedly.');
             self::recordFailure([
                 'error_code' => $error->get_error_code(),
@@ -131,11 +135,14 @@ final class UpgradeManager
         }
     }
 
-    /** @return bool|\WP_Error */
-    private static function ensureRuntimeIntegrity(string $installedSchema): bool|\WP_Error
+    /** @param array<string,bool>|null $capabilitySnapshot
+     *  @return bool|\WP_Error
+     */
+    private static function ensureRuntimeIntegrity(string $installedSchema, ?array $capabilitySnapshot): bool|\WP_Error
     {
         $capabilitiesInstalled = Capabilities::install();
         if ($capabilitiesInstalled === false) {
+            self::rollbackCapabilities($capabilitySnapshot, 'capability_install');
             $error = new \WP_Error('spcrc_capability_install_failed', 'Required File 24 capabilities could not be installed and verified.');
             self::fail($error, $installedSchema);
             return $error;
@@ -148,6 +155,7 @@ final class UpgradeManager
                 'Required retention schedule could not be verified.'
             );
             self::cleanupNewSchedules($retentionExisted, $recoveryExisted);
+            self::rollbackCapabilities($capabilitySnapshot, 'retention_schedule');
             self::fail($error, $installedSchema);
             return $error;
         }
@@ -157,6 +165,7 @@ final class UpgradeManager
                 'Required privacy recovery schedule could not be verified.'
             );
             self::cleanupNewSchedules($retentionExisted, $recoveryExisted);
+            self::rollbackCapabilities($capabilitySnapshot, 'privacy_recovery_schedule');
             self::fail($error, $installedSchema);
             return $error;
         }
@@ -170,10 +179,30 @@ final class UpgradeManager
         return AtomicOptionLock::acquire(self::LOCK_OPTION, self::LOCK_TTL);
     }
 
-
     private static function refreshLock(string $token): bool
     {
         return AtomicOptionLock::refresh(self::LOCK_OPTION, $token, self::LOCK_TTL);
+    }
+
+    /** @return array<string,bool>|null */
+    private static function capabilitySnapshot(): ?array
+    {
+        if (! method_exists(Capabilities::class, 'snapshot')) {
+            return null;
+        }
+        $snapshot = Capabilities::snapshot();
+        return is_array($snapshot) ? $snapshot : null;
+    }
+
+    /** @param array<string,bool>|null $snapshot */
+    private static function rollbackCapabilities(?array $snapshot, string $stage): void
+    {
+        if ($snapshot === null || ! method_exists(Capabilities::class, 'restoreSnapshot')) {
+            return;
+        }
+        if (! Capabilities::restoreSnapshot($snapshot)) {
+            do_action('spcrc/upgrade_capability_rollback_failed', $stage, array_keys($snapshot));
+        }
     }
 
     private static function cleanupNewSchedules(bool $retentionExisted, bool $recoveryExisted): void
