@@ -126,6 +126,9 @@ final class GovernanceController
         $data = $this->allParams($request);
         $type = Sanitizer::key($data['artifact_type'] ?? '', 60);
         $data['owner_user_id'] = get_current_user_id();
+        if ($type === 'trust-claim') {
+            $data['claim_key'] = $data['claim_key'] ?? ($data['artifact_key'] ?? '');
+        }
         $result = $type === 'trust-claim'
             ? $this->trustCenter?->saveClaim($data)
             : $this->artifacts->save($data, absint($data['expected_version'] ?? 0));
