@@ -6,9 +6,7 @@ namespace Sabri\Platform\Security\Registry;
 
 use Sabri\Platform\Security\Support\Sanitizer;
 
-/**
- * Formal File 00–25 ownership and assurance matrix.
- */
+/** Formal File 00–25 ownership and assurance matrix. */
 final class PlatformIntegrationMatrix
 {
     /** @var array<int,array<string,mixed>> */
@@ -63,11 +61,19 @@ final class PlatformIntegrationMatrix
             if (! in_array($state, ['compatible', 'unassessed', 'degraded', 'blocked', 'missing'], true)) {
                 $state = 'blocked';
             }
+
+            $requiresCompatible = in_array((string) $definition['criticality'], ['critical', 'high-risk'], true);
+            if ($file === 24) {
+                $writeAllowed = $state === 'compatible';
+            } elseif ($requiresCompatible) {
+                $writeAllowed = $state === 'compatible';
+            } else {
+                $writeAllowed = ! in_array($state, ['blocked', 'missing'], true);
+            }
+
             $results[$file] = array_merge($definition, [
                 'state' => $state,
-                'write_allowed' => $file === 24 || ! in_array($definition['criticality'], ['critical', 'high-risk'], true)
-                    ? $state !== 'blocked'
-                    : $state === 'compatible',
+                'write_allowed' => $writeAllowed,
             ]);
         }
         return $results;
