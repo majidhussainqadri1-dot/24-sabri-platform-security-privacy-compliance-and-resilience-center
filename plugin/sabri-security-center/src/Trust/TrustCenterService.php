@@ -32,7 +32,12 @@ final class TrustCenterService
         $status = Sanitizer::key($data['status'] ?? 'draft', 30);
         $expectedVersion = absint($data['expected_version'] ?? 0);
         $existing = $claimKey !== '' ? $this->artifacts->get('trust-claim', $claimKey) : null;
+        $existingPayload = is_array($existing['payload'] ?? null) ? $existing['payload'] : [];
         $actor = get_current_user_id();
+        if ($actor < 1) {
+            return new \WP_Error('spcrc_trust_claim_actor_invalid', 'Trust Center changes require an authenticated attributable actor.');
+        }
+
         $evidenceRef = Sanitizer::opaqueReference($data['evidence_ref'] ?? '');
         $expiresAt = Sanitizer::isoTime($data['expires_at'] ?? '');
         $reviewedAt = Sanitizer::isoTime($data['reviewed_at'] ?? '');
@@ -44,11 +49,25 @@ final class TrustCenterService
             if (! is_array($existing) || ! in_array(($existing['status'] ?? ''), ['draft', 'expired'], true)) {
                 return new \WP_Error('spcrc_trust_claim_workflow_invalid', 'A verified public claim must approve an existing draft or expired claim.');
             }
-            if ((int) ($existing['owner_user_id'] ?? 0) === $actor) {
+            $owner = absint($existing['owner_user_id'] ?? 0);
+            if ($owner < 1) {
+                return new \WP_Error('spcrc_trust_claim_author_invalid', 'A verified public claim requires an attributable draft author.');
+            }
+            if ($owner === $actor) {
                 return new \WP_Error('spcrc_trust_claim_self_approval_forbidden', 'The claim author cannot approve the same public claim.');
             }
             if ($expectedVersion < 1) {
                 return new \WP_Error('spcrc_trust_claim_expected_version_required', 'Trust claim approval requires the exact current draft version.');
+            }
+            if (Sanitizer::key($existingPayload['claim_type'] ?? '', 80) !== $claimType) {
+                return new \WP_Error('spcrc_trust_claim_identity_changed', 'Claim type cannot be changed during approval.');
+            }
+            $submittedTitle = Sanitizer::text($data['title'] ?? '', 200);
+            $submittedSummary = Sanitizer::text($data['summary'] ?? '', 500);
+            if (($submittedTitle !== '' && $submittedTitle !== Sanitizer::text($existing['title'] ?? '', 200))
+                || ($submittedSummary !== '' && $submittedSummary !== Sanitizer::text($existingPayload['summary'] ?? '', 500))
+            ) {
+                return new \WP_Error('spcrc_trust_claim_content_changed', 'Claim content cannot be rewritten during independent approval.');
             }
             if ($evidenceRef === '' || $expiresAt === '' || $reviewedAt === '') {
                 return new \WP_Error('spcrc_trust_claim_evidence_missing', 'Verified public claims require evidence, a completed review and an expiry.');
@@ -57,27 +76,35 @@ final class TrustCenterService
             return new \WP_Error('spcrc_trust_claim_forbidden', 'Trust Center claims require explicit management authority.');
         }
 
-        if ($claimType === 'certification' && $status === 'verified' && ! Sanitizer::boolean($data['independent'] ?? false)) {
-            return new \WP_Error('spcrc_trust_certification_independence_missing', 'Certification claims require independent evidence.');
+        $independent = $status === 'verified'
+            ? Sanitizer::boolean($existingPayload['independent'] ?? false)
+            : Sanitizer::boolean($data['independent'] ?? false);
+        if ($claimType === 'certification' && $status === 'verified' && ! $independent) {
+            return new \WP_Error('spcrc_trust_certification_independence_missing', 'Certification claims require independent evidence declared in the reviewed draft.');
         }
 
         $ownerUserId = is_array($existing)
             ? absint($existing['owner_user_id'] ?? 0)
             : $actor;
-        $payload = [
-            'claim_type' => $claimType,
-            'summary' => Sanitizer::text($data['summary'] ?? '', 500),
-            'public_url' => '',
-            'independent' => Sanitizer::boolean($data['independent'] ?? false),
-        ];
-        if ($status === 'verified') {
-            $payload['approved_by_user_id'] = $actor;
-        }
+        $payload = $status === 'verified'
+            ? [
+                'claim_type' => Sanitizer::key($existingPayload['claim_type'] ?? '', 80),
+                'summary' => Sanitizer::text($existingPayload['summary'] ?? '', 500),
+                'public_url' => '',
+                'independent' => $independent,
+                'approved_by_user_id' => $actor,
+            ]
+            : [
+                'claim_type' => $claimType,
+                'summary' => Sanitizer::text($data['summary'] ?? '', 500),
+                'public_url' => '',
+                'independent' => $independent,
+            ];
 
         return $this->artifacts->save([
             'artifact_type' => 'trust-claim',
             'artifact_key' => $claimKey,
-            'title' => $data['title'] ?? (is_array($existing) ? ($existing['title'] ?? '') : ''),
+            'title' => $status === 'verified' ? ($existing['title'] ?? '') : ($data['title'] ?? ''),
             'status' => $status,
             'classification' => 'C0',
             'owner_user_id' => $ownerUserId,
@@ -108,7 +135,9 @@ final class TrustCenterService
             if ($reviewed === '' || $expires === '' || strtotime($expires) <= time()) {
                 continue;
             }
-            if (absint($payload['approved_by_user_id'] ?? 0) < 1 || absint($payload['approved_by_user_id'] ?? 0) === absint($record['owner_user_id'] ?? 0)) {
+            $owner = absint($record['owner_user_id'] ?? 0);
+            $approver = absint($payload['approved_by_user_id'] ?? 0);
+            if ($owner < 1 || $approver < 1 || $approver === $owner) {
                 continue;
             }
             if ($claimType === 'certification' && ! Sanitizer::boolean($payload['independent'] ?? false)) {
