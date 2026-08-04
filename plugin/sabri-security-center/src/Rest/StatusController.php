@@ -136,8 +136,11 @@ final class StatusController
             ],
             'generated_at' => gmdate('c'),
         ];
-        $filtered = apply_filters('spcrc/public_trust_payload', $payload);
-        $safe = $this->sanitizeTrustPayload(is_array($filtered) ? $filtered : $payload);
+
+        // Public security/privacy facts may only originate from the evidence-gated
+        // TrustCenterService. A general WordPress filter must not be able to add,
+        // replace or forge claims after approval and expiry checks have completed.
+        $safe = $this->sanitizeTrustPayload($payload);
         $response = new \WP_REST_Response($safe);
         $response->header('Cache-Control', 'public, max-age=300');
         $response->header('X-Content-Type-Options', 'nosniff');
@@ -181,22 +184,31 @@ final class StatusController
             if (! is_array($claim)) {
                 continue;
             }
+            $key = Sanitizer::key($claim['key'] ?? '', 120);
+            $type = Sanitizer::key($claim['type'] ?? '', 80);
+            $verifiedAt = Sanitizer::isoTime($claim['verified_at'] ?? '');
+            $expiresAt = Sanitizer::isoTime($claim['expires_at'] ?? '');
+            if ($key === '' || $type === '' || $verifiedAt === '' || $expiresAt === '' || strtotime($expiresAt) <= time()) {
+                continue;
+            }
             $claims[] = [
-                'key' => Sanitizer::key($claim['key'] ?? '', 120),
-                'type' => Sanitizer::key($claim['type'] ?? '', 80),
+                'key' => $key,
+                'type' => $type,
                 'title' => Sanitizer::text($claim['title'] ?? '', 200),
                 'summary' => Sanitizer::text($claim['summary'] ?? '', 500),
-                'verified_at' => Sanitizer::isoTime($claim['verified_at'] ?? ''),
-                'expires_at' => Sanitizer::isoTime($claim['expires_at'] ?? ''),
+                'verified_at' => $verifiedAt,
+                'expires_at' => $expiresAt,
             ];
         }
+
+        $claimTypes = array_fill_keys(array_column($claims, 'type'), true);
         return [
             'platform' => Sanitizer::text($payload['platform'] ?? 'Sabri Social Homeopathy Platform', 120),
             'program_status' => 'Repository code-complete candidate; production assurance pending',
             'security_program' => 'Foundation candidate; production assurance pending',
             'claims' => $claims,
-            'privacy_request_available' => Sanitizer::boolean(apply_filters('spcrc/privacy_request_intake_available', false)),
-            'responsible_disclosure_available' => Sanitizer::boolean(apply_filters('spcrc/responsible_disclosure_channel_available', false)),
+            'privacy_request_available' => isset($claimTypes['rights-request']),
+            'responsible_disclosure_available' => isset($claimTypes['responsible-disclosure']),
             'unsupported_claims' => Sanitizer::textList($payload['unsupported_claims'] ?? [], 10, 180),
             'version' => defined('SPCRC_VERSION') ? SPCRC_VERSION : '',
         ];
