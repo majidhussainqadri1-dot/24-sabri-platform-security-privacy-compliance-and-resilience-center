@@ -11,6 +11,15 @@ final class DetectionEngine
 {
     private bool $guard = false;
 
+    /** @var array<string,int> */
+    private const RISK_RANK = [
+        'informational' => 0,
+        'low' => 1,
+        'medium' => 2,
+        'high' => 3,
+        'critical' => 4,
+    ];
+
     /** @var array<string,array<string,mixed>> */
     private const RULES = [
         'privileged-change' => ['events' => ['governance_decision_saved', 'security_state_requested', 'risk_accepted'], 'minimum_risk' => 'medium'],
@@ -36,14 +45,27 @@ final class DetectionEngine
         if ($this->guard || ($event['event_type'] ?? '') === 'governed_artifact_saved') {
             return;
         }
+
         $eventType = Sanitizer::key($event['event_type'] ?? '', 120);
         $risk = Sanitizer::key($event['risk_level'] ?? 'low', 20);
-        foreach (apply_filters('spcrc/detection_rules', self::RULES) as $ruleKey => $rule) {
+        $riskRank = self::RISK_RANK[$risk] ?? -1;
+        if ($eventType === '' || $riskRank < 0) {
+            return;
+        }
+
+        $rules = apply_filters('spcrc/detection_rules', self::RULES);
+        if (! is_array($rules)) {
+            return;
+        }
+
+        foreach ($rules as $ruleKey => $rule) {
             if (! is_string($ruleKey) || ! is_array($rule)) {
                 continue;
             }
             $events = Sanitizer::textList($rule['events'] ?? [], 50, 120);
-            if (! in_array($eventType, $events, true)) {
+            $minimumRisk = Sanitizer::key($rule['minimum_risk'] ?? 'medium', 20);
+            $minimumRank = self::RISK_RANK[$minimumRisk] ?? null;
+            if ($minimumRank === null || $riskRank < $minimumRank || ! in_array($eventType, $events, true)) {
                 continue;
             }
             $this->createAlert($ruleKey, $event, $risk);
