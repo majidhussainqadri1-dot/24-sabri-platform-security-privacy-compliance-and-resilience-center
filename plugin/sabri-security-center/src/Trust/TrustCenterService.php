@@ -40,6 +40,11 @@ final class TrustCenterService
         }
 
         $evidenceRef = Sanitizer::opaqueReference($data['evidence_ref'] ?? '');
+        $effectiveAt = Sanitizer::isoTime($data['effective_at'] ?? '');
+        $rawEffectiveAt = Sanitizer::text($data['effective_at'] ?? '', 80);
+        if ($rawEffectiveAt !== '' && $effectiveAt === '') {
+            return new \WP_Error('spcrc_trust_claim_effective_time_invalid', 'Trust claim effective time must be a valid ISO 8601 timestamp.');
+        }
         $expiresAt = Sanitizer::isoTime($data['expires_at'] ?? '');
         $reviewedAt = Sanitizer::isoTime($data['reviewed_at'] ?? '');
 
@@ -76,12 +81,15 @@ final class TrustCenterService
             $now = time();
             $reviewedTimestamp = strtotime($reviewedAt);
             $expiresTimestamp = strtotime($expiresAt);
+            $effectiveTimestamp = $effectiveAt === '' ? null : strtotime($effectiveAt);
             if ($reviewedTimestamp === false || $expiresTimestamp === false
+                || ($effectiveAt !== '' && $effectiveTimestamp === false)
                 || $reviewedTimestamp > $now + self::CLOCK_SKEW_SECONDS
                 || $expiresTimestamp <= $now
                 || $expiresTimestamp <= $reviewedTimestamp
+                || ($effectiveTimestamp !== null && $expiresTimestamp <= $effectiveTimestamp)
             ) {
-                return new \WP_Error('spcrc_trust_claim_time_window_invalid', 'Verified public claims require a completed non-future review and a future expiry after that review.');
+                return new \WP_Error('spcrc_trust_claim_time_window_invalid', 'Verified public claims require a completed non-future review and an expiry after review and any effective time.');
             }
         } elseif (! current_user_can('spcrc_manage_trust_center')) {
             return new \WP_Error('spcrc_trust_claim_forbidden', 'Trust Center claims require explicit management authority.');
@@ -123,7 +131,7 @@ final class TrustCenterService
             'classification' => 'C0',
             'owner_user_id' => $ownerUserId,
             'evidence_ref' => $evidenceRef,
-            'effective_at' => $data['effective_at'] ?? '',
+            'effective_at' => $effectiveAt,
             'expires_at' => $expiresAt,
             'reviewed_at' => $reviewedAt,
             'next_review_at' => $data['next_review_at'] ?? '',
@@ -145,15 +153,20 @@ final class TrustCenterService
             if (! in_array($claimType, self::ALLOWED_CLAIMS, true)) {
                 continue;
             }
+            $effective = Sanitizer::isoTime($record['effective_at'] ?? '');
             $reviewed = Sanitizer::isoTime($record['reviewed_at'] ?? '');
             $expires = Sanitizer::isoTime($record['expires_at'] ?? '');
             $evidenceRef = Sanitizer::opaqueReference($record['evidence_ref'] ?? '');
+            $effectiveTimestamp = $effective === '' ? null : strtotime($effective);
             $reviewedTimestamp = $reviewed === '' ? false : strtotime($reviewed);
             $expiresTimestamp = $expires === '' ? false : strtotime($expires);
             if ($evidenceRef === '' || $reviewedTimestamp === false || $expiresTimestamp === false
+                || ($effective !== '' && $effectiveTimestamp === false)
+                || ($effectiveTimestamp !== null && $effectiveTimestamp > $now)
                 || $reviewedTimestamp > $now + self::CLOCK_SKEW_SECONDS
                 || $expiresTimestamp <= $now
                 || $expiresTimestamp <= $reviewedTimestamp
+                || ($effectiveTimestamp !== null && $expiresTimestamp <= $effectiveTimestamp)
             ) {
                 continue;
             }
@@ -170,6 +183,7 @@ final class TrustCenterService
                 'type' => $claimType,
                 'title' => Sanitizer::text($record['title'] ?? '', 200),
                 'summary' => Sanitizer::text($payload['summary'] ?? '', 500),
+                'effective_at' => $effective,
                 'verified_at' => $reviewed,
                 'expires_at' => $expires,
             ];
