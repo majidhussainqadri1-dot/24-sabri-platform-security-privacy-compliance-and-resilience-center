@@ -70,11 +70,24 @@ namespace Sabri\Platform\Security {
         public static array $caps = ['spcrc_manage_incidents' => true];
 
         /** @return array<string,bool> */
+        public static function bootstrapBundle(): array
+        {
+            return [
+                'spcrc_view_overview' => true,
+                'spcrc_view_module_posture' => true,
+                'spcrc_manage_controls' => true,
+                'spcrc_manage_findings' => true,
+                'spcrc_manage_risks' => true,
+                'spcrc_request_governance_decision' => true,
+            ];
+        }
+
+        /** @return array<string,bool> */
         public static function snapshot(): array { return self::$caps; }
 
         public static function install(): bool
         {
-            self::$caps = ['spcrc_view_overview' => true, 'spcrc_view_module_posture' => true];
+            self::$caps = self::bootstrapBundle();
             return true;
         }
 
@@ -122,7 +135,8 @@ namespace Sabri\Platform\Security {
     expectActivation(($GLOBALS['activation_options']['spcrc_version'] ?? '') === '0.99.0', 'Successful activation must persist plugin version.');
     expectActivation(($GLOBALS['activation_options']['spcrc_schema_version'] ?? '') === '0.25.5', 'Successful activation must persist schema version.');
     expectActivation(! isset($GLOBALS['activation_options']['spcrc_last_upgrade_error']), 'Successful activation must clear prior failure evidence.');
-    expectActivation(Capabilities::$caps === ['spcrc_view_overview' => true, 'spcrc_view_module_posture' => true], 'Successful activation must retain the new least-privilege capability state.');
+    expectActivation(Capabilities::$caps === Capabilities::bootstrapBundle(), 'Successful activation must retain the bounded bootstrap Security Administrator capability state.');
+    expectActivation(empty(Capabilities::$caps['spcrc_manage_incidents']), 'Successful activation must not retain incident-command authority in the bootstrap administrator role.');
 
     echo "PASS: activation fail-closed schedule, capability compensation and version-state contracts\n";
 }
