@@ -87,7 +87,7 @@ jobs:
           php -r 'require "tests/bootstrap.php"; if (count(Sabri\Platform\Security\Capabilities::all()) < 27) { exit(1); }'
           grep -q 'F24-R100' docs/REQUIREMENTS-TRACEABILITY-0.99.0.md
           grep -q 'repository_coding_complete' plugin/sabri-security-center/src/Release/ReleaseStatus.php
-          grep -q "PRODUCTION_VERSION = '1.0.0'" plugin/sabri-security-center/src/Release/ReleaseStatus.php
+          grep -q "PRODUCTION_TARGET = '1.0.0'" plugin/sabri-security-center/src/Release/ReleaseStatus.php
 
       - name: Verify security, privacy, incident and resilience contracts
         shell: bash
