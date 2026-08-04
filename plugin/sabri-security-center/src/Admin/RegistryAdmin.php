@@ -35,11 +35,13 @@ final class RegistryAdmin
     public function save(): void
     {
         $type = Sanitizer::key($_POST['artifact_type'] ?? '', 60);
-        $capability = GovernedArtifactRegistry::capability($type);
+        $capability = self::requiredCapability($type);
         if ($type === '' || ! current_user_can($capability)) {
             wp_die(esc_html__('You are not allowed to manage this governed registry.', 'sabri-security-center'));
         }
-        check_admin_referer('spcrc_save_governed_artifact');
+        if (check_admin_referer('spcrc_save_governed_artifact') === false) {
+            wp_die(esc_html__('The security token is invalid or expired.', 'sabri-security-center'));
+        }
         $payloadRaw = is_scalar($_POST['payload_json'] ?? null) ? (string) wp_unslash($_POST['payload_json']) : '{}';
         $payload = json_decode($payloadRaw, true);
         if (! is_array($payload)) {
@@ -100,7 +102,7 @@ final class RegistryAdmin
             <?php if ($records === []) : ?><tr><td colspan="5"><?php esc_html_e('No records.', 'sabri-security-center'); ?></td></tr><?php endif; ?>
             <?php foreach ($records as $record) : ?><tr><td><?php echo esc_html((string) ($record['artifact_key'] ?? '')); ?></td><td><?php echo esc_html((string) ($record['title'] ?? '')); ?></td><td><?php echo esc_html((string) ($record['status'] ?? '')); ?></td><td><?php echo esc_html((string) ($record['version'] ?? '')); ?></td><td><?php echo esc_html((string) ($record['updated_at'] ?? '')); ?></td></tr><?php endforeach; ?>
             </tbody></table>
-            <?php if (current_user_can(GovernedArtifactRegistry::capability($selected))) : ?>
+            <?php if (current_user_can(self::requiredCapability($selected))) : ?>
             <h2><?php esc_html_e('Create or update record', 'sabri-security-center'); ?></h2>
             <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
                 <input type="hidden" name="action" value="spcrc_save_governed_artifact">
@@ -119,5 +121,12 @@ final class RegistryAdmin
             <?php endif; ?>
         </div>
         <?php
+    }
+
+    private static function requiredCapability(string $type): string
+    {
+        return $type === 'key-metadata'
+            ? 'spcrc_manage_key_metadata'
+            : GovernedArtifactRegistry::capability($type);
     }
 }
