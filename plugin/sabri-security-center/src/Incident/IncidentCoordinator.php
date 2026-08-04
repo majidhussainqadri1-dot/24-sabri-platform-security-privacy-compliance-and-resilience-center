@@ -26,6 +26,10 @@ final class IncidentCoordinator
     /** @return string|\WP_Error */
     public function declare(array $data): string|\WP_Error
     {
+        if (! current_user_can('spcrc_manage_incidents')) {
+            return new \WP_Error('spcrc_incident_declaration_forbidden', 'Incident declaration requires incident-management authority.');
+        }
+
         $severity = Sanitizer::key($data['severity'] ?? '', 20);
         $playbook = Sanitizer::key($data['playbook'] ?? '', 80);
         if (! in_array($severity, ['sev0', 'sev1', 'sev2', 'sev3', 'sev4'], true)) {
@@ -33,9 +37,6 @@ final class IncidentCoordinator
         }
         if (! in_array($playbook, self::PLAYBOOKS, true)) {
             return new \WP_Error('spcrc_incident_playbook_invalid', 'A supported incident playbook is required.');
-        }
-        if (in_array($severity, ['sev0', 'sev1'], true) && ! current_user_can('spcrc_manage_incidents')) {
-            return new \WP_Error('spcrc_incident_declaration_forbidden', 'High-severity incident declaration requires incident-management authority.');
         }
 
         $created = $this->incidents->create([
@@ -91,7 +92,6 @@ final class IncidentCoordinator
         return $created;
     }
 
-
     private function recordPartialDeclarationGap(string $incidentUuid, string $reason, \WP_Error $error): void
     {
         AuditGapStore::record('spcrc_incident_audit_gap', 'incident-declaration', $incidentUuid, $reason, [
@@ -102,6 +102,23 @@ final class IncidentCoordinator
     /** @return bool|\WP_Error */
     public function advance(string $incidentUuid, string $targetStatus, string $reason, string $evidenceRef): bool|\WP_Error
     {
+        if (! current_user_can('spcrc_manage_incidents')) {
+            return new \WP_Error('spcrc_incident_transition_forbidden', 'Incident transition requires incident-management authority.');
+        }
+
+        $incident = $this->incidents->get($incidentUuid);
+        if (! is_array($incident)) {
+            return new \WP_Error('spcrc_incident_not_found', 'Incident could not be found.');
+        }
+
+        $targetStatus = Sanitizer::key($targetStatus, 40);
+        if (in_array($targetStatus, ['closed', 'cancelled'], true)
+            && in_array((string) ($incident['severity'] ?? ''), ['sev0', 'sev1'], true)
+            && ! current_user_can('spcrc_close_critical_incidents')
+        ) {
+            return new \WP_Error('spcrc_critical_incident_close_forbidden', 'Closing a critical incident requires separately delegated authority.');
+        }
+
         return $this->incidents->transition($incidentUuid, $targetStatus, [
             'reason' => $reason,
             'evidence_ref' => $evidenceRef,
@@ -111,6 +128,10 @@ final class IncidentCoordinator
     /** @return string|\WP_Error */
     public function recordAction(string $incidentUuid, string $actionKey, string $title, string $status, string $evidenceRef, array $payload = []): string|\WP_Error
     {
+        if (! current_user_can('spcrc_manage_incidents')) {
+            return new \WP_Error('spcrc_incident_action_forbidden', 'Incident action recording requires incident-management authority.');
+        }
+
         $incident = $this->incidents->get($incidentUuid);
         if (! is_array($incident)) {
             return new \WP_Error('spcrc_incident_not_found', 'Incident could not be found.');
