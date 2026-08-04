@@ -78,6 +78,7 @@ final class RegistryAdmin
         ];
 
         if ($type === 'trust-claim') {
+            $data['claim_key'] = $data['artifact_key'];
             $data['claim_type'] = $payload['claim_type'] ?? '';
             $data['summary'] = $payload['summary'] ?? '';
             $data['independent'] = $payload['independent'] ?? false;
