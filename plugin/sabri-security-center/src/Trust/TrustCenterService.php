@@ -23,14 +23,26 @@ final class TrustCenterService
     /** @return string|\WP_Error */
     public function saveClaim(array $data): string|\WP_Error
     {
+        if (! current_user_can('spcrc_manage_trust_center')) {
+            return new \WP_Error('spcrc_trust_claim_forbidden', 'Trust Center claims require explicit management authority.');
+        }
+
         $claimType = Sanitizer::key($data['claim_type'] ?? '', 80);
         if (! in_array($claimType, self::ALLOWED_CLAIMS, true)) {
             return new \WP_Error('spcrc_trust_claim_type_invalid', 'Trust claim type is not approved for public presentation.');
         }
         $status = Sanitizer::key($data['status'] ?? 'draft', 30);
         $evidenceRef = Sanitizer::opaqueReference($data['evidence_ref'] ?? '');
-        if ($status === 'verified' && ($evidenceRef === '' || Sanitizer::isoTime($data['expires_at'] ?? '') === '')) {
-            return new \WP_Error('spcrc_trust_claim_evidence_missing', 'Verified public claims require evidence and an expiry.');
+        $expiresAt = Sanitizer::isoTime($data['expires_at'] ?? '');
+        $reviewedAt = Sanitizer::isoTime($data['reviewed_at'] ?? '');
+
+        if ($status === 'verified') {
+            if (! current_user_can('spcrc_approve_governance_decision')) {
+                return new \WP_Error('spcrc_trust_claim_approval_forbidden', 'Verified public claims require independent governance approval authority.');
+            }
+            if ($evidenceRef === '' || $expiresAt === '' || $reviewedAt === '') {
+                return new \WP_Error('spcrc_trust_claim_evidence_missing', 'Verified public claims require evidence, a completed review and an expiry.');
+            }
         }
         if ($claimType === 'certification' && $status === 'verified' && ! Sanitizer::boolean($data['independent'] ?? false)) {
             return new \WP_Error('spcrc_trust_certification_independence_missing', 'Certification claims require independent evidence.');
@@ -41,11 +53,11 @@ final class TrustCenterService
             'title' => $data['title'] ?? '',
             'status' => $status,
             'classification' => 'C0',
-            'owner_user_id' => $data['owner_user_id'] ?? get_current_user_id(),
+            'owner_user_id' => get_current_user_id(),
             'evidence_ref' => $evidenceRef,
             'effective_at' => $data['effective_at'] ?? '',
-            'expires_at' => $data['expires_at'] ?? '',
-            'reviewed_at' => $data['reviewed_at'] ?? '',
+            'expires_at' => $expiresAt,
+            'reviewed_at' => $reviewedAt,
             'next_review_at' => $data['next_review_at'] ?? '',
             'payload' => [
                 'claim_type' => $claimType,
@@ -53,7 +65,7 @@ final class TrustCenterService
                 'public_url' => '',
                 'independent' => Sanitizer::boolean($data['independent'] ?? false),
             ],
-        ]);
+        ], absint($data['expected_version'] ?? 0));
     }
 
     /** @return array<int,array<string,mixed>> */
@@ -64,17 +76,25 @@ final class TrustCenterService
             if (($record['status'] ?? '') !== 'verified' || ($record['classification'] ?? '') !== 'C0') {
                 continue;
             }
-            $expires = Sanitizer::isoTime($record['expires_at'] ?? '');
-            if ($expires === '' || strtotime($expires) <= time()) {
+            $payload = is_array($record['payload'] ?? null) ? $record['payload'] : [];
+            $claimType = Sanitizer::key($payload['claim_type'] ?? '', 80);
+            if (! in_array($claimType, self::ALLOWED_CLAIMS, true)) {
                 continue;
             }
-            $payload = is_array($record['payload'] ?? null) ? $record['payload'] : [];
+            $reviewed = Sanitizer::isoTime($record['reviewed_at'] ?? '');
+            $expires = Sanitizer::isoTime($record['expires_at'] ?? '');
+            if ($reviewed === '' || $expires === '' || strtotime($expires) <= time()) {
+                continue;
+            }
+            if ($claimType === 'certification' && ! Sanitizer::boolean($payload['independent'] ?? false)) {
+                continue;
+            }
             $claims[] = [
                 'key' => Sanitizer::key($record['artifact_key'] ?? '', 120),
-                'type' => Sanitizer::key($payload['claim_type'] ?? '', 80),
+                'type' => $claimType,
                 'title' => Sanitizer::text($record['title'] ?? '', 200),
                 'summary' => Sanitizer::text($payload['summary'] ?? '', 500),
-                'verified_at' => Sanitizer::isoTime($record['reviewed_at'] ?? ''),
+                'verified_at' => $reviewed,
                 'expires_at' => $expires,
             ];
         }
