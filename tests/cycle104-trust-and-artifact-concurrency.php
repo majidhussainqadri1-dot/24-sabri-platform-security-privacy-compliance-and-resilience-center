@@ -73,20 +73,47 @@ $forbidden = $trust->saveClaim([
     'title' => 'Security overview',
     'status' => 'draft',
 ]);
-cycleReviewAssert(is_wp_error($forbidden) && $forbidden->get_error_code() === 'spcrc_trust_claim_forbidden', 'Trust claims require explicit management authority.');
+cycleReviewAssert(is_wp_error($forbidden) && $forbidden->get_error_code() === 'spcrc_trust_claim_forbidden', 'Trust claim drafting requires explicit management authority.');
 
 $GLOBALS['current_user_caps']['spcrc_manage_trust_center'] = true;
+$draft = $trust->saveClaim([
+    'claim_type' => 'security-overview',
+    'claim_key' => 'security-overview',
+    'title' => 'Security overview',
+    'summary' => 'Evidence-gated public security information.',
+    'status' => 'draft',
+]);
+cycleReviewAssert(! is_wp_error($draft), 'An authorized manager must be able to create a draft public claim.');
+cycleReviewAssert(($registry->get('trust-claim', 'security-overview')['owner_user_id'] ?? 0) === 7, 'The draft author must be durably attributed.');
+
+$GLOBALS['current_user_caps']['spcrc_approve_governance_decision'] = true;
+$selfApproval = $trust->saveClaim([
+    'claim_type' => 'security-overview',
+    'claim_key' => 'security-overview',
+    'title' => 'Security overview',
+    'summary' => 'Evidence-gated public security information.',
+    'status' => 'verified',
+    'expected_version' => 1,
+    'evidence_ref' => 'evidence:trust-001',
+    'reviewed_at' => gmdate('c'),
+    'expires_at' => gmdate('c', time() + DAY_IN_SECONDS),
+]);
+cycleReviewAssert(is_wp_error($selfApproval) && $selfApproval->get_error_code() === 'spcrc_trust_claim_self_approval_forbidden', 'The draft author must not approve the same public claim.');
+
+$GLOBALS['current_user_id'] = 8;
+unset($GLOBALS['current_user_caps']['spcrc_manage_trust_center'], $GLOBALS['current_user_caps']['spcrc_approve_governance_decision']);
 $unapproved = $trust->saveClaim([
     'claim_type' => 'security-overview',
     'claim_key' => 'security-overview',
     'title' => 'Security overview',
     'summary' => 'Evidence-gated public security information.',
     'status' => 'verified',
+    'expected_version' => 1,
     'evidence_ref' => 'evidence:trust-001',
     'reviewed_at' => gmdate('c'),
     'expires_at' => gmdate('c', time() + DAY_IN_SECONDS),
 ]);
-cycleReviewAssert(is_wp_error($unapproved) && $unapproved->get_error_code() === 'spcrc_trust_claim_approval_forbidden', 'Verified public claims require separate approval authority.');
+cycleReviewAssert(is_wp_error($unapproved) && $unapproved->get_error_code() === 'spcrc_trust_claim_approval_forbidden', 'A second actor still requires explicit approval authority.');
 
 $GLOBALS['current_user_caps']['spcrc_approve_governance_decision'] = true;
 $approved = $trust->saveClaim([
@@ -95,11 +122,12 @@ $approved = $trust->saveClaim([
     'title' => 'Security overview',
     'summary' => 'Evidence-gated public security information.',
     'status' => 'verified',
+    'expected_version' => 1,
     'evidence_ref' => 'evidence:trust-001',
     'reviewed_at' => gmdate('c'),
     'expires_at' => gmdate('c', time() + DAY_IN_SECONDS),
 ]);
-cycleReviewAssert(! is_wp_error($approved), 'An authorized evidence-backed verified claim must be stored.');
+cycleReviewAssert(! is_wp_error($approved), 'A distinct authorized approver must be able to verify the evidence-backed claim.');
 cycleReviewAssert(count($trust->publicClaims()) === 1, 'Exactly one approved unexpired claim must be publicly projected.');
 
 add_filter('spcrc/public_trust_payload', static function (array $payload): array {
