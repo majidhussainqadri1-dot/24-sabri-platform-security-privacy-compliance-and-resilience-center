@@ -89,7 +89,7 @@ jobs:
           cp "$PACKAGE_ONE" /tmp/file24-package-one.zip
           PACKAGE_TWO="$(./tools/build-release.sh)"
           cmp /tmp/file24-package-one.zip "$PACKAGE_TWO"
-          echo "95d0d69d517996896b1396447dcee8ed1eed9a56a5531ad26d9e2ea19c8920db  $PACKAGE_TWO" | sha256sum -c -
+          echo "75b57bb893ff158739cabbc0b969187a9a82ae147eb8b8c36e7405b2e7ea2d4f  $PACKAGE_TWO" | sha256sum -c -
           unzip -t "$PACKAGE_TWO"
 
           git checkout HEAD -- .github/workflows/materialize-file24-code-complete.yml
