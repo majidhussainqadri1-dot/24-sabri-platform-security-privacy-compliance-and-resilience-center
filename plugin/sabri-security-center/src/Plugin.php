@@ -122,7 +122,7 @@ final class Plugin
         (new GovernanceAdmin($governance))->registerHooks();
         (new AssuranceAdmin($assurance))->registerHooks();
         (new VerifiedPrivacyAdmin($privacyRequests, $privacy, $modules))->registerHooks();
-        (new RegistryAdmin($artifacts))->registerHooks();
+        (new RegistryAdmin($artifacts, $trust))->registerHooks();
 
         (new StatusController(
             $modules,
@@ -139,7 +139,7 @@ final class Plugin
             $performance,
             $resilience
         ))->registerHooks();
-        (new GovernanceController($artifacts))->registerHooks();
+        (new GovernanceController($artifacts, $trust))->registerHooks();
 
         // Register service objects without transferring native domain ownership.
         add_filter('spcrc/governed_artifact_registry', static fn (): GovernedArtifactRegistry => $artifacts);
@@ -149,6 +149,7 @@ final class Plugin
         add_filter('spcrc/incident_coordinator', static fn (): IncidentCoordinator => $incidentCoordinator);
         add_filter('spcrc/resilience_coordinator', static fn (): ResilienceCoordinator => $resilience);
         add_filter('spcrc/performance_monitor', static fn (): PerformanceMonitor => $performance);
+        add_filter('spcrc/trust_center_service', static fn (): TrustCenterService => $trust);
 
         do_action('spcrc/booted', $this);
     }
