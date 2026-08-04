@@ -1,0 +1,88 @@
+name: Materialize File 24 Code-Complete Source
+
+on:
+  push:
+    branches:
+      - codex/file-24-full-code-complete-0.99.0
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+concurrency:
+  group: file24-code-complete-materialization
+  cancel-in-progress: false
+
+jobs:
+  materialize-code-complete-source:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: codex/file-24-full-code-complete-0.99.0
+          fetch-depth: 30
+
+      - name: Detect pending code-complete patch
+        id: pending
+        shell: bash
+        run: |
+          if [ -f handoff-code-complete/part-00.b64part ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "No pending File 24 code-complete patch remains."
+          fi
+
+      - name: Set up PHP 8.3
+        if: steps.pending.outputs.present == 'true'
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: none
+
+      - name: Apply and verify code-complete source
+        if: steps.pending.outputs.present == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat handoff-code-complete/part-*.b64part > /tmp/file24-code-complete.patch.bz2.b64
+          base64 -d /tmp/file24-code-complete.patch.bz2.b64 > /tmp/file24-code-complete.patch.bz2
+          bunzip2 -c /tmp/file24-code-complete.patch.bz2 > /tmp/file24-code-complete.patch
+          git apply --check /tmp/file24-code-complete.patch
+          git apply /tmp/file24-code-complete.patch
+          rm -rf handoff-code-complete
+          chmod +x tools/build-release.sh
+
+          PHP_COUNT="$(find plugin tests -type f -name '*.php' | wc -l)"
+          test "$PHP_COUNT" -ge 176
+          find plugin tests -type f -name '*.php' -print0 | xargs -0 -n1 php -l
+
+          TEST_COUNT=0
+          while IFS= read -r -d '' test_file; do
+            php "$test_file"
+            TEST_COUNT=$((TEST_COUNT + 1))
+          done < <(find tests -maxdepth 1 -type f -name '*.php' ! -name 'bootstrap.php' -print0 | sort -z)
+          test "$TEST_COUNT" -ge 108
+
+          PACKAGE_ONE="$(./tools/build-release.sh)"
+          cp "$PACKAGE_ONE" /tmp/file24-package-one.zip
+          PACKAGE_TWO="$(./tools/build-release.sh)"
+          cmp /tmp/file24-package-one.zip "$PACKAGE_TWO"
+          unzip -t "$PACKAGE_TWO"
+          grep -q "define('SPCRC_VERSION', '0.99.0')" plugin/sabri-security-center/sabri-security-center.php
+          php -r '$d=json_decode(file_get_contents("docs/SOURCE-MANIFEST-0.99.0.json"), true, 512, JSON_THROW_ON_ERROR); if (($d["verification"]["requirements"] ?? 0) !== 100) { exit(1); }'
+
+          git checkout HEAD -- .github/workflows/materialize-file24-code-complete.yml
+
+      - name: Commit verified code-complete source
+        if: steps.pending.outputs.present == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "feat(file-24): implement complete repository coding candidate 0.99.0"
+          git push origin HEAD:codex/file-24-full-code-complete-0.99.0
