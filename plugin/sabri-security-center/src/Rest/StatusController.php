@@ -4,16 +4,23 @@ declare(strict_types=1);
 
 namespace Sabri\Platform\Security\Rest;
 
+use Sabri\Platform\Security\Monitoring\PerformanceMonitor;
+use Sabri\Platform\Security\Registry\GovernedArtifactRegistry;
 use Sabri\Platform\Security\Registry\ModuleRegistry;
+use Sabri\Platform\Security\Registry\PlatformIntegrationMatrix;
+use Sabri\Platform\Security\Registry\RequirementCatalog;
 use Sabri\Platform\Security\Registry\SecurityStateRegistry;
+use Sabri\Platform\Security\Release\ReleaseStatus;
+use Sabri\Platform\Security\Resilience\ResilienceCoordinator;
 use Sabri\Platform\Security\Storage\AssuranceRepository;
 use Sabri\Platform\Security\Storage\ControlRepository;
 use Sabri\Platform\Security\Storage\FindingRepository;
-use Sabri\Platform\Security\Storage\IncidentRepository;
 use Sabri\Platform\Security\Storage\GovernanceRepository;
+use Sabri\Platform\Security\Storage\IncidentRepository;
 use Sabri\Platform\Security\Storage\RiskRepository;
 use Sabri\Platform\Security\Support\Sanitizer;
 use Sabri\Platform\Security\System\SystemCheck;
+use Sabri\Platform\Security\Trust\TrustCenterService;
 
 final class StatusController
 {
@@ -28,7 +35,11 @@ final class StatusController
         private ?ControlRepository $controls = null,
         private ?FindingRepository $findings = null,
         private ?AssuranceRepository $assurance = null,
-        private ?GovernanceRepository $governance = null
+        private ?GovernanceRepository $governance = null,
+        private ?GovernedArtifactRegistry $artifacts = null,
+        private ?TrustCenterService $trustCenter = null,
+        private ?PerformanceMonitor $performance = null,
+        private ?ResilienceCoordinator $resilience = null
     ) {
     }
 
@@ -55,6 +66,7 @@ final class StatusController
 
     public function status(): \WP_REST_Response
     {
+        $started = microtime(true);
         $counts = [];
         if ($this->findings && current_user_can('spcrc_manage_findings')) {
             $counts['open_findings'] = $this->findings->openCount();
@@ -77,37 +89,53 @@ final class StatusController
             $counts['vendor_records'] = $this->assurance->count('vendor');
             $counts['backup_records'] = $this->assurance->count('backup');
         }
+        if ($this->artifacts) {
+            $counts['governed_artifacts'] = $this->artifacts->count();
+            foreach (['policy', 'vulnerability', 'alert', 'release-gate', 'drill'] as $type) {
+                $counts[$type . '_records'] = $this->artifacts->count($type);
+            }
+        }
 
-        $response = new \WP_REST_Response([
-            'version' => SPCRC_VERSION,
+        $payload = [
+            'version' => defined('SPCRC_VERSION') ? SPCRC_VERSION : '',
             'schema_version' => (string) get_option('spcrc_schema_version', ''),
             'environment' => Sanitizer::key(wp_get_environment_type(), 30),
+            'release' => class_exists(ReleaseStatus::class) ? ReleaseStatus::summary() : [],
+            'requirements' => class_exists(RequirementCatalog::class) ? RequirementCatalog::summary() : [],
+            'integration_matrix' => class_exists(PlatformIntegrationMatrix::class) ? PlatformIntegrationMatrix::evaluate() : [],
             'modules' => array_values(array_map([$this, 'publicModuleSummary'], $this->modules->all())),
             'security_state_requests' => array_values(array_map([$this, 'stateSummary'], $this->states->all())),
             'counts' => $counts,
+            'resilience' => $this->resilience ? $this->resilience->posture() : [],
             'checks' => $this->checks->run(),
             'generated_at' => gmdate('c'),
-        ]);
+        ];
+        if ($this->performance) {
+            $this->performance->record('status_endpoint_latency_ms', (microtime(true) - $started) * 1000, 'ms');
+            $payload['performance'] = ['status_endpoint_latency_ms' => $this->performance->summary('status_endpoint_latency_ms')];
+        }
+
+        $response = new \WP_REST_Response($payload);
         $response->header('Cache-Control', 'private, no-store, max-age=0');
+        $response->header('X-Robots-Tag', 'noindex, noarchive');
         $response->header('X-Content-Type-Options', 'nosniff');
         return $response;
     }
 
     public function trust(): \WP_REST_Response
     {
-        $payload = [
+        $payload = $this->trustCenter ? $this->trustCenter->payload() : [
             'platform' => 'Sabri Social Homeopathy Platform',
-            'security_program' => 'Foundation under active development',
-            'privacy_request_available' => Sanitizer::boolean(apply_filters('spcrc/privacy_request_intake_available', false)),
-            'responsible_disclosure_available' => Sanitizer::boolean(apply_filters('spcrc/responsible_disclosure_channel_available', false)),
+            'program_status' => 'Repository code-complete candidate; production assurance pending',
+            'security_program' => 'Foundation candidate; production assurance pending',
+            'claims' => [],
             'unsupported_claims' => [
                 'No claim of unhackable security',
                 'No claim of certification without independent evidence',
                 'No claim of end-to-end encryption without audited implementation',
             ],
-            'version' => SPCRC_VERSION,
+            'generated_at' => gmdate('c'),
         ];
-
         $filtered = apply_filters('spcrc/public_trust_payload', $payload);
         $safe = $this->sanitizeTrustPayload(is_array($filtered) ? $filtered : $payload);
         $response = new \WP_REST_Response($safe);
@@ -116,9 +144,7 @@ final class StatusController
         return $response;
     }
 
-    /** @param array<string,mixed> $manifest
-     *  @return array<string,mixed>
-     */
+    /** @param array<string,mixed> $manifest @return array<string,mixed> */
     private function publicModuleSummary(array $manifest): array
     {
         return [
@@ -134,9 +160,7 @@ final class StatusController
         ];
     }
 
-    /** @param array<string,mixed> $state
-     *  @return array<string,mixed>
-     */
+    /** @param array<string,mixed> $state @return array<string,mixed> */
     private function stateSummary(array $state): array
     {
         return [
@@ -149,18 +173,32 @@ final class StatusController
         ];
     }
 
-    /** @param array<string,mixed> $payload
-     *  @return array<string,mixed>
-     */
+    /** @param array<string,mixed> $payload @return array<string,mixed> */
     private function sanitizeTrustPayload(array $payload): array
     {
+        $claims = [];
+        foreach (array_slice(is_array($payload['claims'] ?? null) ? $payload['claims'] : [], 0, 50) as $claim) {
+            if (! is_array($claim)) {
+                continue;
+            }
+            $claims[] = [
+                'key' => Sanitizer::key($claim['key'] ?? '', 120),
+                'type' => Sanitizer::key($claim['type'] ?? '', 80),
+                'title' => Sanitizer::text($claim['title'] ?? '', 200),
+                'summary' => Sanitizer::text($claim['summary'] ?? '', 500),
+                'verified_at' => Sanitizer::isoTime($claim['verified_at'] ?? ''),
+                'expires_at' => Sanitizer::isoTime($claim['expires_at'] ?? ''),
+            ];
+        }
         return [
             'platform' => Sanitizer::text($payload['platform'] ?? 'Sabri Social Homeopathy Platform', 120),
+            'program_status' => 'Repository code-complete candidate; production assurance pending',
             'security_program' => 'Foundation candidate; production assurance pending',
-            'privacy_request_available' => Sanitizer::boolean($payload['privacy_request_available'] ?? false),
-            'responsible_disclosure_available' => Sanitizer::boolean($payload['responsible_disclosure_available'] ?? false),
+            'claims' => $claims,
+            'privacy_request_available' => Sanitizer::boolean(apply_filters('spcrc/privacy_request_intake_available', false)),
+            'responsible_disclosure_available' => Sanitizer::boolean(apply_filters('spcrc/responsible_disclosure_channel_available', false)),
             'unsupported_claims' => Sanitizer::textList($payload['unsupported_claims'] ?? [], 10, 180),
-            'version' => SPCRC_VERSION,
+            'version' => defined('SPCRC_VERSION') ? SPCRC_VERSION : '',
         ];
     }
 }

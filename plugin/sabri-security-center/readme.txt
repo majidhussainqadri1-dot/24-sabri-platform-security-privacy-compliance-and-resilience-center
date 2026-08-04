@@ -4,14 +4,14 @@ Tags: security, privacy, compliance, resilience, audit
 Requires at least: 6.5
 Tested up to: 7.0
 Requires PHP: 8.0
-Stable tag: 0.28.0
+Stable tag: 0.99.0
 License: GPLv2 or later
 
 Central governance and assurance control plane for the Sabri Social Homeopathy Platform.
 
 == Description ==
 
-Foundation 0.28.0, after forty further review-and-correction rounds, provides a private Security Center dashboard, bounded module manifests and audit events, risk/incident/control foundations, a private security-findings triage interface, durable and replay-resistant privacy-request orchestration, bounded retry policy and reconciliation operations, verified privacy intake, fail-closed upgrade integrity, advisory security-state requests, system checks, non-destructive repair, and sanitized REST status/Trust Center payloads.
+Repository code-complete candidate 0.99.0 implements the complete File 24 coding scope defined by the Definitive Master Plan v3.0 and File 24 Harmonized Draft 2 (document version 1.1): governance/policy hierarchy, 100-requirement traceability, Files 00–25 integration matrix, identity/auth assurance, endpoint/upload/private-delivery controls, privacy/data/consent/legal-hold orchestration, vulnerability/detection/remote evidence, incident command, resilience/BIA/drills, evidence-gated Trust Center data, governed registries, release gates and truthful seven-status reporting.
 
 It does not replace native-module authorization, File 00 identity, File 20 enforcement, hosting security, legal counsel, backups, or independent security testing.
 
@@ -27,6 +27,14 @@ It does not replace native-module authorization, File 00 identity, File 20 enfor
 8. Run Security Center checks and the non-destructive repair only when needed.
 
 == Changelog ==
+
+= 0.99.0 =
+* Implemented the complete repository coding scope for F24-R001 through F24-R100 while keeping staging, live and operational acceptance separate.
+* Added 28 governed assurance domains, policy hierarchy, exceptions, assets, data-processing/consent/legal-hold/deletion records, vulnerabilities, external dependencies, continuity/BIA/recovery objectives, drills, release gates and training evidence.
+* Added formal Files 00–25 ownership/assurance matrix, File 02 authentication adapter, File 00/02 sensitive-action assurance, cross-domain clinical/messaging/AI/marketplace/publishing/abuse policies and truthful code-complete release status.
+* Added REST/AJAX/webhook guard, signed webhook replay protection, rate limits, upload quarantine/scanner policy, private delivery grants, network/SSRF policy, scoped security headers and cryptography/E2EE claim gates.
+* Added detection alerts with enforced risk thresholds, authenticated remote evidence queue, incident coordination, out-of-band readiness, resilience schedules, deletion replay, performance measurements and expanded non-destructive repair.
+* Added governed-registry wp-admin fallback, versioned governance REST endpoints, public-safe Trust Center claims, full traceability/phase/release documents, manuals, schema manifest, threat model and deterministic CI integrity evidence.
 
 = 0.28.0 =
 * Added forty fresh review/correction cycles (57–96) with 219 dedicated assertions and final release closure.

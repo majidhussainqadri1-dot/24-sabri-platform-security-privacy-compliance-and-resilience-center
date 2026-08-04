@@ -7,7 +7,7 @@ const MINUTE_IN_SECONDS = 60;
 const HOUR_IN_SECONDS = 3600;
 const DAY_IN_SECONDS = 86400;
 const ABSPATH = '/tmp/wordpress/';
-const SPCRC_VERSION = '0.28.0';
+const SPCRC_VERSION = '0.99.0';
 
 @mkdir(ABSPATH . 'wp-admin/includes', 0777, true);
 if (! file_exists(ABSPATH . 'wp-admin/includes/upgrade.php')) {
@@ -20,6 +20,9 @@ $GLOBALS['wp_transients'] = [];
 $GLOBALS['wp_actions'] = [];
 $GLOBALS['wp_scheduled'] = [];
 $GLOBALS['wp_schedule_recurrences'] = [];
+$GLOBALS['wp_rest_routes'] = [];
+$GLOBALS['wp_redirects'] = [];
+$GLOBALS['wp_enqueued_styles'] = [];
 $GLOBALS['current_user_id'] = 7;
 $GLOBALS['current_user_caps'] = array_fill_keys([
     'spcrc_view_overview',
@@ -38,9 +41,10 @@ $GLOBALS['wp_version'] = '7.0.1';
 
 final class WP_Error
 {
-    public function __construct(private string $code, private string $message) {}
+    public function __construct(private string $code, private string $message, private mixed $data = null) {}
     public function get_error_code(): string { return $this->code; }
     public function get_error_message(): string { return $this->message; }
+    public function get_error_data(): mixed { return $this->data; }
 }
 
 final class WP_REST_Response
@@ -116,7 +120,7 @@ final class FakeWpdb
     {
         if (is_string($prepared)) {
             if (str_contains($prepared, 'spcrc_risks') && str_contains($prepared, 'COUNT(*)')) return count(array_filter($this->risks, static fn(array $r): bool => ($r['status'] ?? '') === 'open'));
-            if (str_contains($prepared, 'spcrc_incidents') && str_contains($prepared, 'COUNT(*)')) return count(array_filter($this->incidents, static fn(array $r): bool => ($r['status'] ?? '') === 'open'));
+            if (str_contains($prepared, 'spcrc_incidents') && str_contains($prepared, 'COUNT(*)')) return count(array_filter($this->incidents, static fn(array $r): bool => ! in_array(($r['status'] ?? ''), ['closed', 'cancelled'], true)));
             if (str_contains($prepared, 'spcrc_controls') && str_contains($prepared, 'COUNT(*)')) return count($this->controls);
             if (str_contains($prepared, 'spcrc_assurance_records') && str_contains($prepared, 'COUNT(*)')) return count($this->assurance);
             if (str_contains($prepared, 'spcrc_governance_decisions') && str_contains($prepared, 'COUNT(*)')) return count(array_filter($this->governance, static fn(array $r): bool => ($r['status'] ?? '') === 'pending'));
@@ -319,6 +323,7 @@ final class FakeWpdb
         if (str_contains($table, 'spcrc_incidents')) {
             $uuid = (string) ($where['incident_uuid'] ?? '');
             if (! isset($this->incidents[$uuid])) return 0;
+            foreach ($where as $field => $value) if (($this->incidents[$uuid][$field] ?? null) != $value) return 0;
             $this->incidents[$uuid] = array_merge($this->incidents[$uuid], $data);
             return 1;
         }
@@ -509,6 +514,7 @@ function has_action(string $hook, mixed $callback = false): int|false
     foreach ($GLOBALS['wp_filters'][$hook] as $priority => $callbacks) foreach ($callbacks as [$registered]) if ($callback === false || $registered === $callback) return (int) $priority;
     return false;
 }
+function has_filter(string $hook, mixed $callback = false): int|false { return has_action($hook, $callback); }
 function apply_filters(string $hook, mixed $value, mixed ...$args): mixed
 {
     if (empty($GLOBALS['wp_filters'][$hook])) return $value;
@@ -557,3 +563,38 @@ function wp_schedule_event(int $timestamp, string $recurrence, string $hook): bo
 function wp_get_scheduled_event(string $hook): object|false { return isset($GLOBALS['wp_scheduled'][$hook]) ? (object) ['timestamp' => $GLOBALS['wp_scheduled'][$hook], 'schedule' => ($GLOBALS['wp_schedule_recurrences'][$hook] ?? '')] : false; }
 function wp_clear_scheduled_hook(string $hook): int { unset($GLOBALS['wp_scheduled'][$hook], $GLOBALS['wp_schedule_recurrences'][$hook]); return 1; }
 function dbDelta(string $sql): void {}
+
+function wp_verify_nonce(string $nonce, string $action = '-1'): int|false { return hash_equals($action, $nonce) || $nonce === 'valid-nonce' ? 1 : false; }
+function register_rest_route(string $namespace, string $route, array $args = [], bool $override = false): bool { $GLOBALS['wp_rest_routes'][$namespace . $route] = $args; return true; }
+function is_admin(): bool { return ! empty($GLOBALS['wp_is_admin']); }
+function is_user_logged_in(): bool { return get_current_user_id() > 0; }
+function admin_url(string $path = ''): string { return 'https://example.test/wp-admin/' . ltrim($path, '/'); }
+function add_query_arg(array|string $key, mixed $value = null, ?string $url = null): string {
+    $args = is_array($key) ? $key : [$key => $value];
+    $base = $url ?? 'https://example.test/';
+    $separator = str_contains($base, '?') ? '&' : '?';
+    return $base . $separator . http_build_query($args);
+}
+function wp_safe_redirect(string $location, int $status = 302): bool { $GLOBALS['wp_redirects'][] = [$location, $status]; return true; }
+function wp_nonce_field(string $action = '-1', string $name = '_wpnonce', bool $referer = true, bool $display = true): string { $html = '<input type="hidden" name="' . $name . '" value="' . $action . '">'; if ($display) echo $html; return $html; }
+function check_admin_referer(string $action = '-1', string $queryArg = '_wpnonce'): int|false { return wp_verify_nonce((string) ($_REQUEST[$queryArg] ?? ''), $action); }
+function submit_button(string $text = 'Save Changes', string $type = 'primary', string $name = 'submit', bool $wrap = true, array|string $otherAttributes = ''): void { echo '<button type="submit" name="' . $name . '">' . htmlspecialchars($text, ENT_QUOTES) . '</button>'; }
+function add_menu_page(string $pageTitle, string $menuTitle, string $capability, string $menuSlug, callable|string $callback = '', string $iconUrl = '', int|float|null $position = null): string { return 'toplevel_page_' . $menuSlug; }
+function add_submenu_page(string $parentSlug, string $pageTitle, string $menuTitle, string $capability, string $menuSlug, callable|string $callback = '', int|float|null $position = null): string|false { return $parentSlug . '_page_' . $menuSlug; }
+function wp_enqueue_style(string $handle, string|false $src = '', array $deps = [], string|bool|null $ver = false, string $media = 'all'): void { $GLOBALS['wp_enqueued_styles'][$handle] = compact('src', 'deps', 'ver', 'media'); }
+function esc_html(string $text): string { return htmlspecialchars($text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); }
+function esc_attr(string $text): string { return htmlspecialchars($text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); }
+function esc_url(string $url): string { return filter_var($url, FILTER_SANITIZE_URL) ?: ''; }
+function esc_html__(string $text, string $domain = 'default'): string { return $text; }
+function esc_html_e(string $text, string $domain = 'default'): void { echo esc_html($text); }
+function esc_attr_e(string $text, string $domain = 'default'): void { echo esc_attr($text); }
+function wp_check_invalid_utf8(string $text, bool $strip = false): string { return preg_match('//u', $text) === 1 ? $text : ''; }
+if (! function_exists('wp_die')) { function wp_die(string $message): void { throw new RuntimeException($message); } }
+
+spl_autoload_register(static function (string $class): void {
+    $prefix = 'Sabri\\Platform\\Security\\';
+    if (! str_starts_with($class, $prefix)) return;
+    $relative = substr($class, strlen($prefix));
+    $path = dirname(__DIR__) . '/plugin/sabri-security-center/src/' . str_replace('\\', '/', $relative) . '.php';
+    if (is_file($path)) require_once $path;
+});

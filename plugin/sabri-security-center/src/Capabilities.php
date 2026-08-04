@@ -24,13 +24,34 @@ final class Capabilities
             'spcrc_approve_governance_decision',
             'spcrc_run_security_assessments',
             'spcrc_manage_security_settings',
+            'spcrc_manage_policies',
+            'spcrc_manage_assets',
+            'spcrc_manage_vulnerabilities',
+            'spcrc_manage_integrations',
+            'spcrc_manage_resilience',
+            'spcrc_manage_trust_center',
+            'spcrc_manage_performance',
+            'spcrc_manage_release_gates',
+            'spcrc_manage_training',
+            'spcrc_view_forensic_metadata',
+            'spcrc_manage_key_metadata',
+            'spcrc_manage_compliance',
+            'spcrc_manage_vendors',
+            'spcrc_run_restore_operations',
+            'spcrc_close_critical_incidents',
         ];
     }
 
     /** @return string[] */
     public static function autoGranted(): array
     {
-        return array_values(array_diff(self::all(), ['spcrc_accept_critical_risk', 'spcrc_approve_governance_decision']));
+        return array_values(array_diff(self::all(), [
+            'spcrc_accept_critical_risk',
+            'spcrc_approve_governance_decision',
+            'spcrc_manage_key_metadata',
+            'spcrc_run_restore_operations',
+            'spcrc_close_critical_incidents',
+        ]));
     }
 
     public static function install(): bool

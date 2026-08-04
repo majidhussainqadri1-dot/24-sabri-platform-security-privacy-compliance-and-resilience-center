@@ -1,4 +1,4 @@
-name: Foundation Integrity
+name: File 24 Repository Code-Complete Integrity
 
 on:
   pull_request:
@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 jobs:
-  foundation-integrity:
+  repository-code-complete-integrity:
     strategy:
       fail-fast: false
       matrix:
@@ -25,9 +25,18 @@ jobs:
           coverage: none
 
       - name: Lint all PHP source and tests
-        run: find plugin tests -type f -name '*.php' -print0 | xargs -0 -n1 php -l
+        shell: bash
+        run: |
+          set -euo pipefail
+          count=0
+          while IFS= read -r -d '' source_file; do
+            php -l "$source_file"
+            count=$((count + 1))
+          done < <(find plugin tests -type f -name '*.php' -print0 | sort -z)
+          test "$count" -ge 176
+          echo "Linted $count PHP files."
 
-      - name: Run complete historical and forty-round suites
+      - name: Run the complete historical and code-complete suites
         shell: bash
         run: |
           set -euo pipefail
@@ -36,93 +45,122 @@ jobs:
             php "$test_file"
             count=$((count + 1))
           done < <(find tests -maxdepth 1 -type f -name '*.php' ! -name 'bootstrap.php' -print0 | sort -z)
-          test "$count" -ge 100
+          test "$count" -ge 108
           echo "Executed $count independent PHP test programs."
 
-      - name: Reject common secret material
+      - name: Reject secrets, private operations material and unsafe PHP
         shell: bash
         run: |
           set -euo pipefail
           test ! -f .env
-          ! find . -type f \( -name '*.pem' -o -name '*.key' -o -name 'id_rsa' \) -print -quit | grep -q .
-          ! grep -RInE --exclude='CHECKSUMS.sha256' --exclude='ci.yml' 'BEGIN (RSA|EC|OPENSSH|DSA) PRIVATE KEY' plugin docs tests README.md SECURITY.md
-          ! grep -RInE --exclude='CHECKSUMS.sha256' --exclude='ci.yml' '(gh[pousr]_[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{30,})' plugin docs tests README.md SECURITY.md
-
-      - name: Verify release, schema and package metadata
-        shell: bash
-        run: |
-          set -euo pipefail
-          grep -q 'Version:     0.28.0' plugin/sabri-security-center/sabri-security-center.php
-          grep -q "define('SPCRC_VERSION', '0.28.0')" plugin/sabri-security-center/sabri-security-center.php
-          grep -q "public const VERSION = '0.25.5'" plugin/sabri-security-center/src/Storage/Schema.php
-          grep -q 'Stable tag: 0.28.0' plugin/sabri-security-center/readme.txt
-          grep -q 'License Inventory — 0.28.0' plugin/sabri-security-center/LICENSES.md
-          php -r '$d=json_decode(file_get_contents("plugin/sabri-security-center/SBOM.spdx.json"), true, 512, JSON_THROW_ON_ERROR); if (($d["spdxVersion"] ?? "") !== "SPDX-2.3" || ($d["packages"][0]["versionInfo"] ?? "") !== "0.28.0") { exit(1); }'
-          test -f docs/FORTY-ROUND-REVIEW-SUMMARY-0.28.0.md
-          test -f docs/RELEASE-RECEIPT-0.28.0.md
-          test -f docs/KNOWN-LIMITATIONS-0.28.0.md
-          test -f docs/REQUIREMENTS-TRACEABILITY-0.28.0.md
-          for cycle in $(seq 57 96); do
-            test -f "docs/REVIEW-AND-CORRECTION-0.28.0-CYCLE-${cycle}.md"
-            find tests -maxdepth 1 -type f -name "cycle${cycle}-*.php" -print -quit | grep -q .
-          done
-
-      - name: Verify forty-round corrective source contracts
-        shell: bash
-        run: |
-          set -euo pipefail
-          grep -q 'wordpress_uuid_generation_failed' plugin/sabri-security-center/src/Support/SecureIdentifier.php
-          grep -q 'spcrc_atomic_lock_invalid' plugin/sabri-security-center/src/Support/AtomicOptionLock.php
-          grep -q 'MAX_TTL = 86400' plugin/sabri-security-center/src/Support/AtomicOptionLock.php
-          grep -q 'validUtf8' plugin/sabri-security-center/src/Support/Sanitizer.php
-          grep -q 'ALLOWED_RESULTS' plugin/sabri-security-center/src/Storage/AuditLogger.php
-          grep -q '_incoming_correlation_hash' plugin/sabri-security-center/src/Storage/AuditLogger.php
-          grep -q 'CAPACITY_MARKER_OPTION' plugin/sabri-security-center/src/Storage/AuditGapStore.php
-          grep -q 'audit_gap_reconciled' plugin/sabri-security-center/src/Storage/AuditGapStore.php
-          grep -q 'spcrc_manifest_version_invalid' plugin/sabri-security-center/src/Registry/ModuleRegistry.php
-          grep -q 'spcrc_manifest_stored_hash_invalid' plugin/sabri-security-center/src/Registry/ModuleRegistry.php
-          grep -q 'resolve_service_actor' plugin/sabri-security-center/src/Registry/SecurityStateRegistry.php
-          grep -q 'security-state-request:' plugin/sabri-security-center/src/Registry/SecurityStateRegistry.php
-          grep -q 'security-state-resolution:' plugin/sabri-security-center/src/Registry/SecurityStateRegistry.php
-          grep -q 'public static function install(): bool' plugin/sabri-security-center/src/Capabilities.php
-          grep -q 'spcrc_activation_installed_at_failed' plugin/sabri-security-center/src/Activation.php
-          grep -q 'spcrc_installed_version_invalid' plugin/sabri-security-center/src/UpgradeManager.php
-          grep -q 'upgrade_failure_evidence_unavailable' plugin/sabri-security-center/src/UpgradeManager.php
-          grep -q 'REQUIRED_INDEXES' plugin/sabri-security-center/src/Storage/Schema.php
-          grep -q 'scheduleValid' plugin/sabri-security-center/src/Retention/RetentionManager.php
-          grep -q 'retention_lock_lost_before_evidence' plugin/sabri-security-center/src/Retention/RetentionManager.php
-          grep -q 'spcrc_privacy_recovery_scan_lock' plugin/sabri-security-center/src/Privacy/RecoveryManager.php
-          grep -q 'spcrc_privacy_verification_stale' plugin/sabri-security-center/src/Privacy/PrivacyVerificationStore.php
+          ! find . -type f \( -name '*.pem' -o -name '*.key' -o -name 'id_rsa' -o -name '*.p12' -o -name '*.pfx' \) -print -quit | grep -q .
+          ! grep -RInE --exclude='ci.yml' 'BEGIN (RSA|EC|OPENSSH|DSA) PRIVATE KEY' plugin docs tests README.md SECURITY.md
+          ! grep -RInE --exclude='ci.yml' '(gh[pousr]_[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{30,})' plugin docs tests README.md SECURITY.md
+          ! grep -RInE --include='*.php' '\b(eval|exec|shell_exec|system|passthru|proc_open|popen|base64_decode)\s*\(' plugin
           ! grep -RInE --include='*.php' ':[[:space:]]*never\b' plugin tests
           ! grep -RInE --include='*.php' '(^|[^A-Za-z0-9_])true[[:space:]]*\|' plugin tests
           ! grep -RIn --include='*.php' 'array_is_list(' plugin tests
 
-      - name: Reject self-mutating workflows and staged source bundles
+      - name: Verify release, schema, SBOM and package metadata
         shell: bash
         run: |
           set -euo pipefail
-          test ! -d handoff
-          test ! -d handoff-cycle41
-          test ! -d handoff-cycle56
-          test ! -d handoff-cycle96
+          grep -q 'Version:     0.99.0' plugin/sabri-security-center/sabri-security-center.php
+          grep -q "define('SPCRC_VERSION', '0.99.0')" plugin/sabri-security-center/sabri-security-center.php
+          grep -q "public const VERSION = '0.25.5'" plugin/sabri-security-center/src/Storage/Schema.php
+          grep -q 'Stable tag: 0.99.0' plugin/sabri-security-center/readme.txt
+          grep -q 'License Inventory — 0.99.0' plugin/sabri-security-center/LICENSES.md
+          grep -q 'GPL-2.0-or-later' plugin/sabri-security-center/LICENSES.md
+          php -r '$d=json_decode(file_get_contents("plugin/sabri-security-center/SBOM.spdx.json"), true, 512, JSON_THROW_ON_ERROR); if (($d["spdxVersion"] ?? "") !== "SPDX-2.3" || ($d["packages"][0]["versionInfo"] ?? "") !== "0.99.0") { exit(1); }'
+          php -r '$d=json_decode(file_get_contents("docs/SCHEMA-MANIFEST-0.99.0.json"), true, 512, JSON_THROW_ON_ERROR); if (($d["schema_version"] ?? "") !== "0.25.5" || count($d["logical_registry_types"] ?? []) !== 28) { exit(1); }'
+          php -r '$d=json_decode(file_get_contents("docs/SOURCE-MANIFEST-0.99.0.json"), true, 512, JSON_THROW_ON_ERROR); if (($d["runtime_version"] ?? "") !== "0.99.0" || empty($d["public_safe_only"]) || !empty($d["private_operations_material_bundled"])) { exit(1); }'
+
+      - name: Verify F24-R001 through F24-R100 repository coding closure
+        shell: bash
+        run: |
+          set -euo pipefail
+          php -r 'require "tests/bootstrap.php"; if (Sabri\Platform\Security\Registry\RequirementCatalog::count() !== 100 || !Sabri\Platform\Security\Registry\RequirementCatalog::repositoryCodingComplete()) { exit(1); }'
+          php -r 'require "tests/bootstrap.php"; if (count(Sabri\Platform\Security\Registry\PlatformIntegrationMatrix::all()) !== 26) { exit(1); }'
+          php -r 'require "tests/bootstrap.php"; if (count(Sabri\Platform\Security\Registry\GovernedArtifactRegistry::types()) !== 28) { exit(1); }'
+          php -r 'require "tests/bootstrap.php"; if (count(Sabri\Platform\Security\Policy\BoundaryPolicyCatalog::all()) !== 6) { exit(1); }'
+          php -r 'require "tests/bootstrap.php"; if (count(Sabri\Platform\Security\Release\ReleaseGateManager::phases()) !== 12) { exit(1); }'
+          php -r 'require "tests/bootstrap.php"; if (count(Sabri\Platform\Security\Capabilities::all()) < 27) { exit(1); }'
+          grep -q 'F24-R100' docs/REQUIREMENTS-TRACEABILITY-0.99.0.md
+          grep -q 'repository_coding_complete' plugin/sabri-security-center/src/Release/ReleaseStatus.php
+          grep -q "PRODUCTION_TARGET = '1.0.0'" plugin/sabri-security-center/src/Release/ReleaseStatus.php
+
+      - name: Verify security, privacy, incident and resilience contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q 'final class GovernedArtifactRegistry' plugin/sabri-security-center/src/Registry/GovernedArtifactRegistry.php
+          grep -q 'final class IdentityAssurance' plugin/sabri-security-center/src/Security/IdentityAssurance.php
+          grep -q 'final class EndpointGuard' plugin/sabri-security-center/src/Security/EndpointGuard.php
+          grep -q 'spcrc_private_delivery_consume_failed' plugin/sabri-security-center/src/Security/PrivateDeliveryPolicy.php
+          grep -q 'dns_get_record' plugin/sabri-security-center/src/Security/NetworkPolicy.php
+          grep -q 'spcrc_vulnerability_finding_failed' plugin/sabri-security-center/src/Security/VulnerabilityManager.php
+          grep -q 'spcrc_incident_declaration_partial' plugin/sabri-security-center/src/Incident/IncidentCoordinator.php
+          grep -q 'spcrc_drill_finding_failed' plugin/sabri-security-center/src/Resilience/ResilienceCoordinator.php
+          grep -q 'persistence_failed' plugin/sabri-security-center/src/Monitoring/RemoteEvidenceQueue.php
+          grep -q 'spcrc/authorize_privacy_module_callback' plugin/sabri-security-center/src/Privacy/PrivacyRequestPolicy.php
+          grep -q 'spcrc/verify_step_up_assurance' plugin/sabri-security-center/src/Privacy/PrivacyRequestPolicy.php
+          grep -q 'spcrc_privacy_verification_stale' plugin/sabri-security-center/src/Privacy/PrivacyVerificationStore.php
+          grep -q 'REQUIRED_INDEXES' plugin/sabri-security-center/src/Storage/Schema.php
+          grep -q 'retention_lock_lost_before_evidence' plugin/sabri-security-center/src/Retention/RetentionManager.php
+          grep -q 'spcrc_manifest_stored_hash_invalid' plugin/sabri-security-center/src/Registry/ModuleRegistry.php
+          grep -q 'MAX_TTL = 86400' plugin/sabri-security-center/src/Support/AtomicOptionLock.php
+          grep -q 'spcrc_atomic_lock_invalid' plugin/sabri-security-center/src/Support/AtomicOptionLock.php
+          grep -q 'spcrc_rate_limit_key_unavailable' plugin/sabri-security-center/src/Security/RateLimiter.php
+          grep -q 'spcrc_critical_incident_close_forbidden' plugin/sabri-security-center/src/Incident/IncidentCoordinator.php
+          grep -q 'minimum_risk' plugin/sabri-security-center/src/Monitoring/DetectionEngine.php
+
+      - name: Verify complete public-safe documentation and manuals
+        shell: bash
+        run: |
+          set -euo pipefail
+          for doc in \
+            CODE-COMPLETE-SUMMARY-0.99.0.md RELEASE-RECEIPT-0.99.0.md KNOWN-LIMITATIONS-0.99.0.md \
+            REQUIREMENTS-TRACEABILITY-0.99.0.md LOGICAL-DATA-MODEL-0.99.0.md SCHEMA-MANIFEST-0.99.0.json \
+            SECURITY-ARCHITECTURE-0.99.0.md DATA-FLOW-OWNERSHIP-0.99.0.md CONTROL-CATALOG-0.99.0.md \
+            THREAT-MODEL-0.99.0.md FILES-00-25-INTEGRATION-MATRIX-0.99.0.md IMPLEMENTATION-PHASES-0.99.0.md \
+            MODULE-SECURITY-SDK-0.99.0.md API-EVENT-CONTRACTS-0.99.0.md COMPLIANCE-APPLICABILITY-0.99.0.md \
+            INCIDENT-RESPONSE-PLAN-0.99.0.md DISASTER-RECOVERY-PLAN-0.99.0.md BACKUP-RESTORE-GUIDE-0.99.0.md \
+            KEY-GOVERNANCE-GUIDE-0.99.0.md MIGRATION-ROLLBACK-0.99.0.md QA-PLAN-0.99.0.md CHANGE-CONTROL-0.99.0.md \
+            REVIEW-AND-CORRECTION-0.99.0-ROUND-1.md REVIEW-AND-CORRECTION-0.99.0-ROUND-2.md \
+            REVIEW-AND-CORRECTION-0.99.0-ROUND-3.md REVIEW-AND-CORRECTION-0.99.0-ROUND-4.md \
+            SOURCE-MANIFEST-0.99.0.json; do
+            test -f "docs/$doc"
+          done
+          for manual in \
+            ADMINISTRATOR-MANUAL.md PRIVACY-OFFICER-MANUAL.md INCIDENT-COMMANDER-MANUAL.md BACKUP-OPERATOR-MANUAL.md \
+            DEVELOPER-SECURITY-GUIDE.md TRUST-CENTER-GUIDANCE.md SECURITY-ARCHITECTURE.md DATA-FLOW-OWNERSHIP.md \
+            CONTROL-CATALOG.md MODULE-SECURITY-SDK.md API-EVENT-CONTRACTS.md COMPLIANCE-APPLICABILITY.md \
+            INCIDENT-RESPONSE-PLAN.md DISASTER-RECOVERY-PLAN.md BACKUP-RESTORE-GUIDE.md KEY-GOVERNANCE-GUIDE.md \
+            LOGICAL-DATA-MODEL.md THREAT-MODEL.md INTEGRATION-MATRIX.md RETENTION-MATRIX.md MIGRATION-ROLLBACK.md \
+            KNOWN-LIMITATIONS.md SCHEMA-MANIFEST.json SOURCE-MANIFEST.json; do
+            test -f "plugin/sabri-security-center/docs/$manual"
+          done
+
+      - name: Reject staged source bundles and self-mutating workflows
+        shell: bash
+        run: |
+          set -euo pipefail
+          ! find . -maxdepth 2 -type d -name 'handoff*' -print -quit | grep -q .
           test ! -d cycle17
-          test ! -f .github/workflows/materialize-file24-cycle12.yml
-          test ! -f .github/workflows/materialize-file24-cycle17.yml
-          test ! -f .github/workflows/materialize-file24-cycle41.yml
-          test ! -f .github/workflows/materialize-file24-cycle56.yml
-          test ! -f .github/workflows/materialize-file24-cycle96.yml
-          test ! -f .github/workflows/apply-cycle2.yml
           ! find .github/workflows -type f ! -name 'ci.yml' -print -quit | grep -q .
           if grep -RInE --exclude='ci.yml' 'git push|contents:[[:space:]]*write' .github/workflows; then
             exit 1
           fi
 
-      - name: Verify source checksums
+      - name: Generate and verify immutable source integrity manifest
+        id: source_integrity
         shell: bash
         run: |
           set -euo pipefail
-          grep -v './.github/workflows/ci.yml$' CHECKSUMS.sha256 > /tmp/file24-checksums
-          sha256sum -c /tmp/file24-checksums
+          git ls-files -z | sort -z | xargs -0 sha256sum > /tmp/file24-source-checksums.sha256
+          test "$(wc -l < /tmp/file24-source-checksums.sha256)" -ge 360
+          sha256sum -c /tmp/file24-source-checksums.sha256
+          echo "path=/tmp/file24-source-checksums.sha256" >> "$GITHUB_OUTPUT"
 
       - name: Build package twice and verify reproducibility
         id: package
@@ -133,37 +171,42 @@ jobs:
           cp "$PACKAGE_ONE" /tmp/file24-package-one.zip
           PACKAGE_TWO="$(./tools/build-release.sh)"
           cmp /tmp/file24-package-one.zip "$PACKAGE_TWO"
-          echo "c062ad32cba27dc533f27241d52c2e54234f8aede00775db82840f498c4143c1  $PACKAGE_TWO" | sha256sum -c -
+          HASH_ONE="$(sha256sum /tmp/file24-package-one.zip | awk '{print $1}')"
+          HASH_TWO="$(sha256sum "$PACKAGE_TWO" | awk '{print $1}')"
+          test "$HASH_ONE" = "$HASH_TWO"
           unzip -t "$PACKAGE_TWO"
           unzip -l "$PACKAGE_TWO" | grep -q 'sabri-security-center/sabri-security-center.php'
           unzip -l "$PACKAGE_TWO" | grep -q 'sabri-security-center/SBOM.spdx.json'
+          unzip -l "$PACKAGE_TWO" | grep -q 'sabri-security-center/docs/ADMINISTRATOR-MANUAL.md'
           (cd "$(dirname "$PACKAGE_TWO")" && sha256sum -c "$(basename "$PACKAGE_TWO").sha256")
           echo "path=$PACKAGE_TWO" >> "$GITHUB_OUTPUT"
+          echo "sha256=$HASH_TWO" >> "$GITHUB_OUTPUT"
 
-      - name: Upload reviewed plugin package
+      - name: Upload code-complete plugin package and integrity receipts
         if: matrix.php == '8.3'
         uses: actions/upload-artifact@v4
         with:
-          name: file-24-security-center-0.28.0
+          name: file-24-security-center-0.99.0
           path: |
             ${{ steps.package.outputs.path }}
             ${{ steps.package.outputs.path }}.sha256
+            ${{ steps.source_integrity.outputs.path }}
           if-no-files-found: error
 
-      - name: Create sanitized source snapshot
+      - name: Create sanitized code-complete source snapshot
         if: matrix.php == '8.3'
         shell: bash
         run: |
           set -euo pipefail
-          rm -rf /tmp/file24-source /tmp/file24-source-snapshot-cycle96.zip
+          rm -rf /tmp/file24-source /tmp/file24-source-snapshot-cycle102.zip
           mkdir -p /tmp/file24-source
           rsync -a --exclude='.git' --exclude='build' ./ /tmp/file24-source/
-          (cd /tmp && zip -X -q -r file24-source-snapshot-cycle96.zip file24-source)
+          (cd /tmp && zip -X -q -r file24-source-snapshot-cycle102.zip file24-source)
 
-      - name: Upload sanitized source snapshot
+      - name: Upload sanitized code-complete source snapshot
         if: matrix.php == '8.3'
         uses: actions/upload-artifact@v4
         with:
-          name: file-24-sanitized-source-snapshot-cycle96
-          path: /tmp/file24-source-snapshot-cycle96.zip
+          name: file-24-sanitized-source-snapshot-cycle102
+          path: /tmp/file24-source-snapshot-cycle102.zip
           if-no-files-found: error

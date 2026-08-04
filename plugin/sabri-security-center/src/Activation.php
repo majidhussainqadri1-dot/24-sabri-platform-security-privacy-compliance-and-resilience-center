@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace Sabri\Platform\Security;
 
+use Sabri\Platform\Security\Monitoring\RemoteEvidenceQueue;
+use Sabri\Platform\Security\Privacy\DeletionReplayManager;
 use Sabri\Platform\Security\Privacy\RecoveryManager;
+use Sabri\Platform\Security\Resilience\ResilienceCoordinator;
 use Sabri\Platform\Security\Retention\RetentionManager;
 use Sabri\Platform\Security\Storage\Schema;
 
@@ -47,6 +50,24 @@ final class Activation
             self::restoreState($stateSnapshot);
             self::recordFailure('spcrc_privacy_recovery_schedule_failed', Schema::VERSION, Schema::VERSION);
             self::abort(__('Required File 24 privacy recovery schedule could not be established.', 'sabri-security-center'));
+        }
+        if (class_exists(DeletionReplayManager::class) && ! DeletionReplayManager::ensureScheduled()) {
+            self::cleanupSchedules($scheduleSnapshot);
+            self::restoreState($stateSnapshot);
+            self::recordFailure('spcrc_deletion_replay_schedule_failed', Schema::VERSION, Schema::VERSION);
+            self::abort(__('Required File 24 deletion-replay schedule could not be established.', 'sabri-security-center'));
+        }
+        if (class_exists(RemoteEvidenceQueue::class) && ! RemoteEvidenceQueue::ensureScheduled()) {
+            self::cleanupSchedules($scheduleSnapshot);
+            self::restoreState($stateSnapshot);
+            self::recordFailure('spcrc_remote_evidence_schedule_failed', Schema::VERSION, Schema::VERSION);
+            self::abort(__('Required File 24 remote-evidence schedule could not be established.', 'sabri-security-center'));
+        }
+        if (class_exists(ResilienceCoordinator::class) && ! ResilienceCoordinator::ensureScheduled()) {
+            self::cleanupSchedules($scheduleSnapshot);
+            self::restoreState($stateSnapshot);
+            self::recordFailure('spcrc_resilience_schedule_failed', Schema::VERSION, Schema::VERSION);
+            self::abort(__('Required File 24 resilience-review schedule could not be established.', 'sabri-security-center'));
         }
 
         update_option('spcrc_version', SPCRC_VERSION, false);
@@ -97,16 +118,19 @@ final class Activation
         }
     }
 
-    /** @return array{retention:bool,recovery:bool} */
+    /** @return array{retention:bool,recovery:bool,deletion:bool,remote:bool,resilience:bool} */
     private static function scheduleSnapshot(): array
     {
         return [
             'retention' => function_exists('wp_next_scheduled') && (bool) wp_next_scheduled(RetentionManager::CRON_HOOK),
             'recovery' => function_exists('wp_next_scheduled') && (bool) wp_next_scheduled(RecoveryManager::EVENT),
+            'deletion' => class_exists(DeletionReplayManager::class) && function_exists('wp_next_scheduled') && (bool) wp_next_scheduled(DeletionReplayManager::EVENT),
+            'remote' => class_exists(RemoteEvidenceQueue::class) && function_exists('wp_next_scheduled') && (bool) wp_next_scheduled(RemoteEvidenceQueue::EVENT),
+            'resilience' => class_exists(ResilienceCoordinator::class) && function_exists('wp_next_scheduled') && (bool) wp_next_scheduled(ResilienceCoordinator::DRILL_EVENT),
         ];
     }
 
-    /** @param array{retention:bool,recovery:bool} $snapshot */
+    /** @param array{retention:bool,recovery:bool,deletion:bool,remote:bool,resilience:bool} $snapshot */
     private static function cleanupSchedules(array $snapshot): void
     {
         if (! $snapshot['retention']) {
@@ -114,6 +138,15 @@ final class Activation
         }
         if (! $snapshot['recovery']) {
             RecoveryManager::unschedule();
+        }
+        if (! $snapshot['deletion'] && class_exists(DeletionReplayManager::class)) {
+            DeletionReplayManager::unschedule();
+        }
+        if (! $snapshot['remote'] && class_exists(RemoteEvidenceQueue::class)) {
+            RemoteEvidenceQueue::unschedule();
+        }
+        if (! $snapshot['resilience'] && class_exists(ResilienceCoordinator::class)) {
+            ResilienceCoordinator::unschedule();
         }
     }
 
