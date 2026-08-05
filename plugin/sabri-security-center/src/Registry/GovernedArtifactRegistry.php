@@ -190,7 +190,13 @@ final class GovernedArtifactRegistry
             if (! is_array($existing) && count($index) >= self::MAX_RECORDS) {
                 return new \WP_Error('spcrc_artifact_capacity_exhausted', 'The bounded artifact registry is at capacity; unresolved records were not evicted.');
             }
-            if (is_array($existing) && $expectedVersion > 0 && (int) ($existing['version'] ?? 0) !== $expectedVersion) {
+            if (is_array($existing) && $expectedVersion < 1) {
+                return new \WP_Error('spcrc_artifact_expected_version_required', 'Existing governed artifacts require an explicit expected version.');
+            }
+            if (! is_array($existing) && $expectedVersion > 0) {
+                return new \WP_Error('spcrc_artifact_unexpected_version', 'A new governed artifact cannot be created with a pre-existing version.');
+            }
+            if (is_array($existing) && (int) ($existing['version'] ?? 0) !== $expectedVersion) {
                 return new \WP_Error('spcrc_artifact_concurrent_update', 'Artifact changed concurrently and was not overwritten.');
             }
 

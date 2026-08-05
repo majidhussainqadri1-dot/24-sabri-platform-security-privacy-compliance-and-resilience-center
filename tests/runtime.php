@@ -8,6 +8,7 @@ final class RuntimeRole
 {
     public array $caps = [];
     public function add_cap(string $capability): void { $this->caps[$capability] = true; }
+    public function remove_cap(string $capability): void { unset($this->caps[$capability]); }
 }
 $GLOBALS['runtime_role'] = new RuntimeRole();
 
@@ -39,8 +40,12 @@ expectRuntime(isset($GLOBALS['hooks']['init']), 'Capability registration must be
 expectRuntime(in_array('spcrc_accept_critical_risk', Capabilities::all(), true), 'Risk-acceptance capability must be declared.');
 expectRuntime(! in_array('spcrc_accept_critical_risk', Capabilities::autoGranted(), true), 'Risk acceptance must not be auto-granted.');
 Capabilities::install();
-expectRuntime(! empty($GLOBALS['runtime_role']->caps['spcrc_manage_findings']), 'Finding management must be granted to administrators.');
-expectRuntime(! empty($GLOBALS['runtime_role']->caps['spcrc_manage_assurance']), 'Assurance management must be granted to administrators.');
+expectRuntime(! empty($GLOBALS['runtime_role']->caps['spcrc_manage_findings']), 'Finding management must remain in the bounded bootstrap Security Administrator bundle.');
+expectRuntime(! empty($GLOBALS['runtime_role']->caps['spcrc_request_governance_decision']), 'The bootstrap Security Administrator must be able to request governance action.');
+expectRuntime(empty($GLOBALS['runtime_role']->caps['spcrc_manage_assurance']), 'Assurance management must require the separately delegated backup-operator duty.');
+expectRuntime(empty($GLOBALS['runtime_role']->caps['spcrc_manage_privacy_requests']), 'Privacy-rights management must require the separately delegated Privacy Officer duty.');
+expectRuntime(empty($GLOBALS['runtime_role']->caps['spcrc_manage_incidents']), 'Incident command must require a separately delegated Incident Commander duty.');
+expectRuntime(empty($GLOBALS['runtime_role']->caps['spcrc_approve_governance_decision']), 'Governance approval must remain separate from governance request authority.');
 expectRuntime(empty($GLOBALS['runtime_role']->caps['spcrc_accept_critical_risk']), 'Critical risk acceptance must require explicit delegation.');
 
 echo "PASS: runtime capability contracts\n";

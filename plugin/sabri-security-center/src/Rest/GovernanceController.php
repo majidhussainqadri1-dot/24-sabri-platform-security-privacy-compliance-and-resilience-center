@@ -9,6 +9,7 @@ use Sabri\Platform\Security\Registry\PlatformIntegrationMatrix;
 use Sabri\Platform\Security\Registry\RequirementCatalog;
 use Sabri\Platform\Security\Release\ReleaseStatus;
 use Sabri\Platform\Security\Support\Sanitizer;
+use Sabri\Platform\Security\Trust\TrustCenterService;
 
 /** Versioned, bounded REST interface for File 24 governance metadata. */
 final class GovernanceController
@@ -20,10 +21,13 @@ final class GovernanceController
         'consent', 'legal-hold', 'processing-activity', 'vulnerability',
         'secret-metadata', 'key-metadata', 'deletion-ledger', 'alert',
         'remote-evidence', 'incident-action', 'upload-assurance', 'private-delivery',
+        'trust-claim',
     ];
 
-    public function __construct(private GovernedArtifactRegistry $artifacts)
-    {
+    public function __construct(
+        private GovernedArtifactRegistry $artifacts,
+        private ?TrustCenterService $trustCenter = null
+    ) {
     }
 
     public function registerHooks(): void
@@ -68,6 +72,7 @@ final class GovernanceController
         }
         if (in_array($type, self::RESTRICTED_READ_TYPES, true)) {
             return current_user_can(self::requiredCapability($type))
+                || ($type === 'trust-claim' && current_user_can('spcrc_approve_governance_decision'))
                 || current_user_can('spcrc_view_forensic_metadata');
         }
         return current_user_can('spcrc_view_overview');
@@ -76,9 +81,17 @@ final class GovernanceController
     public function canSave(mixed $request): bool
     {
         $type = Sanitizer::key($this->param($request, 'artifact_type'), 60);
-        return $type !== ''
-            && in_array($type, GovernedArtifactRegistry::types(), true)
-            && current_user_can(self::requiredCapability($type));
+        if ($type === '' || ! in_array($type, GovernedArtifactRegistry::types(), true)) {
+            return false;
+        }
+        if ($type === 'trust-claim') {
+            $status = Sanitizer::key($this->param($request, 'status'), 40);
+            return $this->trustCenter !== null
+                && ($status === 'verified'
+                    ? current_user_can('spcrc_approve_governance_decision')
+                    : current_user_can('spcrc_manage_trust_center'));
+        }
+        return current_user_can(self::requiredCapability($type));
     }
 
     public function types(): \WP_REST_Response
@@ -111,8 +124,17 @@ final class GovernanceController
             return new \WP_Error('spcrc_governance_write_forbidden', 'This governed artifact domain requires additional authority.');
         }
         $data = $this->allParams($request);
+        $type = Sanitizer::key($data['artifact_type'] ?? '', 60);
         $data['owner_user_id'] = get_current_user_id();
-        $result = $this->artifacts->save($data, absint($data['expected_version'] ?? 0));
+        if ($type === 'trust-claim') {
+            $data['claim_key'] = $data['claim_key'] ?? ($data['artifact_key'] ?? '');
+        }
+        $result = $type === 'trust-claim'
+            ? $this->trustCenter?->saveClaim($data)
+            : $this->artifacts->save($data, absint($data['expected_version'] ?? 0));
+        if ($result === null) {
+            return new \WP_Error('spcrc_trust_claim_service_unavailable', 'Trust claims cannot be changed because the approval service is unavailable.');
+        }
         if (is_wp_error($result)) {
             return $result;
         }

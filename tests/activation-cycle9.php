@@ -44,6 +44,7 @@ namespace Sabri\Platform\Security\Storage {
 namespace Sabri\Platform\Security\Retention {
     final class RetentionManager
     {
+        public const CRON_HOOK = 'spcrc_retention_cleanup';
         public static bool $result = true;
         public static int $unscheduleCalls = 0;
         public static function ensureScheduled(): bool { return self::$result; }
@@ -54,6 +55,7 @@ namespace Sabri\Platform\Security\Retention {
 namespace Sabri\Platform\Security\Privacy {
     final class RecoveryManager
     {
+        public const EVENT = 'spcrc_privacy_recovery';
         public static bool $result = true;
         public static int $unscheduleCalls = 0;
         public static function ensureScheduled(): bool { return self::$result; }
@@ -62,7 +64,40 @@ namespace Sabri\Platform\Security\Privacy {
 }
 
 namespace Sabri\Platform\Security {
-    final class Capabilities { public static function install(): void {} }
+    final class Capabilities
+    {
+        /** @var array<string,bool> */
+        public static array $caps = ['spcrc_manage_incidents' => true];
+
+        /** @return array<string,bool> */
+        public static function bootstrapBundle(): array
+        {
+            return [
+                'spcrc_view_overview' => true,
+                'spcrc_view_module_posture' => true,
+                'spcrc_manage_controls' => true,
+                'spcrc_manage_findings' => true,
+                'spcrc_manage_risks' => true,
+                'spcrc_request_governance_decision' => true,
+            ];
+        }
+
+        /** @return array<string,bool> */
+        public static function snapshot(): array { return self::$caps; }
+
+        public static function install(): bool
+        {
+            self::$caps = self::bootstrapBundle();
+            return true;
+        }
+
+        /** @param array<string,bool> $snapshot */
+        public static function restoreSnapshot(array $snapshot): bool
+        {
+            self::$caps = $snapshot;
+            return true;
+        }
+    }
 
     require_once dirname(__DIR__) . '/plugin/sabri-security-center/src/Activation.php';
 
@@ -79,23 +114,29 @@ namespace Sabri\Platform\Security {
     expectActivation(($GLOBALS['activation_options']['spcrc_last_upgrade_error']['error_code'] ?? '') === 'spcrc_retention_schedule_failed', 'Retention schedule failure must be durably recorded.');
     expectActivation($GLOBALS['activation_deactivated'] === true, 'Failed activation must deactivate the plugin.');
     expectActivation(! isset($GLOBALS['activation_options']['spcrc_version']), 'Failed activation must not claim plugin version success.');
+    expectActivation(Capabilities::$caps === ['spcrc_manage_incidents' => true], 'Retention failure must restore the exact pre-activation capability state.');
 
     $GLOBALS['activation_options'] = [];
     $GLOBALS['activation_deactivated'] = false;
+    Capabilities::$caps = ['spcrc_manage_privacy_requests' => true];
     RetentionManager::$result = true;
     RecoveryManager::$result = false;
     try { Activation::activate(); } catch (\ActivationAbort $e) {}
     expectActivation(($GLOBALS['activation_options']['spcrc_last_upgrade_error']['error_code'] ?? '') === 'spcrc_privacy_recovery_schedule_failed', 'Privacy recovery schedule failure must block activation.');
     expectActivation(! isset($GLOBALS['activation_options']['spcrc_schema_version']), 'Recovery schedule failure must not claim schema version success.');
     expectActivation(RetentionManager::$unscheduleCalls > 0 && RecoveryManager::$unscheduleCalls > 0, 'Failed activation must remove any partially created schedules.');
+    expectActivation(Capabilities::$caps === ['spcrc_manage_privacy_requests' => true], 'Recovery failure must restore the exact pre-activation capability state.');
 
     $GLOBALS['activation_options'] = [];
     $GLOBALS['activation_deactivated'] = false;
+    Capabilities::$caps = ['spcrc_manage_incidents' => true];
     RecoveryManager::$result = true;
     Activation::activate();
     expectActivation(($GLOBALS['activation_options']['spcrc_version'] ?? '') === '0.99.0', 'Successful activation must persist plugin version.');
     expectActivation(($GLOBALS['activation_options']['spcrc_schema_version'] ?? '') === '0.25.5', 'Successful activation must persist schema version.');
     expectActivation(! isset($GLOBALS['activation_options']['spcrc_last_upgrade_error']), 'Successful activation must clear prior failure evidence.');
+    expectActivation(Capabilities::$caps === Capabilities::bootstrapBundle(), 'Successful activation must retain the bounded bootstrap Security Administrator capability state.');
+    expectActivation(empty(Capabilities::$caps['spcrc_manage_incidents']), 'Successful activation must not retain incident-command authority in the bootstrap administrator role.');
 
-    echo "PASS: activation fail-closed schedule and version-state contracts\n";
+    echo "PASS: activation fail-closed schedule, capability compensation and version-state contracts\n";
 }

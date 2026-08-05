@@ -123,7 +123,8 @@ $repair = new Repair();
 $repairResult = $repair->run();
 expect(is_array($repairResult) && get_option('spcrc_schema_version') === '0.25.5', 'Non-destructive repair must verify schema and record version.');
 expect(($repairResult['retention_schedule_verified'] ?? false) && ($repairResult['privacy_recovery_schedule_verified'] ?? false), 'Repair must verify both required schedules.');
-expect(! empty($GLOBALS['administrator_role']->caps['spcrc_manage_risks']) && ! empty($GLOBALS['administrator_role']->caps['spcrc_manage_assurance']), 'Repair must reapply operational capabilities.');
+expect(! empty($GLOBALS['administrator_role']->caps['spcrc_manage_risks']), 'Repair must reapply the bounded bootstrap Security Administrator capabilities.');
+expect(empty($GLOBALS['administrator_role']->caps['spcrc_manage_assurance']) && empty($GLOBALS['administrator_role']->caps['spcrc_run_restore_operations']), 'Repair must preserve assurance and restore separation rather than broaden authority.');
 
 add_filter('spcrc/public_browsing_compatible', '__return_false');
 function __return_false(): bool { return false; }

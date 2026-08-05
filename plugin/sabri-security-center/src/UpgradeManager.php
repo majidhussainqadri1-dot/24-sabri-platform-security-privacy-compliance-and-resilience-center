@@ -43,6 +43,9 @@ final class UpgradeManager
             return $error;
         }
 
+        $capabilitySnapshot = self::capabilitySnapshot();
+        $scheduleSnapshot = self::scheduleSnapshot();
+
         if ($installedSchema === Schema::VERSION && $installedPlugin === SPCRC_VERSION) {
             $schemaIntegrity = Schema::verify();
             if (is_wp_error($schemaIntegrity)) {
@@ -50,7 +53,7 @@ final class UpgradeManager
                 return $schemaIntegrity;
             }
 
-            $integrity = self::ensureRuntimeIntegrity($installedSchema);
+            $integrity = self::ensureRuntimeIntegrity($installedSchema, $capabilitySnapshot, $scheduleSnapshot);
             if (is_wp_error($integrity)) {
                 return $integrity;
             }
@@ -93,7 +96,7 @@ final class UpgradeManager
                 return $error;
             }
 
-            $integrity = self::ensureRuntimeIntegrity($installedSchema);
+            $integrity = self::ensureRuntimeIntegrity($installedSchema, $capabilitySnapshot, $scheduleSnapshot);
             if (is_wp_error($integrity)) {
                 return $integrity;
             }
@@ -104,9 +107,12 @@ final class UpgradeManager
                 (string) get_option('spcrc_schema_version', '') !== Schema::VERSION
                 || (string) get_option('spcrc_version', '') !== SPCRC_VERSION
             ) {
+                self::restoreSchedules($scheduleSnapshot);
+                self::rollbackCapabilities($capabilitySnapshot, 'version_state');
+                self::restoreVersionState($installedSchema, $installedPlugin);
                 $error = new \WP_Error(
                     'spcrc_upgrade_version_state_failed',
-                    'File 24 upgrade version state could not be verified.'
+                    'File 24 upgrade version state could not be verified and all compensatable runtime changes were rolled back.'
                 );
                 self::fail($error, $installedSchema);
                 return $error;
@@ -117,7 +123,10 @@ final class UpgradeManager
             do_action('spcrc/upgraded', $installedSchema, Schema::VERSION, $installedPlugin, SPCRC_VERSION);
             return true;
         } catch (\Throwable $exception) {
-            $error = new \WP_Error('spcrc_upgrade_exception', 'File 24 upgrade failed unexpectedly.');
+            self::restoreSchedules($scheduleSnapshot);
+            self::rollbackCapabilities($capabilitySnapshot, 'exception');
+            self::restoreVersionState($installedSchema, $installedPlugin);
+            $error = new \WP_Error('spcrc_upgrade_exception', 'File 24 upgrade failed unexpectedly and compensatable runtime changes were rolled back.');
             self::recordFailure([
                 'error_code' => $error->get_error_code(),
                 'exception_class' => get_class($exception),
@@ -131,23 +140,26 @@ final class UpgradeManager
         }
     }
 
-    /** @return bool|\WP_Error */
-    private static function ensureRuntimeIntegrity(string $installedSchema): bool|\WP_Error
+    /** @param array<string,bool>|null $capabilitySnapshot
+     *  @param array{retention:bool,recovery:bool} $scheduleSnapshot
+     *  @return bool|\WP_Error
+     */
+    private static function ensureRuntimeIntegrity(string $installedSchema, ?array $capabilitySnapshot, array $scheduleSnapshot): bool|\WP_Error
     {
         $capabilitiesInstalled = Capabilities::install();
         if ($capabilitiesInstalled === false) {
+            self::rollbackCapabilities($capabilitySnapshot, 'capability_install');
             $error = new \WP_Error('spcrc_capability_install_failed', 'Required File 24 capabilities could not be installed and verified.');
             self::fail($error, $installedSchema);
             return $error;
         }
-        $retentionExisted = function_exists('wp_next_scheduled') && (bool) wp_next_scheduled(RetentionManager::CRON_HOOK);
-        $recoveryExisted = function_exists('wp_next_scheduled') && (bool) wp_next_scheduled(RecoveryManager::EVENT);
         if (! RetentionManager::ensureScheduled()) {
             $error = new \WP_Error(
                 'spcrc_retention_schedule_failed',
                 'Required retention schedule could not be verified.'
             );
-            self::cleanupNewSchedules($retentionExisted, $recoveryExisted);
+            self::restoreSchedules($scheduleSnapshot);
+            self::rollbackCapabilities($capabilitySnapshot, 'retention_schedule');
             self::fail($error, $installedSchema);
             return $error;
         }
@@ -156,7 +168,8 @@ final class UpgradeManager
                 'spcrc_privacy_recovery_schedule_failed',
                 'Required privacy recovery schedule could not be verified.'
             );
-            self::cleanupNewSchedules($retentionExisted, $recoveryExisted);
+            self::restoreSchedules($scheduleSnapshot);
+            self::rollbackCapabilities($capabilitySnapshot, 'privacy_recovery_schedule');
             self::fail($error, $installedSchema);
             return $error;
         }
@@ -170,19 +183,70 @@ final class UpgradeManager
         return AtomicOptionLock::acquire(self::LOCK_OPTION, self::LOCK_TTL);
     }
 
-
     private static function refreshLock(string $token): bool
     {
         return AtomicOptionLock::refresh(self::LOCK_OPTION, $token, self::LOCK_TTL);
     }
 
-    private static function cleanupNewSchedules(bool $retentionExisted, bool $recoveryExisted): void
+    /** @return array<string,bool>|null */
+    private static function capabilitySnapshot(): ?array
     {
-        if (! $retentionExisted && method_exists(RetentionManager::class, 'unschedule')) {
+        if (! method_exists(Capabilities::class, 'snapshot')) {
+            return null;
+        }
+        $snapshot = Capabilities::snapshot();
+        return is_array($snapshot) ? $snapshot : null;
+    }
+
+    /** @param array<string,bool>|null $snapshot */
+    private static function rollbackCapabilities(?array $snapshot, string $stage): void
+    {
+        if ($snapshot === null || ! method_exists(Capabilities::class, 'restoreSnapshot')) {
+            return;
+        }
+        if (! Capabilities::restoreSnapshot($snapshot)) {
+            do_action('spcrc/upgrade_capability_rollback_failed', $stage, array_keys($snapshot));
+        }
+    }
+
+    /** @return array{retention:bool,recovery:bool} */
+    private static function scheduleSnapshot(): array
+    {
+        return [
+            'retention' => function_exists('wp_next_scheduled') && (bool) wp_next_scheduled(RetentionManager::CRON_HOOK),
+            'recovery' => function_exists('wp_next_scheduled') && (bool) wp_next_scheduled(RecoveryManager::EVENT),
+        ];
+    }
+
+    /** @param array{retention:bool,recovery:bool} $snapshot */
+    private static function restoreSchedules(array $snapshot): void
+    {
+        if (! $snapshot['retention'] && method_exists(RetentionManager::class, 'unschedule')) {
             RetentionManager::unschedule();
         }
-        if (! $recoveryExisted && method_exists(RecoveryManager::class, 'unschedule')) {
+        if (! $snapshot['recovery'] && method_exists(RecoveryManager::class, 'unschedule')) {
             RecoveryManager::unschedule();
+        }
+    }
+
+    private static function restoreVersionState(string $installedSchema, string $installedPlugin): void
+    {
+        self::restoreVersionOption('spcrc_schema_version', $installedSchema);
+        self::restoreVersionOption('spcrc_version', $installedPlugin);
+        if (
+            (string) get_option('spcrc_schema_version', '') !== $installedSchema
+            || (string) get_option('spcrc_version', '') !== $installedPlugin
+        ) {
+            do_action('spcrc/upgrade_version_rollback_failed', $installedSchema, $installedPlugin);
+        }
+    }
+
+    private static function restoreVersionOption(string $option, string $value): void
+    {
+        if ($value === '') {
+            delete_option($option);
+        } else {
+            update_option($option, $value, false);
         }
     }
 

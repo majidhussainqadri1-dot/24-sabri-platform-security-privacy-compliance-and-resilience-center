@@ -82,12 +82,60 @@ c99(is_wp_error($partialDrill) && $partialDrill->get_error_code() === 'spcrc_dri
 c99(AuditGapStore::count('spcrc_finding_audit_gap') >= 2, 'Partial drill transaction must preserve a second durable audit gap.');
 
 $trust = new TrustCenterService($artifacts);
-$claimMissing = $trust->saveClaim(['claim_type' => 'certification', 'claim_key' => 'iso', 'title' => 'ISO certified', 'status' => 'verified', 'expires_at' => gmdate('c', time() + DAY_IN_SECONDS), 'evidence_ref' => 'cert:iso-01']);
-c99(is_wp_error($claimMissing) && $claimMissing->get_error_code() === 'spcrc_trust_certification_independence_missing', 'Certification claim must require independent evidence.');
-$claim = $trust->saveClaim(['claim_type' => 'security-overview', 'claim_key' => 'security-overview', 'title' => 'Security program overview', 'summary' => 'Repository controls are documented; staging assurance is pending.', 'status' => 'verified', 'expires_at' => gmdate('c', time() + DAY_IN_SECONDS), 'reviewed_at' => gmdate('c'), 'next_review_at' => gmdate('c', time() + 2 * DAY_IN_SECONDS), 'evidence_ref' => 'review:security-overview-01']);
-c99(is_string($claim), 'Evidence-gated public-safe trust claim must persist.');
+$GLOBALS['current_user_id'] = 7;
+$GLOBALS['current_user_caps']['spcrc_manage_trust_center'] = true;
+$certificationDraft = $trust->saveClaim([
+    'claim_type' => 'certification',
+    'claim_key' => 'iso',
+    'title' => 'ISO certification claim',
+    'summary' => 'Independent certification evidence has not yet been established.',
+    'status' => 'draft',
+    'independent' => false,
+]);
+c99(is_string($certificationDraft), 'A certification assertion must begin as an attributable draft.');
+
+$GLOBALS['current_user_id'] = 8;
+unset($GLOBALS['current_user_caps']['spcrc_manage_trust_center']);
+$GLOBALS['current_user_caps']['spcrc_approve_governance_decision'] = true;
+$claimMissing = $trust->saveClaim([
+    'claim_type' => 'certification',
+    'claim_key' => 'iso',
+    'status' => 'verified',
+    'expected_version' => 1,
+    'expires_at' => gmdate('c', time() + DAY_IN_SECONDS),
+    'reviewed_at' => gmdate('c'),
+    'evidence_ref' => 'cert:iso-01',
+]);
+c99(is_wp_error($claimMissing) && $claimMissing->get_error_code() === 'spcrc_trust_certification_independence_missing', 'Certification approval must require independent evidence declared in the reviewed draft.');
+
+$GLOBALS['current_user_id'] = 7;
+unset($GLOBALS['current_user_caps']['spcrc_approve_governance_decision']);
+$GLOBALS['current_user_caps']['spcrc_manage_trust_center'] = true;
+$claimDraft = $trust->saveClaim([
+    'claim_type' => 'security-overview',
+    'claim_key' => 'security-overview',
+    'title' => 'Security program overview',
+    'summary' => 'Repository controls are documented; staging assurance is pending.',
+    'status' => 'draft',
+]);
+c99(is_string($claimDraft), 'A public-safe trust claim must begin as an attributable draft.');
+
+$GLOBALS['current_user_id'] = 8;
+unset($GLOBALS['current_user_caps']['spcrc_manage_trust_center']);
+$GLOBALS['current_user_caps']['spcrc_approve_governance_decision'] = true;
+$claim = $trust->saveClaim([
+    'claim_type' => 'security-overview',
+    'claim_key' => 'security-overview',
+    'status' => 'verified',
+    'expected_version' => 1,
+    'expires_at' => gmdate('c', time() + DAY_IN_SECONDS),
+    'reviewed_at' => gmdate('c'),
+    'next_review_at' => gmdate('c', time() + 2 * DAY_IN_SECONDS),
+    'evidence_ref' => 'review:security-overview-01',
+]);
+c99(is_string($claim), 'A distinct authorized approver must verify the unchanged evidence-gated claim.');
 $claims = $trust->publicClaims();
-c99(count($claims) === 1 && ($claims[0]['type'] ?? '') === 'security-overview', 'Only unexpired verified public-safe claims may publish.');
+c99(count($claims) === 1 && ($claims[0]['type'] ?? '') === 'security-overview', 'Only unexpired independently approved public-safe claims may publish.');
 $payload = $trust->payload();
 c99(($payload['program_status'] ?? '') === 'Repository code-complete candidate; staging and production assurance pending', 'Trust payload must preserve truthful status boundary.');
 

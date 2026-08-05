@@ -45,7 +45,9 @@ function expectCycle9(bool $condition, string $message): void
 
 expectCycle9(Schema::VERSION === '0.25.5' && count(Schema::tables()) === 9, 'Schema must expose nine File 24 tables.');
 Capabilities::install();
-expectCycle9(! empty($GLOBALS['administrator_role']->caps['spcrc_manage_assurance']), 'Assurance capability must be granted to administrators.');
+expectCycle9(! empty($GLOBALS['administrator_role']->caps['spcrc_manage_controls']), 'The bounded bootstrap Security Administrator must retain operational control management.');
+expectCycle9(empty($GLOBALS['administrator_role']->caps['spcrc_manage_assurance']), 'Assurance and backup evidence authority must remain explicitly delegated to the backup operator.');
+expectCycle9(empty($GLOBALS['administrator_role']->caps['spcrc_run_restore_operations']), 'Destructive restore authority must never be inherited by the bootstrap administrator.');
 expectCycle9(empty($GLOBALS['administrator_role']->caps['spcrc_accept_critical_risk']), 'Critical-risk acceptance must remain explicitly delegated.');
 
 $registry = new ModuleRegistry();
