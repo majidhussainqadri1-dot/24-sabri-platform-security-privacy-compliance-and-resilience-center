@@ -11,6 +11,7 @@ use Sabri\Platform\Security\Support\Sanitizer;
 final class GovernancePolicyService
 {
     private const LEVELS = [
+        'islamic-supremacy-charter' => 0,
         'master-plan' => 10,
         'security-charter' => 20,
         'privacy-data-governance' => 30,
@@ -20,6 +21,20 @@ final class GovernancePolicyService
         'procedure' => 70,
         'configuration' => 80,
         'evidence' => 90,
+    ];
+
+    /** @var list<string> */
+    private const ANNUAL_REVIEW_LEVELS = [
+        'islamic-supremacy-charter',
+        'security-charter',
+        'privacy-data-governance',
+        'compliance-applicability',
+    ];
+
+    /** @var list<string> */
+    private const PROTECTED_POLICY_KEYS = [
+        'islamic-supremacy-charter',
+        'anti-surveillance-charter',
     ];
 
     public function __construct(private GovernedArtifactRegistry $artifacts)
@@ -33,16 +48,31 @@ final class GovernancePolicyService
         if (! isset(self::LEVELS[$level])) {
             return new \WP_Error('spcrc_policy_hierarchy_invalid', 'A supported policy hierarchy level is required.');
         }
+        $policyKey = Sanitizer::key($data['policy_key'] ?? '', 120);
+        if ($policyKey === '') {
+            return new \WP_Error('spcrc_policy_key_invalid', 'A stable policy key is required.');
+        }
+        if ($level === 'islamic-supremacy-charter' && $policyKey !== 'islamic-supremacy-charter') {
+            return new \WP_Error('spcrc_islamic_charter_identity_invalid', 'The supreme charter level is reserved for the canonical Islamic Supremacy Charter.');
+        }
         $version = Sanitizer::text($data['policy_version'] ?? '', 40);
         if ($version === '' || preg_match('/^[0-9]+(?:\.[0-9]+){0,3}(?:-[a-z0-9.-]+)?$/i', $version) !== 1) {
             return new \WP_Error('spcrc_policy_version_invalid', 'A bounded semantic policy version is required.');
         }
         $status = Sanitizer::key($data['status'] ?? 'draft', 30);
         $evidenceRef = Sanitizer::opaqueReference($data['evidence_ref'] ?? '');
-        if ($status === 'approved' && ($evidenceRef === '' || Sanitizer::isoTime($data['reviewed_at'] ?? '') === '' || Sanitizer::isoTime($data['next_review_at'] ?? '') === '')) {
+        $reviewedAt = Sanitizer::isoTime($data['reviewed_at'] ?? '');
+        $nextReviewAt = Sanitizer::isoTime($data['next_review_at'] ?? '');
+        if ($status === 'approved' && ($evidenceRef === '' || $reviewedAt === '' || $nextReviewAt === '')) {
             return new \WP_Error('spcrc_policy_approval_evidence_missing', 'Approved policy requires review, next-review and evidence references.');
         }
+        if ($status === 'approved' && in_array($level, self::ANNUAL_REVIEW_LEVELS, true) && ! self::annualReviewValid($reviewedAt, $nextReviewAt)) {
+            return new \WP_Error('spcrc_policy_annual_review_invalid', 'This governing policy requires a next review no later than twelve months after review.');
+        }
         $parentKey = Sanitizer::key($data['parent_policy_key'] ?? '', 120);
+        if ($level === 'islamic-supremacy-charter' && $parentKey !== '') {
+            return new \WP_Error('spcrc_islamic_charter_parent_forbidden', 'The Islamic Supremacy Charter cannot have a higher parent policy.');
+        }
         if ($parentKey !== '') {
             $parent = $this->artifacts->get('policy', $parentKey);
             if (! is_array($parent)) {
@@ -56,7 +86,7 @@ final class GovernancePolicyService
         }
         return $this->artifacts->save([
             'artifact_type' => 'policy',
-            'artifact_key' => $data['policy_key'] ?? '',
+            'artifact_key' => $policyKey,
             'title' => $data['title'] ?? '',
             'status' => $status,
             'classification' => $data['classification'] ?? 'C1',
@@ -64,8 +94,8 @@ final class GovernancePolicyService
             'evidence_ref' => $evidenceRef,
             'effective_at' => $data['effective_at'] ?? '',
             'expires_at' => $data['expires_at'] ?? '',
-            'reviewed_at' => $data['reviewed_at'] ?? '',
-            'next_review_at' => $data['next_review_at'] ?? '',
+            'reviewed_at' => $reviewedAt,
+            'next_review_at' => $nextReviewAt,
             'payload' => [
                 'hierarchy_level' => $level,
                 'hierarchy_rank' => self::LEVELS[$level],
@@ -74,6 +104,8 @@ final class GovernancePolicyService
                 'standards' => Sanitizer::textList($data['standards'] ?? [], 30, 100),
                 'owner_role' => Sanitizer::key($data['owner_role'] ?? '', 80),
                 'change_record_ref' => Sanitizer::opaqueReference($data['change_record_ref'] ?? ''),
+                'annual_review_required' => in_array($level, self::ANNUAL_REVIEW_LEVELS, true),
+                'protected_from_exception' => in_array($policyKey, self::PROTECTED_POLICY_KEYS, true),
             ],
         ]);
     }
@@ -81,6 +113,10 @@ final class GovernancePolicyService
     /** @return string|\WP_Error */
     public function saveException(array $data): string|\WP_Error
     {
+        $policyKey = Sanitizer::key($data['policy_key'] ?? '', 120);
+        if (in_array($policyKey, self::PROTECTED_POLICY_KEYS, true)) {
+            return new \WP_Error('spcrc_protected_charter_exception_forbidden', 'No routine exception may override the Islamic Supremacy or anti-surveillance charter.');
+        }
         $status = Sanitizer::key($data['status'] ?? 'requested', 30);
         $expiresAt = Sanitizer::isoTime($data['expires_at'] ?? '');
         $evidenceRef = Sanitizer::opaqueReference($data['evidence_ref'] ?? '');
@@ -102,13 +138,18 @@ final class GovernancePolicyService
             'reviewed_at' => $data['reviewed_at'] ?? '',
             'next_review_at' => $data['next_review_at'] ?? '',
             'payload' => [
-                'policy_key' => Sanitizer::key($data['policy_key'] ?? '', 120),
+                'policy_key' => $policyKey,
                 'scope' => Sanitizer::text($data['scope'] ?? '', 300),
                 'compensating_controls' => Sanitizer::textList($data['compensating_controls'] ?? [], 30, 120),
                 'requester_user_id' => absint($data['requester_user_id'] ?? get_current_user_id()),
                 'approver_user_id' => absint($data['approver_user_id'] ?? 0),
             ],
         ]);
+    }
+
+    public static function annualReviewValid(string $reviewedAt, string $nextReviewAt): bool
+    {
+        return IslamicGovernanceCharter::annualReviewValid($reviewedAt, $nextReviewAt);
     }
 
     /** @return array<string,int> */

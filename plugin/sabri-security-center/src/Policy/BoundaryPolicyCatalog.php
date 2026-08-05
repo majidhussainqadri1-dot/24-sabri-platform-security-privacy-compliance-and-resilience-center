@@ -7,7 +7,7 @@ namespace Sabri\Platform\Security\Policy;
 use Sabri\Platform\Security\Support\Sanitizer;
 
 /**
- * Machine-readable cross-domain safety boundaries required by F24-R051–R060.
+ * Machine-readable cross-domain safety boundaries.
  * Native owners remain authoritative; File 24 only evaluates assurance evidence.
  */
 final class BoundaryPolicyCatalog
@@ -50,6 +50,36 @@ final class BoundaryPolicyCatalog
             'required_controls' => ['bounded_rate_limit', 'progressive_challenge', 'quota', 'anomaly_detection', 'appeal', 'resource_budget'],
             'high_risk_actions' => ['mass_block', 'mass_report_resolution', 'waf_rule_change'],
         ],
+        'privacy-anti-surveillance' => [
+            'native_owners' => ['native-data-owners', 'file-24-assurance'],
+            'forbidden_in_general_context' => ['sale_of_personal_data', 'covert_tracking', 'behavioral_surveillance', 'hidden_profiling', 'security_log_monetization'],
+            'required_controls' => ['declared_purpose', 'data_minimization', 'bounded_retention', 'user_notice', 'user_choice_or_valid_basis', 'deletion_reconciliation', 'annual_policy_review'],
+            'high_risk_actions' => ['new_tracking_purpose', 'provider_data_transfer', 'model_training', 'security_log_secondary_use'],
+        ],
+        'ranking' => [
+            'native_owners' => ['file-26', 'file-07-profile-source', 'file-09-verification-source'],
+            'forbidden_in_general_context' => ['donation_boost', 'payment_boost', 'paid_promotion_boost', 'founder_favoritism', 'purchased_engagement'],
+            'required_controls' => ['file26_owner_contract', 'versioned_policy', 'explainability', 'audit_log', 'appeal_path', 'monthly_recomputation', 'manipulation_resistance'],
+            'high_risk_actions' => ['policy_activate', 'manual_override', 'bulk_recompute', 'experiment_rollout'],
+        ],
+        'ai-teacher' => [
+            'native_owners' => ['file-16', 'file-21-22-23-publishing-contracts', 'file-26-classification'],
+            'forbidden_in_general_context' => ['human_impersonation', 'verified_doctor_claim', 'undisclosed_ai_post', 'autonomous_diagnosis', 'autonomous_prescription'],
+            'required_controls' => ['institutional_ai_identity', 'visible_ai_disclosure', 'human_review_first_30_days', 'corpus_allowlist', 'source_citations', 'medical_review', 'shariah_review', 'budget_cap', 'provider_failure_fallback'],
+            'high_risk_actions' => ['public_publish', 'provider_change', 'corpus_expand', 'daily_cap_increase'],
+        ],
+        'file-transfer' => [
+            'native_owners' => ['file-17', 'cf-04-when-activated'],
+            'forbidden_in_general_context' => ['unverified_sender', 'unbound_recipient', 'public_original_path', 'permanent_delivery_token', 'unscanned_archive'],
+            'required_controls' => ['one_gib_per_file_limit', 'verified_sender', 'authorized_recipient', 'purpose_binding', 'multipart_or_chunked', 'pause_resume', 'interruption_recovery', 'checksum', 'malware_polyglot_archive_scan', 'short_lived_grant', 'expiry', 'revocation', 'audit'],
+            'high_risk_actions' => ['transfer_issue', 'recipient_change', 'grant_issue', 'quarantine_release'],
+        ],
+        'download' => [
+            'native_owners' => ['native-content-owner', 'cf-04-when-activated'],
+            'forbidden_in_general_context' => ['ineligible_content_download', 'stale_authorization', 'permanent_private_url', 'revoked_object_delivery'],
+            'required_controls' => ['native_owner_eligibility', 'queue', 'progress', 'pause_resume', 'retry', 'checksum', 'range_requests', 'weak_connection_recovery', 'click_time_authorization', 'history', 'audit', 'expiry', 'revocation'],
+            'high_risk_actions' => ['private_download_grant', 'bulk_export', 'offline_package', 'revocation_override'],
+        ],
     ];
 
     /** @return array<string,array<string,mixed>> */
@@ -65,10 +95,7 @@ final class BoundaryPolicyCatalog
         return self::DOMAINS[$domain] ?? null;
     }
 
-    /**
-     * @param array<string,mixed> $evidence
-     * @return array<string,mixed>
-     */
+    /** @param array<string,mixed> $evidence @return array<string,mixed> */
     public static function evaluate(string $domain, array $evidence): array
     {
         $policy = self::get($domain);

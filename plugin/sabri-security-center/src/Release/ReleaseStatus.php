@@ -4,12 +4,13 @@ declare(strict_types=1);
 
 namespace Sabri\Platform\Security\Release;
 
+use Sabri\Platform\Security\Policy\BoundaryPolicyCatalog;
+use Sabri\Platform\Security\Registry\ChatDirectiveCatalog;
+use Sabri\Platform\Security\Registry\PlatformIntegrationMatrix;
 use Sabri\Platform\Security\Registry\RequirementCatalog;
 use Sabri\Platform\Security\Support\Sanitizer;
 
-/**
- * Truthful seven-status release model.
- */
+/** Truthful seven-status release model. */
 final class ReleaseStatus
 {
     public const CODE_COMPLETE_VERSION = '0.99.0';
@@ -18,8 +19,13 @@ final class ReleaseStatus
     /** @return array<string,array<string,mixed>> */
     public static function all(): array
     {
-        $specified = RequirementCatalog::count() === 100;
+        $specified = RequirementCatalog::count() === 100
+            && ChatDirectiveCatalog::count() === 18
+            && PlatformIntegrationMatrix::complete();
         $coded = RequirementCatalog::repositoryCodingComplete()
+            && ChatDirectiveCatalog::repositoryCodingComplete()
+            && PlatformIntegrationMatrix::complete()
+            && count(BoundaryPolicyCatalog::all()) === 11
             && defined('SPCRC_VERSION')
             && version_compare((string) SPCRC_VERSION, self::CODE_COMPLETE_VERSION, '>=');
 
@@ -31,8 +37,8 @@ final class ReleaseStatus
         $operational = $live && Sanitizer::boolean(apply_filters('spcrc/release_evidence_operational', false, $version));
 
         return [
-            'specified' => ['complete' => $specified, 'evidence' => $specified ? 'F24-R001–F24-R100 catalogued' : 'Requirement catalogue incomplete'],
-            'coded' => ['complete' => $coded, 'evidence' => $coded ? 'Repository code-complete candidate ' . $version : 'Repository coding incomplete'],
+            'specified' => ['complete' => $specified, 'evidence' => $specified ? 'F24-R001–F24-R100 plus All-Chats v2.1 File 24 directives catalogued' : 'Requirement catalogue incomplete'],
+            'coded' => ['complete' => $coded, 'evidence' => $coded ? 'Three-plan repository code-complete candidate ' . $version : 'Repository coding incomplete'],
             'packaged' => ['complete' => $packaged, 'evidence' => $packaged ? 'Exact package evidence supplied' : 'Runtime package evidence not asserted'],
             'automated_qa_green' => ['complete' => $automatedQa, 'evidence' => $automatedQa ? 'Exact-head automated QA evidence supplied' : 'Runtime CI evidence not asserted'],
             'staging_accepted' => ['complete' => $staging, 'evidence' => $staging ? 'Founder-approved staging evidence supplied' : 'Hostinger staging acceptance pending'],
