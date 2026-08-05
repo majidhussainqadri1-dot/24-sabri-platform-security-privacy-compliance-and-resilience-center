@@ -21,7 +21,7 @@ $data = new DataGovernanceRegistry($artifacts);
 c97(RequirementCatalog::count() === 100, 'F24-R001 through F24-R100 must be catalogued.');
 c97(RequirementCatalog::repositoryCodingComplete(), 'All requirements must have repository implementations.');
 c97(count(GovernedArtifactRegistry::types()) === 28, 'All governed logical domains must exist.');
-c97(count(PlatformIntegrationMatrix::all()) === 26, 'Files 00 through 25 must have a formal integration row.');
+c97(count(PlatformIntegrationMatrix::all()) === 27 && PlatformIntegrationMatrix::complete(), 'Files 00 through 26 must have formal, contiguous integration rows.');
 
 $master = $policies->savePolicy([
     'policy_key' => 'master-plan-v3', 'title' => 'Definitive Master Plan',

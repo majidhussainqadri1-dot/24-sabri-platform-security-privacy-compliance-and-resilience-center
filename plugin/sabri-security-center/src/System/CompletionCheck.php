@@ -7,6 +7,7 @@ namespace Sabri\Platform\Security\System;
 use Sabri\Platform\Security\Capabilities;
 use Sabri\Platform\Security\Incident\IncidentCoordinator;
 use Sabri\Platform\Security\Policy\BoundaryPolicyCatalog;
+use Sabri\Platform\Security\Registry\ChatDirectiveCatalog;
 use Sabri\Platform\Security\Registry\GovernedArtifactRegistry;
 use Sabri\Platform\Security\Registry\PlatformIntegrationMatrix;
 use Sabri\Platform\Security\Registry\RequirementCatalog;
@@ -31,6 +32,7 @@ final class CompletionCheck
     {
         $checks = is_array($checks) ? $checks : [];
         $summary = RequirementCatalog::summary();
+        $chatSummary = ChatDirectiveCatalog::summary();
         $checks[] = $this->check(
             'requirements_traceability',
             'F24-R001–F24-R100 repository traceability complete',
@@ -38,10 +40,16 @@ final class CompletionCheck
             (int) ($summary['repository_implemented'] ?? 0) . '/100 requirements mapped'
         );
         $checks[] = $this->check(
+            'chat_directives_traceability',
+            'All-Chats v2.1 File 24 directives repository traceability complete',
+            ($chatSummary['repository_coding_complete'] ?? false) === true,
+            (int) ($chatSummary['repository_implemented'] ?? 0) . '/' . (int) ($chatSummary['total'] ?? 0) . ' directives mapped'
+        );
+        $checks[] = $this->check(
             'integration_matrix',
-            'Files 00–25 integration matrix complete',
+            'Files 00–26 integration matrix complete',
             PlatformIntegrationMatrix::complete(),
-            count(PlatformIntegrationMatrix::all()) . '/26 file definitions'
+            count(PlatformIntegrationMatrix::all()) . '/27 file definitions'
         );
         $checks[] = $this->check(
             'governed_domains',
@@ -51,9 +59,9 @@ final class CompletionCheck
         );
         $checks[] = $this->check(
             'boundary_policies',
-            'Clinical, messaging, AI, marketplace, publishing and abuse policies implemented',
-            count(BoundaryPolicyCatalog::all()) === 6,
-            count(BoundaryPolicyCatalog::all()) . '/6 boundary policies'
+            'Core and All-Chats high-risk boundary policies implemented',
+            count(BoundaryPolicyCatalog::all()) === 11,
+            count(BoundaryPolicyCatalog::all()) . '/11 boundary policies'
         );
         $checks[] = $this->check(
             'release_phases',

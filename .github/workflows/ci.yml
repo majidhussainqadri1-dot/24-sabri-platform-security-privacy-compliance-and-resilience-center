@@ -33,7 +33,7 @@ jobs:
             php -l "$source_file"
             count=$((count + 1))
           done < <(find plugin tests -type f -name '*.php' -print0 | sort -z)
-          test "$count" -ge 176
+          test "$count" -ge 184
           echo "Linted $count PHP files."
 
       - name: Run the complete historical and code-complete suites
@@ -45,7 +45,7 @@ jobs:
             php "$test_file"
             count=$((count + 1))
           done < <(find tests -maxdepth 1 -type f -name '*.php' ! -name 'bootstrap.php' -print0 | sort -z)
-          test "$count" -ge 108
+          test "$count" -ge 110
           echo "Executed $count independent PHP test programs."
 
       - name: Reject secrets, private operations material and unsafe PHP
@@ -75,27 +75,35 @@ jobs:
           php -r '$d=json_decode(file_get_contents("docs/SCHEMA-MANIFEST-0.99.0.json"), true, 512, JSON_THROW_ON_ERROR); if (($d["schema_version"] ?? "") !== "0.25.5" || count($d["logical_registry_types"] ?? []) !== 28) { exit(1); }'
           php -r '$d=json_decode(file_get_contents("docs/SOURCE-MANIFEST-0.99.0.json"), true, 512, JSON_THROW_ON_ERROR); if (($d["runtime_version"] ?? "") !== "0.99.0" || empty($d["public_safe_only"]) || !empty($d["private_operations_material_bundled"])) { exit(1); }'
 
-      - name: Verify F24-R001 through F24-R100 repository coding closure
+      - name: Verify F24 and All-Chats repository coding closure
         shell: bash
         run: |
           set -euo pipefail
           php -r 'require "tests/bootstrap.php"; if (Sabri\Platform\Security\Registry\RequirementCatalog::count() !== 100 || !Sabri\Platform\Security\Registry\RequirementCatalog::repositoryCodingComplete()) { exit(1); }'
-          php -r 'require "tests/bootstrap.php"; if (count(Sabri\Platform\Security\Registry\PlatformIntegrationMatrix::all()) !== 26) { exit(1); }'
+          php -r 'require "tests/bootstrap.php"; if (Sabri\Platform\Security\Registry\ChatDirectiveCatalog::count() !== 18 || !Sabri\Platform\Security\Registry\ChatDirectiveCatalog::repositoryCodingComplete()) { exit(1); }'
+          php -r 'require "tests/bootstrap.php"; if (count(Sabri\Platform\Security\Registry\PlatformIntegrationMatrix::all()) !== 27 || !Sabri\Platform\Security\Registry\PlatformIntegrationMatrix::complete()) { exit(1); }'
           php -r 'require "tests/bootstrap.php"; if (count(Sabri\Platform\Security\Registry\GovernedArtifactRegistry::types()) !== 28) { exit(1); }'
-          php -r 'require "tests/bootstrap.php"; if (count(Sabri\Platform\Security\Policy\BoundaryPolicyCatalog::all()) !== 6) { exit(1); }'
+          php -r 'require "tests/bootstrap.php"; if (count(Sabri\Platform\Security\Policy\BoundaryPolicyCatalog::all()) !== 11) { exit(1); }'
           php -r 'require "tests/bootstrap.php"; if (count(Sabri\Platform\Security\Release\ReleaseGateManager::phases()) !== 12) { exit(1); }'
           php -r 'require "tests/bootstrap.php"; if (count(Sabri\Platform\Security\Capabilities::all()) < 27) { exit(1); }'
           grep -q 'F24-R100' docs/REQUIREMENTS-TRACEABILITY-0.99.0.md
+          grep -q 'CHAT-QA-001' docs/CHAT-DIRECTIVES-TRACEABILITY-0.99.0.md
+          grep -q 'File 26' docs/FILES-00-26-INTEGRATION-MATRIX-0.99.0.md
           grep -q 'repository_coding_complete' plugin/sabri-security-center/src/Release/ReleaseStatus.php
           grep -q "PRODUCTION_TARGET = '1.0.0'" plugin/sabri-security-center/src/Release/ReleaseStatus.php
 
-      - name: Verify security, privacy, incident and resilience contracts
+      - name: Verify security, privacy, governance and resilience contracts
         shell: bash
         run: |
           set -euo pipefail
           grep -q 'final class GovernedArtifactRegistry' plugin/sabri-security-center/src/Registry/GovernedArtifactRegistry.php
           grep -q 'final class IdentityAssurance' plugin/sabri-security-center/src/Security/IdentityAssurance.php
           grep -q 'final class EndpointGuard' plugin/sabri-security-center/src/Security/EndpointGuard.php
+          grep -q 'final class IslamicGovernanceCharter' plugin/sabri-security-center/src/Policy/IslamicGovernanceCharter.php
+          grep -q 'final class AntiSurveillancePolicy' plugin/sabri-security-center/src/Policy/AntiSurveillancePolicy.php
+          grep -q 'final class RankingFairnessPolicy' plugin/sabri-security-center/src/Policy/RankingFairnessPolicy.php
+          grep -q 'final class AIHomeopathyTeacherAssurance' plugin/sabri-security-center/src/Policy/AIHomeopathyTeacherAssurance.php
+          grep -q 'VERIFIED_TRANSFER_MAX_BYTES = 1073741824' plugin/sabri-security-center/src/Security/TransferDownloadAssurance.php
           grep -q 'spcrc_private_delivery_consume_failed' plugin/sabri-security-center/src/Security/PrivateDeliveryPolicy.php
           grep -q 'dns_get_record' plugin/sabri-security-center/src/Security/NetworkPolicy.php
           grep -q 'spcrc_vulnerability_finding_failed' plugin/sabri-security-center/src/Security/VulnerabilityManager.php
@@ -128,7 +136,9 @@ jobs:
             KEY-GOVERNANCE-GUIDE-0.99.0.md MIGRATION-ROLLBACK-0.99.0.md QA-PLAN-0.99.0.md CHANGE-CONTROL-0.99.0.md \
             REVIEW-AND-CORRECTION-0.99.0-ROUND-1.md REVIEW-AND-CORRECTION-0.99.0-ROUND-2.md \
             REVIEW-AND-CORRECTION-0.99.0-ROUND-3.md REVIEW-AND-CORRECTION-0.99.0-ROUND-4.md \
-            SOURCE-MANIFEST-0.99.0.json; do
+            SOURCE-MANIFEST-0.99.0.json THREE-PLAN-HARMONIZATION-0.99.0.md \
+            CHAT-DIRECTIVES-TRACEABILITY-0.99.0.md FILES-00-26-INTEGRATION-MATRIX-0.99.0.md \
+            REVIEW-AND-CORRECTION-ALL-CHATS-ROUND-1.md REVIEW-AND-CORRECTION-ALL-CHATS-ROUND-2.md; do
             test -f "docs/$doc"
           done
           for manual in \
@@ -137,7 +147,8 @@ jobs:
             CONTROL-CATALOG.md MODULE-SECURITY-SDK.md API-EVENT-CONTRACTS.md COMPLIANCE-APPLICABILITY.md \
             INCIDENT-RESPONSE-PLAN.md DISASTER-RECOVERY-PLAN.md BACKUP-RESTORE-GUIDE.md KEY-GOVERNANCE-GUIDE.md \
             LOGICAL-DATA-MODEL.md THREAT-MODEL.md INTEGRATION-MATRIX.md RETENTION-MATRIX.md MIGRATION-ROLLBACK.md \
-            KNOWN-LIMITATIONS.md SCHEMA-MANIFEST.json SOURCE-MANIFEST.json; do
+            KNOWN-LIMITATIONS.md SCHEMA-MANIFEST.json SOURCE-MANIFEST.json THREE-PLAN-HARMONIZATION.md \
+            CHAT-DIRECTIVES-TRACEABILITY.md; do
             test -f "plugin/sabri-security-center/docs/$manual"
           done
 
@@ -158,7 +169,7 @@ jobs:
         run: |
           set -euo pipefail
           git ls-files -z | sort -z | xargs -0 sha256sum > /tmp/file24-source-checksums.sha256
-          test "$(wc -l < /tmp/file24-source-checksums.sha256)" -ge 360
+          test "$(wc -l < /tmp/file24-source-checksums.sha256)" -ge 370
           sha256sum -c /tmp/file24-source-checksums.sha256
           echo "path=/tmp/file24-source-checksums.sha256" >> "$GITHUB_OUTPUT"
 
@@ -178,6 +189,7 @@ jobs:
           unzip -l "$PACKAGE_TWO" | grep -q 'sabri-security-center/sabri-security-center.php'
           unzip -l "$PACKAGE_TWO" | grep -q 'sabri-security-center/SBOM.spdx.json'
           unzip -l "$PACKAGE_TWO" | grep -q 'sabri-security-center/docs/ADMINISTRATOR-MANUAL.md'
+          unzip -l "$PACKAGE_TWO" | grep -q 'sabri-security-center/docs/THREE-PLAN-HARMONIZATION.md'
           (cd "$(dirname "$PACKAGE_TWO")" && sha256sum -c "$(basename "$PACKAGE_TWO").sha256")
           echo "path=$PACKAGE_TWO" >> "$GITHUB_OUTPUT"
           echo "sha256=$HASH_TWO" >> "$GITHUB_OUTPUT"

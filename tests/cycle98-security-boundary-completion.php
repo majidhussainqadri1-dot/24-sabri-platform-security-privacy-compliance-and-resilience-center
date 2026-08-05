@@ -91,7 +91,7 @@ add_filter('spcrc/authentication_assurance', static fn (): array => ['authentica
 $allowed = $identity->authorizeSensitiveAction(7, 'key-rotation');
 c98(is_array($allowed) && ! empty($allowed['authorized']), 'Combined membership/authentication assurance must authorize eligible action.');
 
-c98(count(BoundaryPolicyCatalog::all()) === 6, 'Six high-risk boundary policy domains must exist.');
+c98(count(BoundaryPolicyCatalog::all()) === 11, 'Eleven core and All-Chats high-risk boundary policy domains must exist.');
 $clinical = BoundaryPolicyCatalog::get('clinical');
 $verified = BoundaryPolicyCatalog::evaluate('clinical', [
     'controls' => $clinical['required_controls'], 'evidence_ref' => 'test:clinical-controls', 'tested_at' => gmdate('c'),
