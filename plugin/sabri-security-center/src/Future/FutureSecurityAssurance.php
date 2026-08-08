@@ -150,8 +150,8 @@ final class FutureSecurityAssurance
         if ($timestamp === false || $timestamp > time() + 300) {
             return false;
         }
-        $days = max(1, min(365, (int) $maxAgeDays));
-        return $timestamp >= time() - ($days * 86400);
+        $days = Sanitizer::strictInteger($maxAgeDays, 1, 365);
+        return $days !== null && $timestamp >= time() - ($days * 86400);
     }
 
     /** @param string[] $missing

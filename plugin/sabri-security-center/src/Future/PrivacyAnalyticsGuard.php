@@ -15,8 +15,8 @@ final class PrivacyAnalyticsGuard
     {
         $epsilon = $this->finiteFloat($request['epsilon'] ?? null);
         $budget = $this->finiteFloat($request['remaining_budget'] ?? null);
-        $cohort = max(0, (int) ($request['cohort_size'] ?? 0));
-        $minCohort = max(10, min(10000, (int) ($request['minimum_cohort'] ?? 30)));
+        $cohort = Sanitizer::strictInteger($request['cohort_size'] ?? 0, 0, PHP_INT_MAX);
+        $minCohort = Sanitizer::strictInteger($request['minimum_cohort'] ?? 30, 10, 10000);
         $noRaw = Sanitizer::boolean($request['no_raw_rows'] ?? false);
         $clipped = Sanitizer::boolean($request['clipping_applied'] ?? false);
         $cleanRoom = Sanitizer::boolean($request['clean_room'] ?? false);
@@ -25,7 +25,9 @@ final class PrivacyAnalyticsGuard
         if ($epsilon === null || $epsilon <= 0 || $epsilon > 10) $reasons[] = 'epsilon_out_of_bounds';
         if ($budget === null || $budget < 0) $reasons[] = 'privacy_budget_invalid';
         if ($epsilon !== null && $budget !== null && $epsilon > $budget) $reasons[] = 'privacy_budget_exceeded';
-        if ($cohort < $minCohort) $reasons[] = 'cohort_too_small';
+        if ($cohort === null) $reasons[] = 'cohort_size_invalid';
+        if ($minCohort === null) $reasons[] = 'minimum_cohort_invalid';
+        if ($cohort !== null && $minCohort !== null && $cohort < $minCohort) $reasons[] = 'cohort_too_small';
         if (! $noRaw) $reasons[] = 'raw_rows_forbidden';
         if (! $clipped) $reasons[] = 'clipping_required';
         if (! $cleanRoom) $reasons[] = 'clean_room_required';

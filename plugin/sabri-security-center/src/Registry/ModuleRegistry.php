@@ -208,8 +208,11 @@ final class ModuleRegistry
         if (! is_array($routes)) {
             return new \WP_Error('spcrc_manifest_routes_invalid', 'Manifest routes must be a bounded array of same-origin absolute paths.');
         }
+        if (count($routes) > 50) {
+            return new \WP_Error('spcrc_manifest_route_limit', 'Manifest route list exceeds the bounded maximum and was not truncated.');
+        }
         $safe = [];
-        foreach (array_slice($routes, 0, 50) as $route) {
+        foreach ($routes as $route) {
             if (! is_scalar($route) && $route !== null) {
                 return new \WP_Error('spcrc_manifest_route_invalid', 'Manifest route is invalid.');
             }
@@ -383,8 +386,11 @@ final class ModuleRegistry
         if (! is_array($values)) {
             return new \WP_Error('spcrc_manifest_list_invalid', sprintf('Manifest field %s must be a bounded list.', $field));
         }
+        if ($maxItems < 0 || count($values) > $maxItems) {
+            return new \WP_Error('spcrc_manifest_list_limit', sprintf('Manifest field %s exceeds its bounded maximum and was not truncated.', $field));
+        }
         $safe = [];
-        foreach (array_slice($values, 0, max(0, $maxItems)) as $value) {
+        foreach ($values as $value) {
             if (! is_scalar($value) && $value !== null) {
                 return new \WP_Error('spcrc_manifest_list_value_invalid', sprintf('Manifest field %s contains an invalid value.', $field));
             }

@@ -186,7 +186,7 @@ final class PrivacyVerificationStore
         $method = Sanitizer::key($evidence['verification_method'] ?? '', 40);
         $basis = Sanitizer::key($evidence['authority_basis'] ?? '', 40);
         $reference = $this->opaqueReference($evidence['verification_reference'] ?? '');
-        $verifiedBy = absint($evidence['verified_by_user_id'] ?? 0);
+        $verifiedBy = Sanitizer::strictInteger($evidence['verified_by_user_id'] ?? null, 1, PHP_INT_MAX);
         $verifiedAt = Sanitizer::isoTime($evidence['verified_at'] ?? '');
 
         if (
@@ -194,7 +194,7 @@ final class PrivacyVerificationStore
             || ! in_array($basis, PrivacyRequestPolicy::authorityBases(), true)
             || ! PrivacyRequestPolicy::verificationPairAllowed($method, $basis)
             || $reference === ''
-            || $verifiedBy < 1
+            || $verifiedBy === null
             || $verifiedAt === ''
         ) {
             return null;
@@ -214,18 +214,18 @@ final class PrivacyVerificationStore
     {
         $defaults = [
             'authenticated-session' => 900,
-            'verified-email-link' => self::DAY_SECONDS,
-            'verified-mobile-otp' => 3600,
-            'guardian-verification' => self::DAY_SECONDS,
-            'authorized-agent-verification' => self::DAY_SECONDS,
+            'email-confirmed' => self::DAY_SECONDS,
+            'guardian-verified' => self::DAY_SECONDS,
+            'authorized-agent-reviewed' => self::DAY_SECONDS,
             'manual-document-review' => 7 * self::DAY_SECONDS,
         ];
-        $age = (int) apply_filters(
+        $candidate = apply_filters(
             'spcrc/privacy_verification_maximum_age',
             $defaults[$method] ?? 3600,
             $method
         );
-        return max(300, min(7 * self::DAY_SECONDS, $age));
+        $age = Sanitizer::strictInteger($candidate, 300, 7 * self::DAY_SECONDS);
+        return $age ?? ($defaults[$method] ?? 3600);
     }
 
     private function opaqueReference(mixed $value): string
@@ -241,8 +241,8 @@ final class PrivacyVerificationStore
     {
         $method = (string) $evidence['verification_method'];
         $basis = (string) $evidence['authority_basis'];
-        $requesterUserId = absint($request['requester_user_id'] ?? 0);
-        $verifiedBy = absint($evidence['verified_by_user_id'] ?? 0);
+        $requesterUserId = Sanitizer::strictInteger($request['requester_user_id'] ?? null, 1, PHP_INT_MAX) ?? 0;
+        $verifiedBy = Sanitizer::strictInteger($evidence['verified_by_user_id'] ?? null, 1, PHP_INT_MAX);
         $actor = get_current_user_id();
 
         if ($method === 'authenticated-session') {
@@ -278,8 +278,8 @@ final class PrivacyVerificationStore
     private function evidenceConfirmed(array $request, array $evidence): bool
     {
         $method = (string) $evidence['verification_method'];
-        $requesterUserId = absint($request['requester_user_id'] ?? 0);
-        $verifiedBy = absint($evidence['verified_by_user_id'] ?? 0);
+        $requesterUserId = Sanitizer::strictInteger($request['requester_user_id'] ?? null, 1, PHP_INT_MAX) ?? 0;
+        $verifiedBy = Sanitizer::strictInteger($evidence['verified_by_user_id'] ?? null, 1, PHP_INT_MAX);
 
         if ($method === 'manual-document-review') {
             return true;

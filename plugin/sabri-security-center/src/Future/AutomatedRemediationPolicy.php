@@ -20,7 +20,7 @@ final class AutomatedRemediationPolicy
         $reversible = Sanitizer::boolean($request['reversible'] ?? false);
         $previewed = Sanitizer::boolean($request['previewed'] ?? false);
         $rollback = Sanitizer::opaqueReference($request['rollback_reference'] ?? '');
-        $reportedApprovals = max(0, (int) ($request['human_approvals'] ?? 0));
+        $reportedApprovals = Sanitizer::strictInteger($request['human_approvals'] ?? 0, 0, 10);
         $approvalRefs = $this->approvalReferences($request['human_approval_refs'] ?? []);
         $approvals = count($approvalRefs);
         $stepUp = Sanitizer::boolean($request['step_up_verified'] ?? false);
@@ -28,7 +28,8 @@ final class AutomatedRemediationPolicy
 
         if ($action === '' || ! in_array($risk, ['low','medium','high','critical'], true)) $reasons[] = 'invalid_action_or_risk';
         if (! $reversible || ! $previewed || $rollback === '') $reasons[] = 'reversibility_evidence_missing';
-        if ($reportedApprovals !== $approvals) $reasons[] = 'approval_evidence_mismatch';
+        if ($reportedApprovals === null) $reasons[] = 'approval_count_invalid';
+        elseif ($reportedApprovals !== $approvals) $reasons[] = 'approval_evidence_mismatch';
 
         if ($reasons === []) {
             if ($risk === 'low' && in_array($action, self::LOW_RISK_ALLOWLIST, true) && $approvals === 0) {

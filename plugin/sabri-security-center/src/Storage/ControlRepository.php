@@ -51,6 +51,11 @@ final class ControlRepository
         if (in_array($status, ['tested', 'accepted'], true) && ($evidenceRef === '' || $lastTestedAt === null)) {
             return new \WP_Error('spcrc_control_evidence_missing', 'Tested or accepted controls require an opaque evidence reference and completed test timestamp.');
         }
+        $ownerUserId = Sanitizer::strictInteger($data['owner_user_id'] ?? get_current_user_id(), 0, PHP_INT_MAX);
+        if ($ownerUserId === null) {
+            return new \WP_Error('spcrc_control_owner_invalid', 'Control owner must be a non-negative whole user identifier.');
+        }
+        $ownerUserId = $ownerUserId > 0 ? $ownerUserId : null;
 
         $lockOption = 'spcrc_control_lock_' . substr(hash('sha256', $key), 0, 32);
         $lockToken = AtomicOptionLock::acquire($lockOption, self::LOCK_TTL);
@@ -66,7 +71,7 @@ final class ControlRepository
                 'title' => $title,
                 'framework' => $framework,
                 'status' => $status,
-                'owner_user_id' => absint($data['owner_user_id'] ?? get_current_user_id()) ?: null,
+                'owner_user_id' => $ownerUserId,
                 'evidence_ref' => $evidenceRef,
                 'last_tested_at' => $lastTestedAt,
                 'updated_at' => $now,
