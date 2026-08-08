@@ -57,6 +57,11 @@ final class RiskRepository
         if ($title === '' || $moduleKey === '' || Sanitizer::containsSensitiveMaterial($title)) {
             return new \WP_Error('spcrc_risk_invalid', 'A bounded, non-sensitive risk title and module are required.');
         }
+        $ownerUserId = Sanitizer::strictInteger($data['owner_user_id'] ?? get_current_user_id(), 0, PHP_INT_MAX);
+        if ($ownerUserId === null) {
+            return new \WP_Error('spcrc_risk_owner_invalid', 'Risk owner must be a non-negative whole user identifier.');
+        }
+        $ownerUserId = $ownerUserId > 0 ? $ownerUserId : null;
 
         $uuid = SecureIdentifier::uuid4('risk');
         if (is_wp_error($uuid)) {
@@ -74,7 +79,7 @@ final class RiskRepository
                 'inherent_score' => $likelihood * $impact,
                 'status' => 'open',
                 'treatment' => $treatment,
-                'owner_user_id' => absint($data['owner_user_id'] ?? get_current_user_id()) ?: null,
+                'owner_user_id' => $ownerUserId,
                 'due_at' => $this->mysqlTime($data['due_at'] ?? ''),
                 'governance_decision_uuid' => null,
                 'accepted_by_user_id' => null,

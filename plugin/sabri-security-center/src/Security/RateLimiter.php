@@ -44,44 +44,72 @@ final class RateLimiter
         try {
             $now = time();
             $state = get_option($option, []);
-            if (! is_array($state)
-                || ! isset($state['window_started'], $state['count'], $state['expires_at'])
-                || (int) $state['expires_at'] <= $now
-                || (int) $state['window_started'] > $now
-            ) {
-                $state = [
-                    'window_started' => $now,
-                    'count' => 0,
-                    'expires_at' => $now + $windowSeconds,
-                    'violations' => 0,
-                ];
+            if ($state === []) {
+                $state = $this->newState($now, $windowSeconds);
+            } elseif (! is_array($state)) {
+                return new \WP_Error('spcrc_rate_limit_state_invalid', 'Persisted rate-limit state is malformed and was not trusted.');
+            } else {
+                $windowStarted = Sanitizer::strictInteger($state['window_started'] ?? null, 1, PHP_INT_MAX);
+                $count = Sanitizer::strictInteger($state['count'] ?? null, 0, self::MAX_LIMIT);
+                $expiresAt = Sanitizer::strictInteger($state['expires_at'] ?? null, 1, PHP_INT_MAX);
+                $violations = Sanitizer::strictInteger($state['violations'] ?? 0, 0, 20);
+                if (
+                    $windowStarted === null
+                    || $count === null
+                    || $expiresAt === null
+                    || $violations === null
+                    || $windowStarted > $now
+                    || $expiresAt <= $windowStarted
+                    || $expiresAt > $windowStarted + self::MAX_WINDOW
+                ) {
+                    return new \WP_Error('spcrc_rate_limit_state_invalid', 'Persisted rate-limit state is malformed and was not trusted.');
+                }
+                if ($expiresAt <= $now) {
+                    $state = $this->newState($now, $windowSeconds);
+                } else {
+                    $state['window_started'] = $windowStarted;
+                    $state['count'] = $count;
+                    $state['expires_at'] = $expiresAt;
+                    $state['violations'] = $violations;
+                }
             }
 
-            $nextCount = (int) $state['count'] + $cost;
+            $nextCount = $state['count'] + $cost;
             $allowed = $nextCount <= $limit;
             if ($allowed) {
                 $state['count'] = $nextCount;
             } else {
-                $state['violations'] = min(20, (int) ($state['violations'] ?? 0) + 1);
+                $state['violations'] = min(20, $state['violations'] + 1);
             }
             update_option($option, $state, false);
             if (get_option($option, null) !== $state) {
                 return new \WP_Error('spcrc_rate_limit_write_failed', 'Rate-limit state could not be stored and verified.');
             }
 
-            $violations = (int) ($state['violations'] ?? 0);
+            $violations = $state['violations'];
             $challenge = $violations >= 8 ? 'temporary-block' : ($violations >= 3 ? 'challenge' : 'none');
             return [
                 'allowed' => $allowed,
                 'scope' => $scope,
-                'remaining' => max(0, $limit - (int) $state['count']),
-                'retry_after' => $allowed ? 0 : max(1, (int) $state['expires_at'] - $now),
+                'remaining' => max(0, $limit - $state['count']),
+                'retry_after' => $allowed ? 0 : max(1, $state['expires_at'] - $now),
                 'challenge' => $challenge,
                 'identifier_ref' => 'rate:' . $bucket,
             ];
         } finally {
             AtomicOptionLock::release($lock, $token);
         }
+    }
+
+    /** @return array{window_started:int,count:int,expires_at:int,violations:int} */
+    private function newState(int $now, int $windowSeconds): array
+    {
+        return [
+            'window_started' => $now,
+            'count' => 0,
+            'expires_at' => $now + $windowSeconds,
+            'violations' => 0,
+        ];
     }
 
     public function reset(string $scope, string $identifier): bool

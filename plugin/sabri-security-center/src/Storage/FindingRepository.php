@@ -94,7 +94,11 @@ final class FindingRepository
             return $uuid;
         }
         $now = current_time('mysql', true);
-        $actor = absint($data['owner_user_id'] ?? get_current_user_id()) ?: null;
+        $actor = Sanitizer::strictInteger($data['owner_user_id'] ?? get_current_user_id(), 0, PHP_INT_MAX);
+        if ($actor === null) {
+            return new \WP_Error('spcrc_finding_owner_invalid', 'Finding owner must be a non-negative whole user identifier.');
+        }
+        $actor = $actor > 0 ? $actor : null;
         $inserted = $wpdb->insert(
             $wpdb->prefix . 'spcrc_findings',
             [

@@ -195,12 +195,21 @@ final class RemoteEvidenceQueue
                     break;
                 }
 
-                $delivery = apply_filters('spcrc/remote_evidence_deliver', [
-                    'status' => 'unavailable',
-                    'evidence_ref' => '',
-                    'error_code' => 'remote_adapter_unavailable',
-                ], $payload);
-                $delivery = is_array($delivery) ? $delivery : [];
+                try {
+                    $delivery = apply_filters('spcrc/remote_evidence_deliver', [
+                        'status' => 'unavailable',
+                        'evidence_ref' => '',
+                        'error_code' => 'remote_adapter_unavailable',
+                    ], $payload);
+                    $delivery = is_array($delivery) ? $delivery : [];
+                } catch (\Throwable $throwable) {
+                    $delivery = [
+                        'status' => 'unavailable',
+                        'evidence_ref' => '',
+                        'error_code' => 'remote_adapter_exception',
+                    ];
+                    do_action('spcrc/remote_evidence_adapter_exception', (string) ($record['artifact_key'] ?? ''), get_class($throwable));
+                }
                 if (! AtomicOptionLock::refresh(self::LOCK, $token, 300)) {
                     ++$counts['persistence_failed'];
                     $this->recordLeaseGap($record, 'lease_lost_during_delivery');

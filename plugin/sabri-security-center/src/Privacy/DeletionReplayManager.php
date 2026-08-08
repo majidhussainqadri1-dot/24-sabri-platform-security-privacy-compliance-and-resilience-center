@@ -95,7 +95,29 @@ final class DeletionReplayManager
                 }
                 ++$counts['processed'];
                 $holdRef = Sanitizer::opaqueReference($payload['legal_hold_ref'] ?? '');
-                if ($holdRef !== '' && Sanitizer::boolean(apply_filters('spcrc/privacy_legal_hold_active', false, $holdRef, $record))) {
+                $holdActive = false;
+                if ($holdRef !== '') {
+                    try {
+                        $holdActive = Sanitizer::boolean(apply_filters('spcrc/privacy_legal_hold_active', false, $holdRef, $record));
+                    } catch (\Throwable $throwable) {
+                        if ($recordStatus === 'blocked-hold') {
+                            ++$counts['held'];
+                            do_action('spcrc/privacy_legal_hold_adapter_exception', (string) $record['artifact_key'], get_class($throwable));
+                            continue;
+                        }
+                        $failedHold = $this->artifacts->transition('deletion-ledger', (string) $record['artifact_key'], 'failed', (int) $record['version'], [
+                            'last_error_code' => 'legal_hold_adapter_exception',
+                            'next_retry_at' => gmdate('c', time() + 300),
+                        ]);
+                        if (is_wp_error($failedHold)) {
+                            $this->recordPersistenceGap($record, 'legal_hold_exception_state_persistence_failed', $failedHold);
+                        }
+                        ++$counts['failed'];
+                        do_action('spcrc/privacy_legal_hold_adapter_exception', (string) $record['artifact_key'], get_class($throwable));
+                        continue;
+                    }
+                }
+                if ($holdActive) {
                     if ($recordStatus === 'blocked-hold') {
                         ++$counts['held'];
                         continue;
@@ -154,12 +176,21 @@ final class DeletionReplayManager
                     $this->recordLeaseGap($record, 'lease_lost_after_dispatch_claim');
                     break;
                 }
-                $result = apply_filters('spcrc/privacy_deletion_replay_module', [
-                    'status' => 'unavailable',
-                    'evidence_ref' => '',
-                    'error_code' => 'module_handler_unavailable',
-                ], $record);
-                $result = is_array($result) ? $result : [];
+                try {
+                    $result = apply_filters('spcrc/privacy_deletion_replay_module', [
+                        'status' => 'unavailable',
+                        'evidence_ref' => '',
+                        'error_code' => 'module_handler_unavailable',
+                    ], $record);
+                    $result = is_array($result) ? $result : [];
+                } catch (\Throwable $throwable) {
+                    $result = [
+                        'status' => 'failed',
+                        'evidence_ref' => '',
+                        'error_code' => 'module_handler_exception',
+                    ];
+                    do_action('spcrc/privacy_deletion_replay_adapter_exception', (string) ($record['artifact_key'] ?? ''), get_class($throwable));
+                }
                 if (! AtomicOptionLock::refresh(self::LOCK, $token, 300)) {
                     ++$counts['failed'];
                     $this->recordLeaseGap($record, 'lease_lost_during_dispatch');

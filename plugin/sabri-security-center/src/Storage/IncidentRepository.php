@@ -73,6 +73,11 @@ final class IncidentRepository
         if (in_array($severity, ['sev0', 'sev1'], true) && $evidenceRef === '') {
             return new \WP_Error('spcrc_incident_evidence_required', 'SEV0/SEV1 incidents require an opaque private evidence reference.');
         }
+        $ownerUserId = Sanitizer::strictInteger($data['owner_user_id'] ?? get_current_user_id(), 0, PHP_INT_MAX);
+        if ($ownerUserId === null) {
+            return new \WP_Error('spcrc_incident_owner_invalid', 'Incident owner must be a non-negative whole user identifier.');
+        }
+        $ownerUserId = $ownerUserId > 0 ? $ownerUserId : null;
 
         $uuid = SecureIdentifier::uuid4('incident');
         if (is_wp_error($uuid)) {
@@ -87,7 +92,7 @@ final class IncidentRepository
                 'title' => $title,
                 'severity' => $severity,
                 'status' => 'open',
-                'owner_user_id' => absint($data['owner_user_id'] ?? get_current_user_id()) ?: null,
+                'owner_user_id' => $ownerUserId,
                 'summary' => $summary,
                 'evidence_ref' => $evidenceRef,
                 'opened_at' => $now,

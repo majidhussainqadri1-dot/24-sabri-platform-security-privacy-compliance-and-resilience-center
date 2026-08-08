@@ -1,0 +1,29 @@
+name: File 24 Cycle 185-194 Bootstrap
+
+on:
+  push:
+    branches:
+      - file24-ten-round-review-185-194
+
+permissions:
+  contents: write
+
+jobs:
+  apply-final-patches:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply exact reviewed remaining patches
+        run: python3 tools/apply-cycle185-194-final-patches.py
+      - name: Commit exact reviewed source
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git diff --cached --quiet && { echo 'No patch changes produced'; exit 1; }
+          git commit -m 'Complete File 24 cycles 185-197 reviewed source'
+          git push origin HEAD:file24-ten-round-review-185-194
