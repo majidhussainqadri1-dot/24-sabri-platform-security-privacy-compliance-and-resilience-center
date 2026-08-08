@@ -19,6 +19,10 @@ final class RegistryAdmin
         'trust-claim',
     ];
 
+
+    /** Release-gate mutation must go through ReleaseGateManager's dual-control ceremony. */
+    private const SPECIALIZED_WRITE_TYPES = ['release-gate'];
+
     public function __construct(
         private GovernedArtifactRegistry $artifacts,
         private TrustCenterService $trustCenter
@@ -179,6 +183,9 @@ final class RegistryAdmin
 
     private static function canWriteType(string $type, string $status): bool
     {
+        if (in_array($type, self::SPECIALIZED_WRITE_TYPES, true)) {
+            return false;
+        }
         if ($type === 'trust-claim') {
             return $status === 'verified'
                 ? current_user_can('spcrc_approve_governance_decision')
@@ -189,6 +196,9 @@ final class RegistryAdmin
 
     private static function canDisplayWriteForm(string $type): bool
     {
+        if (in_array($type, self::SPECIALIZED_WRITE_TYPES, true)) {
+            return false;
+        }
         return $type === 'trust-claim'
             ? current_user_can('spcrc_manage_trust_center') || current_user_can('spcrc_approve_governance_decision')
             : current_user_can(self::requiredCapability($type));
