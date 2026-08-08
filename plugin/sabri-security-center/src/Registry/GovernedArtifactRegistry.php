@@ -494,9 +494,18 @@ final class GovernedArtifactRegistry
         }
         if (in_array($type, ['policy', 'continuity-plan', 'bia', 'performance-objective'], true)
             && in_array($status, ['approved', 'active', 'measured'], true)
-            && $nextReviewAt === ''
         ) {
-            return new \WP_Error('spcrc_artifact_next_review_required', 'Approved governance artifacts require a future review date.');
+            if ($reviewedAt === '' || $nextReviewAt === '') {
+                return new \WP_Error('spcrc_artifact_next_review_required', 'Approved governance artifacts require completed review evidence and a future review date.');
+            }
+            $reviewedTimestamp = strtotime($reviewedAt);
+            $nextReviewTimestamp = strtotime($nextReviewAt);
+            if ($reviewedTimestamp === false || $nextReviewTimestamp === false
+                || $reviewedTimestamp > time() + 300
+                || $nextReviewTimestamp <= time()
+            ) {
+                return new \WP_Error('spcrc_artifact_review_freshness_invalid', 'Governance review evidence must be current, non-future and have an unexpired next-review date.');
+            }
         }
         return true;
     }
