@@ -41,7 +41,7 @@ After Cycle 194, the complete historical/current suite was executed instead of s
 |---:|---|---|
 | 195 | Full-suite PHP 8.0 compatibility | **Defect found and corrected.** Cycle 187 test callbacks used the PHP 8.1-only `never` return type despite the repository declaring PHP 8.0 support. The return type was removed without changing the exception-path assertion; a permanent compatibility regression was added. |
 | 196 | First fresh whole-system review after the last fix | **No new repository-correctable defect found.** Rechecked stable/Continuous Value/Future catalogues, Files 00–26 integration, strict state/identity/freshness/completeness gates and native-owner boundaries. |
-| 197 | Second independent final closure review | **No new repository-correctable defect found.** Rechecked the complete historical/current suite, CI monotonic range/floors, deterministic package contract, public-safe source boundary and zero-known-defect repository closure statement. |
+| 197 | Second independent final closure review | **No new repository-correctable defect found.** Rechecked the complete historical/current suite, dynamic CI discovery of every top-level regression, actual post-review source/test counts, deterministic package contract, public-safe source boundary and zero-known-defect repository closure statement. |
 
 **Consecutive clean final closing cycles: 196, 197.**
 
