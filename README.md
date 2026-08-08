@@ -10,9 +10,10 @@ File 24 is the cross-platform security-governance and assurance plane for the Sa
 - Base requirements: **F24-R001–F24-R100 repository-implemented**
 - Recovered directives: **18/18 CHAT-* repository-implemented**
 - Later central-plan delta: **CV-262–CV-285 = 24/24** plus **F24-CEN-01 = 1/1 repository-implemented**
-- Final current-plan repository review: **Cycles 112 and 113**
+- Future Security & Privacy Superset: **F24-FUT-001–F24-FUT-025 = 25/25 repository-implemented**
+- Final current-plan repository reviews: **Cycles 112–115**
 
-This status means the approved repository-coding scope, including the later Continuous Value / Top-20 File-24 delta, is implemented, traceable, reviewed, testable and packageable. It does **not** mean Hostinger staging acceptance, independent certification, penetration-test acceptance, restore-drill acceptance, live deployment or operational acceptance.
+This status means the approved repository-coding scope, including the later Continuous Value / Top-20 File-24 delta and the Future Security & Privacy Superset, is implemented, traceable, reviewed, testable and packageable. It does **not** mean Hostinger staging acceptance, independent certification, penetration-test acceptance, restore-drill acceptance, live deployment or operational acceptance.
 
 ## Implemented repository scope
 
@@ -28,6 +29,7 @@ This status means the approved repository-coding scope, including the later Cont
 - Islamic governance, anti-surveillance, ranking fairness, AI assurance and verified-transfer/download assurance from the recovered directives;
 - `CV-262..CV-285` explicit traceability for zero trust, encryption, secrets, audit, privacy, cookies, secure SDLC, vulnerability management, compliance, backup/DR, incidents, SLOs, performance, observability, graceful degradation, RPO/RTO, release rings, support, capacity, migrations, vendor resilience and runbooks;
 - `F24-CEN-01` Assurance Center contract: controls/evidence/exceptions/incidents/disaster-recovery assurance with native authorization/encryption/rate-limiting/validation preserved;
+- `F24-FUT-001..F24-FUT-025` Future Security & Privacy Superset covering post-quantum readiness, crypto agility/inventory, security graph/attack paths, attack-surface/control monitoring, policy-as-code, DSPM/DLP, differential privacy/clean rooms, workload/JIT identity, cyber recovery/chaos/BAS/deception, exploitability/VEX/SLSA, agentic AI/AIBOM, assurance cases and bounded remediation;
 - capability-protected wp-admin fallback, private REST APIs, security headers and truthful seven-status reporting;
 - public-safe architecture, RTM, schema/threat/integration manifests, manuals, SBOM, license inventory, checksums and deterministic build tooling.
 
@@ -35,7 +37,9 @@ This status means the approved repository-coding scope, including the later Cont
 
 `ContinuousValueRequirementCatalog` fixes the later central-plan inventory at 25/25 requirements. `ContinuousValueAssurance` requires explicit evidence shapes and fails closed for missing controls, invalid timestamps or unsafe/path-like evidence references. `AssuranceCenterContract` blocks native-control takeover, a File-24 security single point of failure and public exposure of private operations material.
 
-Cycles 112 and 113 form the two fresh current-plan review/fix/retest rounds. The second cycle permanently tests unknown CV identifiers, missing consent withdrawal, fail-open degradation, incomplete release rings, vendor lock-in and Assurance Center ownership violations.
+`FutureSecurityCapabilityCatalog` fixes the future-superset inventory at 25/25. `FutureSecurityAssurance` provides fail-closed evidence shapes for every future ID. Dedicated primitives implement bounded Security Knowledge Graph/attack-path analysis, declarative Policy-as-Code, privacy egress/DLP decisions, differential-privacy/clean-room budgets, artifact provenance/VEX verification, bounded agentic-AI controls and human-governed automated-remediation recommendations.
+
+Cycles 112 and 113 close the final current-plan delta; Cycles 114 and 115 provide positive and adversarial closure for the future-security layer.
 
 ## Public/private boundary
 
@@ -56,4 +60,4 @@ The build creates an installable ZIP and SHA-256 receipt under `build/`.
 
 ## External gates deliberately deferred
 
-Real Hostinger WordPress/MySQL activation and upgrade, live companion contracts, providers, production key custody, backup restore, rollback rehearsal, browser/RTL/accessibility acceptance, independent penetration testing, qualified legal applicability review, Founder staging acceptance, production deployment and operational SLO evidence remain separate evidence-gated work. Repository code-complete status must never be presented as those later statuses.
+Real Hostinger WordPress/MySQL activation and upgrade, live companion contracts, providers, production key custody, real post-quantum provider capability, external attack-surface telemetry, production DLP/clean-room infrastructure, hardware-backed workload identity, cyber-vault immutability, real chaos/BAS exercises, live VEX feeds, externally signed provenance, production AI-agent providers, backup restore, rollback rehearsal, browser/RTL/accessibility acceptance, independent penetration testing, qualified legal applicability review, Founder staging acceptance, production deployment and operational SLO evidence remain separate evidence-gated work. Repository code-complete status must never be presented as those later statuses.

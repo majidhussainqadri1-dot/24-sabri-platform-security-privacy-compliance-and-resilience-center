@@ -11,6 +11,16 @@ use Sabri\Platform\Security\Admin\FindingAdmin;
 use Sabri\Platform\Security\Admin\GovernanceAdmin;
 use Sabri\Platform\Security\Admin\RegistryAdmin;
 use Sabri\Platform\Security\Admin\VerifiedPrivacyAdmin;
+use Sabri\Platform\Security\Future\AgenticAiSecurity;
+use Sabri\Platform\Security\Future\ArtifactProvenanceVerifier;
+use Sabri\Platform\Security\Future\AttackPathEngine;
+use Sabri\Platform\Security\Future\AutomatedRemediationPolicy;
+use Sabri\Platform\Security\Future\FutureSecurityAssurance;
+use Sabri\Platform\Security\Future\FutureSecurityCapabilityCatalog;
+use Sabri\Platform\Security\Future\PolicyAsCodeEngine;
+use Sabri\Platform\Security\Future\PrivacyAnalyticsGuard;
+use Sabri\Platform\Security\Future\PrivacyEgressGuard;
+use Sabri\Platform\Security\Future\SecurityKnowledgeGraph;
 use Sabri\Platform\Security\Incident\IncidentCoordinator;
 use Sabri\Platform\Security\Integration\File00Adapter;
 use Sabri\Platform\Security\Integration\File02Adapter;
@@ -163,6 +173,18 @@ final class Plugin
         add_filter('spcrc/evaluate_ai_teacher_assurance', static fn (array $evidence): array => AIHomeopathyTeacherAssurance::evaluate($evidence));
         add_filter('spcrc/evaluate_verified_transfer_assurance', static fn (array $evidence): array => TransferDownloadAssurance::evaluateTransfer($evidence));
         add_filter('spcrc/evaluate_download_assurance', static fn (array $evidence): array => TransferDownloadAssurance::evaluateDownload($evidence));
+
+        // Future Security & Privacy Superset: assessment, correlation and bounded recommendations only.
+        add_filter('spcrc/future_security_catalog', static fn (): array => FutureSecurityCapabilityCatalog::all());
+        add_filter('spcrc/evaluate_future_security_capability', static fn (array $current, string $capabilityId, array $evidence): array => FutureSecurityAssurance::evaluate($capabilityId, $evidence), 10, 3);
+        add_filter('spcrc/security_knowledge_graph', static fn (): SecurityKnowledgeGraph => new SecurityKnowledgeGraph());
+        add_filter('spcrc/attack_path_engine', static fn (): AttackPathEngine => new AttackPathEngine());
+        add_filter('spcrc/policy_as_code_engine', static fn (): PolicyAsCodeEngine => new PolicyAsCodeEngine());
+        add_filter('spcrc/privacy_egress_guard', static fn (): PrivacyEgressGuard => new PrivacyEgressGuard());
+        add_filter('spcrc/privacy_analytics_guard', static fn (): PrivacyAnalyticsGuard => new PrivacyAnalyticsGuard());
+        add_filter('spcrc/artifact_provenance_verifier', static fn (): ArtifactProvenanceVerifier => new ArtifactProvenanceVerifier());
+        add_filter('spcrc/agentic_ai_security', static fn (): AgenticAiSecurity => new AgenticAiSecurity());
+        add_filter('spcrc/automated_remediation_policy', static fn (): AutomatedRemediationPolicy => new AutomatedRemediationPolicy());
 
         do_action('spcrc/booted', $this);
     }
