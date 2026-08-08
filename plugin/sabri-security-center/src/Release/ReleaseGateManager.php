@@ -93,6 +93,7 @@ final class ReleaseGateManager
         $criteria = Sanitizer::textList($criteria, 100, 160);
         $approvalHashes = [];
         $stepUpHash = '';
+        $riskAcceptanceHash = '';
         if (in_array($status, ['passed', 'waived', 'not-applicable'], true)) {
             if ($criteria === []) {
                 return new \WP_Error('spcrc_release_gate_criteria_missing', 'Passing or waiving a release gate requires bounded acceptance criteria evidence.');
@@ -154,6 +155,7 @@ final class ReleaseGateManager
                 if (! $riskAccepted) {
                     return new \WP_Error('spcrc_release_gate_risk_acceptance_required', 'A governed Founder-approved risk-acceptance reference is required for a release waiver.');
                 }
+                $riskAcceptanceHash = hash('sha256', $riskAcceptanceRef);
             }
             if ($phase === '24l-independent-assurance-staging'
                 && ! Sanitizer::boolean(apply_filters('spcrc/release_external_acceptance_ready', false, $phase, $evidenceRef))
@@ -170,6 +172,7 @@ final class ReleaseGateManager
             'decided_by_user_id' => $actor,
             'dual_approval_hashes' => $approvalHashes,
             'step_up_reference_hash' => $stepUpHash,
+            'risk_acceptance_reference_hash' => $riskAcceptanceHash,
         ]);
         return $this->artifacts->save($record, $expectedVersion);
     }
