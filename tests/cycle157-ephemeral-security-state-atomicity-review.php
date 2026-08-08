@@ -17,7 +17,7 @@ $first = $guard->authorize($policy, $request);
 c157(! is_wp_error($first), 'First bounded idempotent request must be accepted.');
 $duplicate = $guard->authorize($policy, $request);
 c157(is_wp_error($duplicate) && $duplicate->get_error_code() === 'spcrc_endpoint_replay_detected', 'Duplicate idempotency key must be blocked during its active lifetime.');
-$idemOption = 'spcrc_idempotency_' . substr(hash('sha256', 'endpoint|idem:cycle157-idempotency'), 0, 40);
+$idemOption = 'spcrc_idempotency_' . substr(hash('sha256', 'endpoint|user:7|idem:cycle157-idempotency'), 0, 40);
 $GLOBALS['wp_options'][$idemOption]['expires_at'] = time() - 1;
 $reclaimed = $guard->authorize($policy, $request);
 c157(! is_wp_error($reclaimed), 'Expired idempotency state must be atomically reclaimable instead of becoming a permanent tombstone.');

@@ -141,23 +141,15 @@ final class IncidentCoordinator
                 return new \WP_Error('spcrc_critical_incident_step_up_required', 'Fresh File 00 step-up assurance is required to close a SEV0/SEV1 incident.');
             }
 
-            $approvalEvidence = $this->artifacts->save([
-                'artifact_type' => 'incident-action',
-                'artifact_key' => 'dual-close-' . substr(hash('sha256', $incidentUuid . '|' . $targetStatus . '|' . $evidenceRef), 0, 32),
-                'title' => 'Critical incident dual-control closure approval',
-                'status' => 'completed',
-                'classification' => 'C5',
-                'owner_user_id' => get_current_user_id(),
-                'evidence_ref' => $evidenceRef,
-                'payload' => [
-                    'incident_uuid' => Sanitizer::uuid($incidentUuid),
-                    'target_status' => $targetStatus,
-                    'approval_refs' => $normalizedApprovals,
-                    'step_up_reference_hash' => hash('sha256', $stepUpReference),
-                ],
-            ]);
+            $approvalEvidence = $this->persistCriticalClosureApproval(
+                $incidentUuid,
+                $targetStatus,
+                $evidenceRef,
+                $normalizedApprovals,
+                $stepUpReference
+            );
             if (is_wp_error($approvalEvidence)) {
-                return new \WP_Error('spcrc_critical_incident_approval_evidence_failed', 'Critical incident closure approval evidence could not be persisted.', ['cause' => $approvalEvidence->get_error_code()]);
+                return $approvalEvidence;
             }
         }
 
@@ -166,6 +158,56 @@ final class IncidentCoordinator
             'evidence_ref' => $evidenceRef,
             'dual_approval_refs' => $normalizedApprovals,
         ]);
+    }
+
+
+    /** @param string[] $approvalRefs @return string|\WP_Error */
+    private function persistCriticalClosureApproval(
+        string $incidentUuid,
+        string $targetStatus,
+        string $evidenceRef,
+        array $approvalRefs,
+        string $stepUpReference
+    ): string|\WP_Error {
+        $artifactKey = 'dual-close-' . substr(hash('sha256', $incidentUuid . '|' . $targetStatus . '|' . $evidenceRef), 0, 32);
+        $stepUpHash = hash('sha256', $stepUpReference);
+        $existing = $this->artifacts->get('incident-action', $artifactKey);
+        if (is_array($existing)) {
+            $payload = is_array($existing['payload'] ?? null) ? $existing['payload'] : [];
+            $storedApprovals = is_array($payload['approval_refs'] ?? null) ? array_values($payload['approval_refs']) : [];
+            if (($existing['status'] ?? '') === 'completed'
+                && hash_equals((string) ($existing['evidence_ref'] ?? ''), $evidenceRef)
+                && hash_equals((string) ($payload['incident_uuid'] ?? ''), Sanitizer::uuid($incidentUuid))
+                && hash_equals((string) ($payload['target_status'] ?? ''), $targetStatus)
+                && hash_equals((string) ($payload['step_up_reference_hash'] ?? ''), $stepUpHash)
+                && $storedApprovals === array_values($approvalRefs)
+            ) {
+                return (string) ($existing['artifact_uuid'] ?? '');
+            }
+            return new \WP_Error(
+                'spcrc_critical_incident_approval_evidence_conflict',
+                'Existing critical-closure approval evidence does not match the current verified closure ceremony.'
+            );
+        }
+
+        $saved = $this->artifacts->save([
+            'artifact_type' => 'incident-action',
+            'artifact_key' => $artifactKey,
+            'title' => 'Critical incident dual-control closure approval',
+            'status' => 'completed',
+            'classification' => 'C5',
+            'owner_user_id' => get_current_user_id(),
+            'evidence_ref' => $evidenceRef,
+            'payload' => [
+                'incident_uuid' => Sanitizer::uuid($incidentUuid),
+                'target_status' => $targetStatus,
+                'approval_refs' => array_values($approvalRefs),
+                'step_up_reference_hash' => $stepUpHash,
+            ],
+        ]);
+        return is_wp_error($saved)
+            ? new \WP_Error('spcrc_critical_incident_approval_evidence_failed', 'Critical incident closure approval evidence could not be persisted.', ['cause' => $saved->get_error_code()])
+            : $saved;
     }
 
     /** @return string|\WP_Error */

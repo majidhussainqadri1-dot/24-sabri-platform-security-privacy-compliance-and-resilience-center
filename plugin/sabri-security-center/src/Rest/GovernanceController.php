@@ -32,6 +32,10 @@ final class GovernanceController
         'private-delivery',
     ];
 
+
+    /** Mutations with stronger domain ceremonies must use their dedicated service. */
+    private const SPECIALIZED_WRITE_TYPES = ['release-gate'];
+
     public function __construct(
         private GovernedArtifactRegistry $artifacts,
         private ?TrustCenterService $trustCenter = null
@@ -90,6 +94,9 @@ final class GovernanceController
     {
         $type = Sanitizer::key($this->param($request, 'artifact_type'), 60);
         if ($type === '' || ! in_array($type, GovernedArtifactRegistry::types(), true)) {
+            return false;
+        }
+        if (in_array($type, self::SPECIALIZED_WRITE_TYPES, true)) {
             return false;
         }
         if ($type === 'trust-claim') {

@@ -15,8 +15,8 @@ $ci = (string) file_get_contents(__DIR__ . '/../.github/workflows/ci.yml');
 $register = (string) file_get_contents(__DIR__ . '/../docs/REVIEW-AND-CORRECTION-FUTURE-SECURITY-CYCLES-156-165.md');
 
 c167(preg_match('/seq 116 ([0-9]+)/', $ci, $range) === 1 && (int) ($range[1] ?? 0) >= 167, 'Current CI must execute every review regression through Cycle 167.');
-c167(str_contains($ci, 'test "$count" -ge 259') && str_contains($ci, 'test "$count" -ge 172'), 'Current CI must enforce post-fix lint/test floors.');
-c167(str_contains($ci, 'file-24-sanitized-source-snapshot-cycle167'), 'Sanitized source artifact naming must identify Cycle-167 closure.');
+c167(preg_match_all('/test "\$count" -ge ([0-9]+)/', $ci, $floorMatches) >= 2 && max(array_map('intval', $floorMatches[1] ?? [])) >= 259 && min(array_map('intval', $floorMatches[1] ?? [])) >= 172, 'Current CI must retain or advance post-fix lint/test floors.');
+c167(preg_match('/file-24-sanitized-source-snapshot-cycle([0-9]+)/', $ci, $artifactMatch) === 1 && (int) ($artifactMatch[1] ?? 0) >= 167, 'Sanitized source artifact naming must remain at Cycle 167 or advance beyond it.');
 c167(str_contains($register, '**Consecutive clean post-fix closing cycles: 166, 167.**'), 'Register must record two consecutive fresh clean reviews after the last fix.');
 c167(str_contains($register, 'Known unresolved repository-correctable defects after fixes/retests | **0**'), 'Repository closure must remain zero-known-defect at the repository-correctable boundary.');
 c167(RequirementCatalog::repositoryCodingComplete(), 'Stable requirement catalogue must remain repository complete.');

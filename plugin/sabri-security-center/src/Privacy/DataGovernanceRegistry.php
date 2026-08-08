@@ -231,6 +231,15 @@ final class DataGovernanceRegistry
         if ($moduleKey === '' || $subjectRef === '' || $requestRef === '') {
             return new \WP_Error('spcrc_deletion_ledger_invalid', 'Module, subject and privacy-request references are required.');
         }
+        $attempts = Sanitizer::strictInteger($data['attempts'] ?? 0, 0, 1000000);
+        if ($attempts === null) {
+            return new \WP_Error('spcrc_deletion_attempts_invalid', 'Deletion replay attempts must be a bounded non-negative whole number.');
+        }
+        $rawNextRetry = Sanitizer::text($data['next_retry_at'] ?? '', 80);
+        $nextRetryAt = Sanitizer::isoTime($data['next_retry_at'] ?? '');
+        if ($rawNextRetry !== '' && $nextRetryAt === '') {
+            return new \WP_Error('spcrc_deletion_retry_time_invalid', 'Deletion retry time must be a valid absolute ISO-8601 timestamp.');
+        }
         return $this->artifacts->save([
             'artifact_type' => 'deletion-ledger',
             'artifact_key' => $data['ledger_key'] ?? '',
@@ -245,8 +254,8 @@ final class DataGovernanceRegistry
                 'subject_ref' => $subjectRef,
                 'request_ref' => $requestRef,
                 'deletion_scope' => Sanitizer::textList($data['deletion_scope'] ?? [], 50, 100),
-                'attempts' => Sanitizer::strictInteger($data['attempts'] ?? 0, 0, 1000000) ?? 0,
-                'next_retry_at' => Sanitizer::isoTime($data['next_retry_at'] ?? ''),
+                'attempts' => $attempts,
+                'next_retry_at' => $nextRetryAt,
                 'last_error_code' => Sanitizer::key($data['last_error_code'] ?? '', 120),
                 'legal_hold_ref' => Sanitizer::opaqueReference($data['legal_hold_ref'] ?? ''),
             ],
