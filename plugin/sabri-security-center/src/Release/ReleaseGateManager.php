@@ -78,7 +78,7 @@ final class ReleaseGateManager
         if ($expectedVersion < 1) {
             return new \WP_Error('spcrc_release_gate_expected_version_invalid', 'Release-gate decisions require the exact positive current version.');
         }
-        if (in_array($status, ['passed', 'failed', 'waived'], true) && $evidenceRef === '') {
+        if (in_array($status, ['passed', 'failed', 'waived', 'not-applicable'], true) && $evidenceRef === '') {
             return new \WP_Error('spcrc_release_gate_evidence_missing', 'Release-gate determinations require opaque evidence.');
         }
 
@@ -93,7 +93,7 @@ final class ReleaseGateManager
         $criteria = Sanitizer::textList($criteria, 100, 160);
         $approvalHashes = [];
         $stepUpHash = '';
-        if (in_array($status, ['passed', 'waived'], true)) {
+        if (in_array($status, ['passed', 'waived', 'not-applicable'], true)) {
             if ($criteria === []) {
                 return new \WP_Error('spcrc_release_gate_criteria_missing', 'Passing or waiving a release gate requires bounded acceptance criteria evidence.');
             }
@@ -116,7 +116,10 @@ final class ReleaseGateManager
                 }
             }
             if (count($approvals) < 2) {
-                return new \WP_Error('spcrc_release_gate_dual_approval_required', 'Passing or waiving a release gate requires two distinct human approval references.');
+                return new \WP_Error('spcrc_release_gate_dual_approval_required', 'Passing, waiving or marking a release gate not-applicable requires two distinct human approval references.');
+            }
+            if (in_array($status, ['waived', 'not-applicable'], true) && ! current_user_can('spcrc_approve_governance_decision')) {
+                return new \WP_Error('spcrc_release_gate_exception_authority_required', 'Waiver and not-applicable release decisions require explicit governance-approval authority.');
             }
             $approvalHashes = array_map(static fn (string $reference): string => hash('sha256', $reference), $approvals);
             $stepUpHash = hash('sha256', $stepUpReference);
@@ -132,8 +135,25 @@ final class ReleaseGateManager
                 return new \WP_Error('spcrc_release_gate_audit_gaps_open', 'Unresolved operational audit gaps block a positive release decision.');
             }
             $p0Count = Sanitizer::strictInteger(apply_filters('spcrc/release_blocking_p0_count', 0, $phase), 0, PHP_INT_MAX);
-            if ($p0Count === null || $p0Count > 0) {
+            $blockingDefectCount = Sanitizer::strictInteger(apply_filters('spcrc/release_blocking_defect_count', 0, $phase, $status), 0, PHP_INT_MAX);
+            if ($status !== 'waived' && ($p0Count === null || $p0Count > 0)) {
                 return new \WP_Error('spcrc_release_gate_p0_blocked', 'Known P0 defects block release-phase progression.');
+            }
+            if ($status !== 'waived' && ($blockingDefectCount === null || $blockingDefectCount > 0)) {
+                return new \WP_Error('spcrc_release_gate_known_defects_blocked', 'Known unresolved release-blocking defects require correction or an explicit governed waiver.');
+            }
+            if ($status === 'waived') {
+                $riskAcceptanceRef = Sanitizer::opaqueReference($context['risk_acceptance_reference'] ?? '');
+                $riskAccepted = $riskAcceptanceRef !== '' && Sanitizer::boolean(apply_filters(
+                    'spcrc/verify_founder_risk_acceptance',
+                    false,
+                    $actor,
+                    $phase,
+                    $riskAcceptanceRef
+                ));
+                if (! $riskAccepted) {
+                    return new \WP_Error('spcrc_release_gate_risk_acceptance_required', 'A governed Founder-approved risk-acceptance reference is required for a release waiver.');
+                }
             }
             if ($phase === '24l-independent-assurance-staging'
                 && ! Sanitizer::boolean(apply_filters('spcrc/release_external_acceptance_ready', false, $phase, $evidenceRef))

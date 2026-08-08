@@ -31,7 +31,10 @@ final class TrustCenterService
 
         $claimKey = Sanitizer::key($data['claim_key'] ?? $claimType, 120);
         $status = Sanitizer::key($data['status'] ?? 'draft', 30);
-        $expectedVersion = absint($data['expected_version'] ?? 0);
+        $expectedVersion = Sanitizer::strictInteger($data['expected_version'] ?? 0, 0, PHP_INT_MAX);
+        if ($expectedVersion === null) {
+            return new \WP_Error('spcrc_trust_claim_expected_version_invalid', 'Expected version must be a non-negative whole number.');
+        }
         $existing = $claimKey !== '' ? $this->artifacts->get('trust-claim', $claimKey) : null;
         $existingPayload = is_array($existing['payload'] ?? null) ? $existing['payload'] : [];
         $actor = get_current_user_id();
@@ -102,9 +105,6 @@ final class TrustCenterService
             return new \WP_Error('spcrc_trust_certification_independence_missing', 'Certification claims require independent evidence declared in the reviewed draft.');
         }
 
-        // A draft's owner is its latest material author/editor. Otherwise an
-        // editor could rewrite another person's draft, preserve the old owner,
-        // and then approve their own new wording under a false two-person trail.
         $ownerUserId = $status === 'verified'
             ? absint($existing['owner_user_id'] ?? 0)
             : $actor;

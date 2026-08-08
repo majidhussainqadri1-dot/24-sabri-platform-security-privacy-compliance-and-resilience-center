@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Sabri\Platform\Security\Security;
 
+use Sabri\Platform\Security\Support\AtomicOptionLock;
 use Sabri\Platform\Security\Support\Sanitizer;
 use Sabri\Platform\Security\Support\SecureIdentifier;
 
@@ -133,8 +134,9 @@ final class EndpointGuard
             return new \WP_Error('spcrc_webhook_signature_invalid', 'Webhook signature verification failed.');
         }
 
+        $now = time();
         $replayKey = 'spcrc_webhook_seen_' . substr(hash('sha256', $provider . '|' . $timestamp . '|' . $signature), 0, 40);
-        if (! add_option($replayKey, ['expires_at' => time() + $tolerance], '', false)) {
+        if (! $this->claimExpiringOption($replayKey, ['expires_at' => $now + $tolerance], $now)) {
             return new \WP_Error('spcrc_webhook_replay_detected', 'Webhook replay was blocked.');
         }
 
@@ -153,7 +155,41 @@ final class EndpointGuard
         if (is_wp_error($claim)) {
             return '';
         }
-        $record = ['claim' => $claim, 'expires_at' => time() + 86400];
-        return add_option($option, $record, '', false) ? 'idem:' . substr(hash('sha256', $claim), 0, 32) : '';
+        $now = time();
+        $record = ['claim' => $claim, 'expires_at' => $now + 86400];
+        return $this->claimExpiringOption($option, $record, $now) ? 'idem:' . substr(hash('sha256', $claim), 0, 32) : '';
+    }
+
+    /** @param array<string,mixed> $record */
+    private function claimExpiringOption(string $option, array $record, int $now): bool
+    {
+        $lockOption = 'spcrc_ephemeral_claim_lock_' . substr(hash('sha256', $option), 0, 32);
+        $token = AtomicOptionLock::acquire($lockOption, 15);
+        if (is_wp_error($token)) {
+            return false;
+        }
+
+        try {
+            $existing = get_option($option, null);
+            if ($existing === null) {
+                return add_option($option, $record, '', false);
+            }
+
+            $expiresAt = is_array($existing)
+                ? Sanitizer::strictInteger($existing['expires_at'] ?? null, 1, PHP_INT_MAX)
+                : null;
+            if ($expiresAt === null || $expiresAt > $now) {
+                return false;
+            }
+
+            if (! delete_option($option) && get_option($option, null) !== null) {
+                return false;
+            }
+            return add_option($option, $record, '', false);
+        } finally {
+            if (! AtomicOptionLock::release($lockOption, $token)) {
+                do_action('spcrc/ephemeral_claim_lock_release_failed', $lockOption);
+            }
+        }
     }
 }

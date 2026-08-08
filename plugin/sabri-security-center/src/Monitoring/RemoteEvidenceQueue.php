@@ -149,13 +149,58 @@ final class RemoteEvidenceQueue
                     continue;
                 }
                 ++$counts['processed'];
+                if (! AtomicOptionLock::refresh(self::LOCK, $token, 300)) {
+                    ++$counts['persistence_failed'];
+                    $this->recordLeaseGap($record, 'lease_lost_before_delivery');
+                    break;
+                }
+                $attemptBase = Sanitizer::strictInteger($payload['attempts'] ?? 0, 0, 1000000);
+                if ($attemptBase === null) {
+                    ++$counts['persistence_failed'];
+                    $this->recordLeaseGap($record, 'attempt_counter_invalid');
+                    continue;
+                }
+                $attempts = $attemptBase + 1;
+                $claimed = $this->artifacts->transition(
+                    'remote-evidence',
+                    (string) $record['artifact_key'],
+                    'delivering',
+                    (int) $record['version'],
+                    [
+                        'attempts' => $attempts,
+                        'delivery_started_at' => gmdate('c'),
+                        'last_error_code' => '',
+                    ]
+                );
+                if (is_wp_error($claimed)) {
+                    ++$counts['persistence_failed'];
+                    $this->recordPersistenceGap($record, 'delivery_claim_persistence_failed', $claimed);
+                    continue;
+                }
+                $record = $this->artifacts->get('remote-evidence', (string) $record['artifact_key']);
+                if (! is_array($record)) {
+                    ++$counts['persistence_failed'];
+                    $this->recordLeaseGap(['artifact_key' => 'remote-evidence'], 'delivery_claim_reload_failed');
+                    continue;
+                }
+                $payload = is_array($record['payload'] ?? null) ? $record['payload'] : [];
+                if (! AtomicOptionLock::refresh(self::LOCK, $token, 300)) {
+                    ++$counts['persistence_failed'];
+                    $this->recordLeaseGap($record, 'lease_lost_after_delivery_claim');
+                    break;
+                }
+
                 $delivery = apply_filters('spcrc/remote_evidence_deliver', [
                     'status' => 'unavailable',
                     'evidence_ref' => '',
                     'error_code' => 'remote_adapter_unavailable',
                 ], $payload);
                 $delivery = is_array($delivery) ? $delivery : [];
-                $attempts = absint($payload['attempts'] ?? 0) + 1;
+                if (! AtomicOptionLock::refresh(self::LOCK, $token, 300)) {
+                    ++$counts['persistence_failed'];
+                    $this->recordLeaseGap($record, 'lease_lost_during_delivery');
+                    break;
+                }
                 if (Sanitizer::key($delivery['status'] ?? '', 30) === 'delivered'
                     && Sanitizer::opaqueReference($delivery['evidence_ref'] ?? '') !== ''
                 ) {
@@ -191,6 +236,16 @@ final class RemoteEvidenceQueue
             $this->guard = false;
             AtomicOptionLock::release(self::LOCK, $token);
         }
+    }
+
+    /** @param array<string,mixed> $record */
+    private function recordLeaseGap(array $record, string $reason): void
+    {
+        $artifactKey = Sanitizer::key($record['artifact_key'] ?? '', 120);
+        AuditGapStore::record('spcrc_remote_evidence_audit_gap', 'remote-evidence', $artifactKey, $reason, [
+            'error_code' => 'spcrc_remote_evidence_lock_lost',
+        ]);
+        do_action('spcrc/remote_evidence_lock_lost', $artifactKey, $reason);
     }
 
     /** @param array<string,mixed> $record */

@@ -44,6 +44,10 @@ final class GovernancePolicyService
     /** @return string|\WP_Error */
     public function savePolicy(array $data): string|\WP_Error
     {
+        $expectedVersion = Sanitizer::strictInteger($data['expected_version'] ?? 0, 0, PHP_INT_MAX);
+        if ($expectedVersion === null) {
+            return new \WP_Error('spcrc_policy_expected_version_invalid', 'Expected version must be a non-negative whole number.');
+        }
         $level = Sanitizer::key($data['hierarchy_level'] ?? '', 80);
         if (! isset(self::LEVELS[$level])) {
             return new \WP_Error('spcrc_policy_hierarchy_invalid', 'A supported policy hierarchy level is required.');
@@ -107,12 +111,16 @@ final class GovernancePolicyService
                 'annual_review_required' => in_array($level, self::ANNUAL_REVIEW_LEVELS, true),
                 'protected_from_exception' => in_array($policyKey, self::PROTECTED_POLICY_KEYS, true),
             ],
-        ]);
+        ], $expectedVersion);
     }
 
     /** @return string|\WP_Error */
     public function saveException(array $data): string|\WP_Error
     {
+        $expectedVersion = Sanitizer::strictInteger($data['expected_version'] ?? 0, 0, PHP_INT_MAX);
+        if ($expectedVersion === null) {
+            return new \WP_Error('spcrc_policy_expected_version_invalid', 'Expected version must be a non-negative whole number.');
+        }
         $policyKey = Sanitizer::key($data['policy_key'] ?? '', 120);
         if (in_array($policyKey, self::PROTECTED_POLICY_KEYS, true)) {
             return new \WP_Error('spcrc_protected_charter_exception_forbidden', 'No routine exception may override the Islamic Supremacy or anti-surveillance charter.');
@@ -144,7 +152,7 @@ final class GovernancePolicyService
                 'requester_user_id' => absint($data['requester_user_id'] ?? get_current_user_id()),
                 'approver_user_id' => absint($data['approver_user_id'] ?? 0),
             ],
-        ]);
+        ], $expectedVersion);
     }
 
     public static function annualReviewValid(string $reviewedAt, string $nextReviewAt): bool

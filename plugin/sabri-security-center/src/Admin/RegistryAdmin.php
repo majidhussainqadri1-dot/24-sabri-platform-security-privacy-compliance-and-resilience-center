@@ -54,6 +54,11 @@ final class RegistryAdmin
             wp_die(esc_html__('The security token is invalid or expired.', 'sabri-security-center'));
         }
 
+        $expectedVersion = Sanitizer::strictInteger($_POST['expected_version'] ?? 0, 0, PHP_INT_MAX);
+        if ($expectedVersion === null) {
+            wp_die(esc_html__('Expected version must be a non-negative whole number.', 'sabri-security-center'));
+        }
+
         $payloadRaw = is_scalar($_POST['payload_json'] ?? null) ? (string) wp_unslash($_POST['payload_json']) : '{}';
         $payload = json_decode($payloadRaw, true);
         if (! is_array($payload)) {
@@ -68,7 +73,7 @@ final class RegistryAdmin
             'classification' => $_POST['classification'] ?? 'C1',
             'module_key' => $_POST['module_key'] ?? 'file-24-security-center',
             'owner_user_id' => get_current_user_id(),
-            'expected_version' => absint($_POST['expected_version'] ?? 0),
+            'expected_version' => $expectedVersion,
             'evidence_ref' => $_POST['evidence_ref'] ?? '',
             'effective_at' => $_POST['effective_at'] ?? '',
             'expires_at' => $_POST['expires_at'] ?? '',

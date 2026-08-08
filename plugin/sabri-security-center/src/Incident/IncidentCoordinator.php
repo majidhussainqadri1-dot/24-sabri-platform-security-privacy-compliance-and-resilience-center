@@ -100,7 +100,7 @@ final class IncidentCoordinator
     }
 
     /** @return bool|\WP_Error */
-    public function advance(string $incidentUuid, string $targetStatus, string $reason, string $evidenceRef, array $approvalRefs = []): bool|\WP_Error
+    public function advance(string $incidentUuid, string $targetStatus, string $reason, string $evidenceRef, array $approvalRefs = [], string $stepUpReference = ''): bool|\WP_Error
     {
         if (! current_user_can('spcrc_manage_incidents')) {
             return new \WP_Error('spcrc_incident_transition_forbidden', 'Incident transition requires incident-management authority.');
@@ -129,6 +129,17 @@ final class IncidentCoordinator
             if (count($normalizedApprovals) < 2) {
                 return new \WP_Error('spcrc_critical_incident_dual_approval_required', 'SEV0/SEV1 closure requires two distinct opaque human approval references.');
             }
+            $stepUpReference = Sanitizer::opaqueReference($stepUpReference);
+            $stepUpOk = $stepUpReference !== '' && Sanitizer::boolean(apply_filters(
+                'spcrc/verify_step_up_assurance',
+                false,
+                get_current_user_id(),
+                'critical-incident-close:' . Sanitizer::uuid($incidentUuid),
+                $stepUpReference
+            ));
+            if (! $stepUpOk) {
+                return new \WP_Error('spcrc_critical_incident_step_up_required', 'Fresh File 00 step-up assurance is required to close a SEV0/SEV1 incident.');
+            }
 
             $approvalEvidence = $this->artifacts->save([
                 'artifact_type' => 'incident-action',
@@ -142,6 +153,7 @@ final class IncidentCoordinator
                     'incident_uuid' => Sanitizer::uuid($incidentUuid),
                     'target_status' => $targetStatus,
                     'approval_refs' => $normalizedApprovals,
+                    'step_up_reference_hash' => hash('sha256', $stepUpReference),
                 ],
             ]);
             if (is_wp_error($approvalEvidence)) {

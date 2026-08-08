@@ -38,7 +38,8 @@ c136(is_wp_error($oneApproval) && $oneApproval->get_error_code() === 'spcrc_crit
 $duplicateApproval = $coordinator->advance($incident, 'closed', 'Closure requested.', 'incident:c136-close', ['approval:human-a', 'approval:human-a']);
 c136(is_wp_error($duplicateApproval) && $duplicateApproval->get_error_code() === 'spcrc_critical_incident_dual_approval_required', 'Duplicate approval references do not satisfy dual control.');
 
-$closed = $coordinator->advance($incident, 'closed', 'Two-person closure approved.', 'incident:c136-close', ['approval:human-a', 'approval:human-b']);
+add_filter('spcrc/verify_step_up_assurance', '__return_true', 10, 4);
+$closed = $coordinator->advance($incident, 'closed', 'Two-person closure approved.', 'incident:c136-close', ['approval:human-a', 'approval:human-b'], 'assertion:cycle136-fresh-stepup');
 c136($closed === true, 'Two distinct opaque human approvals must permit authorized critical closure.');
 $record = $repository->get($incident);
 c136(is_array($record) && ($record['status'] ?? '') === 'closed', 'Critical incident must end in closed state only after dual control.');

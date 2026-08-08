@@ -97,7 +97,16 @@ final class RateLimiter
         }
 
         $bucket = substr(hash_hmac('sha256', $scope . '|' . $identifier, $salt), 0, 40);
-        return delete_option('spcrc_rate_' . $bucket);
+        $lock = 'spcrc_rate_lock_' . $bucket;
+        $token = AtomicOptionLock::acquire($lock, 15);
+        if (is_wp_error($token)) {
+            return false;
+        }
+        try {
+            return delete_option('spcrc_rate_' . $bucket);
+        } finally {
+            AtomicOptionLock::release($lock, $token);
+        }
     }
 
     /** @return string|\WP_Error */
