@@ -60,8 +60,9 @@ final class TransferDownloadAssurance
     {
         $controls = Sanitizer::textList($evidence['controls'] ?? [], 100, 100);
         $missing = array_values(array_diff(self::TRANSFER_CONTROLS, $controls));
-        $maxBytes = absint($evidence['max_bytes_per_file'] ?? 0);
-        $sizeValid = $maxBytes > 0 && $maxBytes <= self::VERIFIED_TRANSFER_MAX_BYTES;
+        $parsedMaxBytes = Sanitizer::strictInteger($evidence['max_bytes_per_file'] ?? null, 1, self::VERIFIED_TRANSFER_MAX_BYTES);
+        $maxBytes = $parsedMaxBytes ?? 0;
+        $sizeValid = $parsedMaxBytes !== null;
         $evidenceRef = Sanitizer::opaqueReference($evidence['evidence_ref'] ?? '');
         $testedAt = Sanitizer::isoTime($evidence['tested_at'] ?? '');
         $evidenceFresh = self::evidenceFresh($testedAt, $now);
