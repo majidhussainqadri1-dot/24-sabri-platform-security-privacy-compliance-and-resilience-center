@@ -14,13 +14,21 @@ final class NetworkPolicy
         if ($url === '' || strlen($url) > 2048 || preg_match('/[\r\n]/', $url) === 1) {
             return false;
         }
-        $home = wp_parse_url(home_url(), PHP_URL_HOST);
+        $homeUrl = home_url();
+        $home = wp_parse_url($homeUrl, PHP_URL_HOST);
         $host = wp_parse_url($url, PHP_URL_HOST);
+        $homeScheme = strtolower((string) wp_parse_url($homeUrl, PHP_URL_SCHEME));
         $scheme = strtolower((string) wp_parse_url($url, PHP_URL_SCHEME));
+        $homePort = wp_parse_url($homeUrl, PHP_URL_PORT);
+        $port = wp_parse_url($url, PHP_URL_PORT);
+        $homeEffectivePort = is_int($homePort) ? $homePort : ($homeScheme === 'https' ? 443 : 80);
+        $effectivePort = is_int($port) ? $port : ($scheme === 'https' ? 443 : 80);
         return is_string($home) && is_string($host)
             && $home !== ''
             && hash_equals(strtolower($home), strtolower($host))
-            && $scheme === 'https'
+            && $homeScheme === 'https'
+            && $scheme === $homeScheme
+            && $homeEffectivePort === $effectivePort
             && wp_parse_url($url, PHP_URL_USER) === null
             && wp_parse_url($url, PHP_URL_PASS) === null;
     }
