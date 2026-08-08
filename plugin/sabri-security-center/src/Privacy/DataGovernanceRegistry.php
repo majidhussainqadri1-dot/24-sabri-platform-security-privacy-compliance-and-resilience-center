@@ -20,6 +20,10 @@ final class DataGovernanceRegistry
     /** @param array<string,mixed> $data @return string|\WP_Error */
     public function registerDataAsset(array $data): string|\WP_Error
     {
+        $expectedVersion = $this->expectedVersion($data);
+        if (is_wp_error($expectedVersion)) {
+            return $expectedVersion;
+        }
         $classification = strtoupper(Sanitizer::text($data['classification'] ?? '', 2));
         $owner = Sanitizer::key($data['native_owner'] ?? '', 120);
         $retention = Sanitizer::key($data['retention_rule'] ?? '', 120);
@@ -47,12 +51,16 @@ final class DataGovernanceRegistry
                 'backup_rule' => Sanitizer::key($data['backup_rule'] ?? '', 120),
                 'deletion_method' => Sanitizer::key($data['deletion_method'] ?? '', 120),
             ],
-        ], absint($data['expected_version'] ?? 0));
+        ], $expectedVersion);
     }
 
     /** @param array<string,mixed> $data @return string|\WP_Error */
     public function registerProcessingActivity(array $data): string|\WP_Error
     {
+        $expectedVersion = $this->expectedVersion($data);
+        if (is_wp_error($expectedVersion)) {
+            return $expectedVersion;
+        }
         $purpose = Sanitizer::text($data['purpose'] ?? '', 500);
         $nativeOwner = Sanitizer::key($data['native_owner'] ?? '', 120);
         $lawfulBasis = Sanitizer::key($data['lawful_basis'] ?? '', 80);
@@ -85,12 +93,16 @@ final class DataGovernanceRegistry
                 'deletion_route' => Sanitizer::key($data['deletion_route'] ?? '', 120),
                 'dpia_status' => Sanitizer::key($data['dpia_status'] ?? 'not-assessed', 40),
             ],
-        ], absint($data['expected_version'] ?? 0));
+        ], $expectedVersion);
     }
 
     /** @param array<string,mixed> $data @return string|\WP_Error */
     public function recordConsent(array $data): string|\WP_Error
     {
+        $expectedVersion = $this->expectedVersion($data);
+        if (is_wp_error($expectedVersion)) {
+            return $expectedVersion;
+        }
         $category = Sanitizer::key($data['category'] ?? '', 100);
         $purpose = Sanitizer::key($data['purpose'] ?? '', 100);
         $noticeVersion = Sanitizer::text($data['notice_version'] ?? '', 40);
@@ -119,12 +131,16 @@ final class DataGovernanceRegistry
                 'guardian_ref' => Sanitizer::opaqueReference($data['guardian_ref'] ?? ''),
                 'withdrawal_route' => Sanitizer::key($data['withdrawal_route'] ?? '', 120),
             ],
-        ], absint($data['expected_version'] ?? 0));
+        ], $expectedVersion);
     }
 
     /** @param array<string,mixed> $data @return string|\WP_Error */
     public function recordLegalHold(array $data): string|\WP_Error
     {
+        $expectedVersion = $this->expectedVersion($data);
+        if (is_wp_error($expectedVersion)) {
+            return $expectedVersion;
+        }
         $scope = Sanitizer::textList($data['scope'] ?? [], 50, 120);
         if ($scope === []) {
             return new \WP_Error('spcrc_legal_hold_scope_missing', 'A category-specific legal-hold scope is required.');
@@ -148,12 +164,16 @@ final class DataGovernanceRegistry
                 'subject_ref' => Sanitizer::opaqueReference($data['subject_ref'] ?? ''),
                 'preservation_ref' => Sanitizer::opaqueReference($data['preservation_ref'] ?? ''),
             ],
-        ], absint($data['expected_version'] ?? 0));
+        ], $expectedVersion);
     }
 
     /** @param array<string,mixed> $data @return string|\WP_Error */
     public function recordTransfer(array $data): string|\WP_Error
     {
+        $expectedVersion = $this->expectedVersion($data);
+        if (is_wp_error($expectedVersion)) {
+            return $expectedVersion;
+        }
         $origin = Sanitizer::text($data['origin_region'] ?? '', 80);
         $destination = Sanitizer::text($data['destination_region'] ?? '', 80);
         $vendorRef = Sanitizer::opaqueReference($data['vendor_ref'] ?? '');
@@ -195,12 +215,16 @@ final class DataGovernanceRegistry
                 'exit_plan_ref' => Sanitizer::opaqueReference($data['exit_plan_ref'] ?? ''),
                 'location_assurance' => $locationAssurance,
             ],
-        ], absint($data['expected_version'] ?? 0));
+        ], $expectedVersion);
     }
 
     /** @param array<string,mixed> $data @return string|\WP_Error */
     public function recordDeletionObligation(array $data): string|\WP_Error
     {
+        $expectedVersion = $this->expectedVersion($data);
+        if (is_wp_error($expectedVersion)) {
+            return $expectedVersion;
+        }
         $moduleKey = Sanitizer::key($data['module_key'] ?? '', 120);
         $subjectRef = Sanitizer::opaqueReference($data['subject_ref'] ?? '');
         $requestRef = Sanitizer::opaqueReference($data['request_ref'] ?? '');
@@ -221,12 +245,21 @@ final class DataGovernanceRegistry
                 'subject_ref' => $subjectRef,
                 'request_ref' => $requestRef,
                 'deletion_scope' => Sanitizer::textList($data['deletion_scope'] ?? [], 50, 100),
-                'attempts' => absint($data['attempts'] ?? 0),
+                'attempts' => Sanitizer::strictInteger($data['attempts'] ?? 0, 0, 1000000) ?? 0,
                 'next_retry_at' => Sanitizer::isoTime($data['next_retry_at'] ?? ''),
                 'last_error_code' => Sanitizer::key($data['last_error_code'] ?? '', 120),
                 'legal_hold_ref' => Sanitizer::opaqueReference($data['legal_hold_ref'] ?? ''),
             ],
-        ], absint($data['expected_version'] ?? 0));
+        ], $expectedVersion);
+    }
+
+    /** @param array<string,mixed> $data @return int|\WP_Error */
+    private function expectedVersion(array $data): int|\WP_Error
+    {
+        $version = Sanitizer::strictInteger($data['expected_version'] ?? 0, 0, PHP_INT_MAX);
+        return $version === null
+            ? new \WP_Error('spcrc_data_governance_expected_version_invalid', 'Expected version must be a non-negative whole number.')
+            : $version;
     }
 
     public function activeLegalHold(string $holdKey): bool

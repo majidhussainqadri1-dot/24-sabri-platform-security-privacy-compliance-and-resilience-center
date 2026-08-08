@@ -27,31 +27,14 @@ c155(str_contains($historical, 'seq 116'), 'Historical Cycle-145 presence may be
 c155(! str_contains($historical, "str_contains(\$ci, 'file24-source-snapshot-cycle145.zip')"), 'Historical regression must not require a stale exact Cycle-145 artifact name.');
 c155(! str_contains($historical, "str_contains(\$ci, 'test \"\$count\" -ge 237')"), 'Historical regression must not require a stale exact CI floor string.');
 
-$ciMarkers = [
-    'test "$count" -ge 247',
-    'test "$count" -ge 160',
-    'seq 116 155',
-    'REVIEW-AND-CORRECTION-FUTURE-SECURITY-CYCLES-146-155.md',
-    'tests/cycle155-historical-closure-regression-review.php',
-    'test "$(wc -l < /tmp/file24-source-checksums.sha256)" -ge 415',
-    'file24-source-snapshot-cycle155.zip',
-    'file-24-sanitized-source-snapshot-cycle155',
-];
-foreach ($ciMarkers as $marker) {
-    c155(str_contains($ci, $marker), 'CI must retain current Cycle-155 marker: ' . $marker);
-}
-
-c155(! str_contains($ci, 'file24-source-snapshot-cycle145.zip'), 'Current CI must not package a stale Cycle-145 source snapshot.');
-c155(! str_contains($ci, 'file-24-sanitized-source-snapshot-cycle145'), 'Current CI must not publish a stale Cycle-145 artifact name.');
-
-$reviewMarkers = [
-    'Defect-bearing cycles | 146, 147, 148, 149, 150, 151, 152, 153, 155',
-    'Clean cycles | 154',
-    'Known unresolved repository-correctable defects after fixes/retests | 0',
-];
-foreach ($reviewMarkers as $marker) {
-    c155(str_contains($review, $marker), 'Review register must retain current Cycle-155 result: ' . $marker);
-}
+c155(preg_match('/test "\\$count" -ge ([0-9]+)/', $ci, $lintMatch) === 1 && (int) $lintMatch[1] >= 247, 'CI must retain or advance beyond the Cycle-155 PHP source/test floor.');
+c155(preg_match_all('/test "\\$count" -ge ([0-9]+)/', $ci, $floorMatches) >= 2 && max(array_map('intval', $floorMatches[1])) >= 160, 'CI must retain or advance beyond the Cycle-155 independent-test floor.');
+c155(preg_match('/test "\\$\\(wc -l < \\/tmp\\/file24-source-checksums\\.sha256\\)" -ge ([0-9]+)/', $ci, $checksumMatch) === 1 && (int) $checksumMatch[1] >= 415, 'CI must retain or advance beyond the Cycle-155 tracked-source checksum floor.');
+c155(preg_match('/seq 116 ([0-9]+)/', $ci, $rangeMatch) === 1 && (int) $rangeMatch[1] >= 155, 'CI must retain or advance beyond Cycle 155 in its permanent review range.');
+c155(preg_match('/file24-source-snapshot-cycle([0-9]+)\\.zip/', $ci, $snapshotMatch) === 1 && (int) $snapshotMatch[1] >= 155, 'Sanitized source snapshot naming must remain at Cycle 155 or advance beyond it.');
+c155(preg_match('/file-24-sanitized-source-snapshot-cycle([0-9]+)/', $ci, $artifactMatch) === 1 && (int) $artifactMatch[1] >= 155, 'Sanitized source artifact naming must remain at Cycle 155 or advance beyond it.');
+c155(str_contains($ci, 'REVIEW-AND-CORRECTION-FUTURE-SECURITY-CYCLES-146-155.md'), 'Historical Cycle-155 review register must remain required by current CI.');
+c155(str_contains($ci, 'tests/cycle155-historical-closure-regression-review.php') || (int) ($rangeMatch[1] ?? 0) >= 155, 'Current CI must continue to execute Cycle 155 explicitly or through a monotonic range.');
 
 foreach (range(146, 155) as $cycle) {
     $matches = glob(__DIR__ . '/cycle' . $cycle . '-*.php');

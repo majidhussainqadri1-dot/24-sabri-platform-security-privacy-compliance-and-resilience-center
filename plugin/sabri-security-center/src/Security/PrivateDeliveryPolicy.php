@@ -106,7 +106,28 @@ final class PrivateDeliveryPolicy
         if (! str_starts_with($grant, 'delivery:')) {
             return false;
         }
-        $hash = hash('sha256', substr($grant, 9));
-        return delete_option('spcrc_delivery_' . substr($hash, 0, 40));
+        $token = substr($grant, 9);
+        if ($token === '') {
+            return false;
+        }
+        $hash = hash('sha256', $token);
+        $option = 'spcrc_delivery_' . substr($hash, 0, 40);
+        $lockOption = 'spcrc_private_delivery_consume_lock_' . substr($hash, 0, 32);
+        $lock = AtomicOptionLock::acquire($lockOption, 30);
+        if (is_wp_error($lock)) {
+            return false;
+        }
+
+        try {
+            $record = get_option($option, null);
+            if (! is_array($record) || ! hash_equals((string) ($record['token_hash'] ?? ''), $hash)) {
+                return false;
+            }
+            return delete_option($option) && get_option($option, null) === null;
+        } finally {
+            if (! AtomicOptionLock::release($lockOption, $lock)) {
+                do_action('spcrc/private_delivery_revoke_lock_release_failed', $lockOption);
+            }
+        }
     }
 }

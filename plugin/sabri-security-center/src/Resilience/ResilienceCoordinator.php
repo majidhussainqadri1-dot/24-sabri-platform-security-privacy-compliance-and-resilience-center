@@ -84,6 +84,10 @@ final class ResilienceCoordinator
     /** @return string|\WP_Error */
     public function saveBia(array $data): string|\WP_Error
     {
+        $expectedVersion = Sanitizer::strictInteger($data['expected_version'] ?? 0, 0, PHP_INT_MAX);
+        if ($expectedVersion === null) {
+            return new \WP_Error('spcrc_resilience_expected_version_invalid', 'Expected version must be a non-negative whole number.');
+        }
         $tier = Sanitizer::key($data['tier'] ?? '', 20);
         if (! isset(self::PROVISIONAL_OBJECTIVES[$tier])) {
             return new \WP_Error('spcrc_bia_tier_invalid', 'A supported BIA tier is required.');
@@ -106,12 +110,16 @@ final class ResilienceCoordinator
                 'data_volume_class' => Sanitizer::key($data['data_volume_class'] ?? 'unknown', 30),
                 'recovery_dependencies' => Sanitizer::textList($data['recovery_dependencies'] ?? [], 30, 100),
             ],
-        ]);
+        ], $expectedVersion);
     }
 
     /** @return string|\WP_Error */
     public function saveRecoveryObjective(array $data): string|\WP_Error
     {
+        $expectedVersion = Sanitizer::strictInteger($data['expected_version'] ?? 0, 0, PHP_INT_MAX);
+        if ($expectedVersion === null) {
+            return new \WP_Error('spcrc_resilience_expected_version_invalid', 'Expected version must be a non-negative whole number.');
+        }
         $tier = Sanitizer::key($data['tier'] ?? '', 20);
         if (! isset(self::PROVISIONAL_OBJECTIVES[$tier])) {
             return new \WP_Error('spcrc_recovery_tier_invalid', 'A supported recovery tier is required.');
@@ -139,12 +147,16 @@ final class ResilienceCoordinator
             'reviewed_at' => $data['reviewed_at'] ?? '',
             'next_review_at' => $data['next_review_at'] ?? '',
             'payload' => ['tier' => $tier, 'rpo_seconds' => $rpo, 'rto_seconds' => $rto, 'contractual' => $status === 'approved'],
-        ]);
+        ], $expectedVersion);
     }
 
     /** @return string|\WP_Error */
     public function saveContinuityPlan(array $data): string|\WP_Error
     {
+        $expectedVersion = Sanitizer::strictInteger($data['expected_version'] ?? 0, 0, PHP_INT_MAX);
+        if ($expectedVersion === null) {
+            return new \WP_Error('spcrc_resilience_expected_version_invalid', 'Expected version must be a non-negative whole number.');
+        }
         $mode = Sanitizer::key($data['mode'] ?? '', 60);
         if (! in_array($mode, self::CONTINUITY_MODES, true)) {
             return new \WP_Error('spcrc_continuity_mode_invalid', 'A supported continuity mode is required.');
@@ -166,12 +178,16 @@ final class ResilienceCoordinator
                 'user_message' => Sanitizer::text($data['user_message'] ?? '', 300),
                 'exit_criteria' => Sanitizer::textList($data['exit_criteria'] ?? [], 30, 120),
             ],
-        ]);
+        ], $expectedVersion);
     }
 
     /** @return string|\WP_Error */
     public function recordDrill(array $data): string|\WP_Error
     {
+        $expectedVersion = Sanitizer::strictInteger($data['expected_version'] ?? 0, 0, PHP_INT_MAX);
+        if ($expectedVersion === null) {
+            return new \WP_Error('spcrc_resilience_expected_version_invalid', 'Expected version must be a non-negative whole number.');
+        }
         $status = Sanitizer::key($data['status'] ?? '', 30);
         $evidenceRef = Sanitizer::opaqueReference($data['evidence_ref'] ?? '');
         if (in_array($status, ['passed', 'failed'], true) && $evidenceRef === '') {
@@ -201,7 +217,7 @@ final class ResilienceCoordinator
                 'measured_rto_seconds' => $measuredRto,
                 'corrective_actions' => Sanitizer::textList($data['corrective_actions'] ?? [], 50, 140),
             ],
-        ]);
+        ], $expectedVersion);
         if (! is_wp_error($saved) && $status === 'failed') {
             $finding = $this->findings->create([
                 'module_key' => 'file-24-security-center',

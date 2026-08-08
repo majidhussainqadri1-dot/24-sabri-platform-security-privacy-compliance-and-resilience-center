@@ -103,15 +103,61 @@ final class DeletionReplayManager
                     continue;
                 }
 
+                if (! AtomicOptionLock::refresh(self::LOCK, $token, 300)) {
+                    ++$counts['failed'];
+                    $this->recordLeaseGap($record, 'lease_lost_before_dispatch');
+                    break;
+                }
+
+                $attemptBase = Sanitizer::strictInteger($payload['attempts'] ?? 0, 0, 1000000);
+                if ($attemptBase === null) {
+                    ++$counts['failed'];
+                    $this->recordLeaseGap($record, 'attempt_counter_invalid');
+                    continue;
+                }
+                $attempts = $attemptBase + 1;
+                $dispatching = $this->artifacts->transition(
+                    'deletion-ledger',
+                    (string) $record['artifact_key'],
+                    'dispatching',
+                    (int) $record['version'],
+                    [
+                        'attempts' => $attempts,
+                        'dispatch_started_at' => gmdate('c'),
+                        'last_error_code' => '',
+                    ]
+                );
+                if (is_wp_error($dispatching)) {
+                    ++$counts['failed'];
+                    $this->recordPersistenceGap($record, 'dispatch_state_persistence_failed', $dispatching);
+                    continue;
+                }
+                $record = $this->artifacts->get('deletion-ledger', (string) $record['artifact_key']);
+                if (! is_array($record)) {
+                    ++$counts['failed'];
+                    $this->recordLeaseGap(['artifact_key' => 'deletion-ledger'], 'dispatch_state_reload_failed');
+                    continue;
+                }
+                $payload = is_array($record['payload'] ?? null) ? $record['payload'] : [];
+
+                if (! AtomicOptionLock::refresh(self::LOCK, $token, 300)) {
+                    ++$counts['failed'];
+                    $this->recordLeaseGap($record, 'lease_lost_after_dispatch_claim');
+                    break;
+                }
                 $result = apply_filters('spcrc/privacy_deletion_replay_module', [
                     'status' => 'unavailable',
                     'evidence_ref' => '',
                     'error_code' => 'module_handler_unavailable',
                 ], $record);
                 $result = is_array($result) ? $result : [];
+                if (! AtomicOptionLock::refresh(self::LOCK, $token, 300)) {
+                    ++$counts['failed'];
+                    $this->recordLeaseGap($record, 'lease_lost_during_dispatch');
+                    break;
+                }
                 $status = Sanitizer::key($result['status'] ?? 'failed', 30);
                 $evidence = Sanitizer::opaqueReference($result['evidence_ref'] ?? '');
-                $attempts = absint($payload['attempts'] ?? 0) + 1;
 
                 if ($status === 'reconciled' && $evidence !== '') {
                     $updated = $record;
@@ -158,6 +204,16 @@ final class DeletionReplayManager
                 do_action('spcrc/privacy_deletion_replay_lock_release_failed', $token);
             }
         }
+    }
+
+    /** @param array<string,mixed> $record */
+    private function recordLeaseGap(array $record, string $reason): void
+    {
+        $artifactKey = Sanitizer::key($record['artifact_key'] ?? '', 120);
+        AuditGapStore::record('spcrc_deletion_replay_audit_gap', 'deletion-ledger', $artifactKey, $reason, [
+            'error_code' => 'spcrc_deletion_replay_lock_lost',
+        ]);
+        do_action('spcrc/privacy_deletion_replay_lock_lost', $artifactKey, $reason);
     }
 
     /** @param array<string,mixed> $record */
