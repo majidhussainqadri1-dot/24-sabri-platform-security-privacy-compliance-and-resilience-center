@@ -84,21 +84,64 @@ final class FutureSecurityAssurance
         );
     }
 
-    private static function meaningful(mixed $value): bool
+    private static function meaningful(mixed $value, int $depth = 0): bool
     {
+        if ($depth > 4) {
+            return false;
+        }
         if (is_bool($value)) {
             return $value;
         }
-        if (is_int($value) || is_float($value)) {
+        if (is_int($value)) {
             return $value >= 0;
+        }
+        if (is_float($value)) {
+            return is_finite($value) && $value >= 0;
         }
         if (is_string($value)) {
             return trim($value) !== '' && ! Sanitizer::containsSensitiveMaterial($value);
         }
         if (is_array($value)) {
-            return $value !== [];
+            if ($value === [] || count($value) > 100) {
+                return false;
+            }
+
+            $hasMeaningfulValue = false;
+            foreach ($value as $item) {
+                if (! self::safeNestedEvidence($item, $depth + 1)) {
+                    return false;
+                }
+                if (self::meaningful($item, $depth + 1)) {
+                    $hasMeaningfulValue = true;
+                }
+            }
+            return $hasMeaningfulValue;
         }
         return false;
+    }
+
+    private static function safeNestedEvidence(mixed $value, int $depth): bool
+    {
+        if ($depth > 4 || $value === null || is_object($value) || is_resource($value)) {
+            return false;
+        }
+        if (is_float($value)) {
+            return is_finite($value);
+        }
+        if (is_string($value)) {
+            return ! Sanitizer::containsSensitiveMaterial($value);
+        }
+        if (is_array($value)) {
+            if ($value === [] || count($value) > 100) {
+                return false;
+            }
+            foreach ($value as $item) {
+                if (! self::safeNestedEvidence($item, $depth + 1)) {
+                    return false;
+                }
+            }
+        }
+        return is_scalar($value) || is_array($value);
     }
 
     private static function fresh(string $reviewedAt, mixed $maxAgeDays): bool
