@@ -63,7 +63,9 @@ Hybrid requirements do not fabricate external provider, legal, penetration-test,
 - **Cycle 124** — Agentic AI data-scope/cost-budget defects corrected and retested.
 - **Cycle 125** — distinct-human remediation approval plus CI/package/documentation gate defects corrected and retested.
 
-For the latest requested ten rounds, defects were found in **8/10 rounds: 117, 118, 119, 120, 121, 122, 124 and 125**. No new repository-correctable defect was found in **116 and 123**. The full register is `REVIEW-AND-CORRECTION-FUTURE-SECURITY-CYCLES-116-125.md`.
+For the first requested ten rounds, defects were found in **8/10 rounds: 117, 118, 119, 120, 121, 122, 124 and 125**. No new repository-correctable defect was found in **116 and 123**. The full register is `REVIEW-AND-CORRECTION-FUTURE-SECURITY-CYCLES-116-125.md`.
+
+A second requested ten-round audit then reopened the corrected repository. **Defects were found and corrected in all 10 cycles 126–135**: release-scope parity, stale boundary evidence, vulnerability lifecycle skipping, expired governance review windows, AI Teacher future-launch/stale-evidence acceptance, performance non-finite/mixed-unit contamination, stale transfer/download evidence, upload-scan hash/freshness binding, private-delivery consume concurrency and same-origin port confusion. The full second register is `REVIEW-AND-CORRECTION-FUTURE-SECURITY-CYCLES-126-135.md`.
 
 ## Release boundary
 
@@ -73,8 +75,8 @@ The following remain deliberately outside repository coding and are separate evi
 
 The invariant gates now include:
 
-- PHP source/test files: **at least 209**, all lint-clean on PHP 8.0 and PHP 8.3;
-- independent top-level PHP test programs: **at least 124**, all executed;
+- PHP source/test files: **at least 227**, all lint-clean on PHP 8.0 and PHP 8.3;
+- independent top-level PHP test programs: **at least 140**, all executed;
 - base requirement catalogue: **100/100**;
 - recovered directive catalogue: **18/18**;
 - Continuous Value / final-plan catalogue: **25/25** (`CV-262..CV-285` + `F24-CEN-01`);
@@ -82,8 +84,8 @@ The invariant gates now include:
 - Files 00–26 integration rows: **27/27**;
 - governed logical domains: **28**;
 - release phases encoded: **24A–24L (12/12)**;
-- current-plan and future-superset review evidence: **Cycles 112–125**, with permanent regression tests;
-- explicit CI existence/parity gates for all ten Future Security implementation classes, the Future Superset root/package docs, and cycles `116..125`;
+- current-plan and future-superset review evidence: **Cycles 112–135**, with permanent regression tests;
+- explicit CI existence/parity gates for all ten Future Security implementation classes, the Future Superset root/package docs, and cycles `116..135`;
 - deterministic package build, SHA-256 receipt and package/source integrity gates remain mandatory.
 
-**Repository coding result:** 100% of the identified current governing File-24 coding scope plus the approved Future Security & Privacy Superset is represented and gated, with zero known unresolved repository defect after the ten fresh review/correction rounds. Later staging/live/operational statuses remain unclaimed until independently evidenced.
+**Repository coding result:** 100% of the identified current governing File-24 coding scope plus the approved Future Security & Privacy Superset is represented and gated, with zero known unresolved repository defect after the latest ten fresh review/correction rounds (126–135). Later staging/live/operational statuses remain unclaimed until independently evidenced.
