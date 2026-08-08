@@ -153,7 +153,9 @@ function verifiedPrivacy(array $request): array
         'authority_basis' => 'self',
         'verification_reference' => 'case:test-privacy',
         'verified_by_user_id' => 99,
-        'verified_at' => '2026-07-31T15:00:00Z',
+        // Keep the fixture inside the production seven-day freshness gate so
+        // the regression remains deterministic regardless of calendar date.
+        'verified_at' => gmdate('c', time() - 60),
         'verification_attested' => true,
     ];
 }
