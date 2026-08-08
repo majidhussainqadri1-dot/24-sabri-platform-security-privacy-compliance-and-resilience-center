@@ -16,6 +16,31 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - name: Correct bootstrap multi-occurrence replacement
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('tools/apply-cycle185-194-final-patches.py')
+          s = p.read_text()
+          old = """replace_once(p, '/tmp/file24-source-snapshot-cycle184.zip', '/tmp/file24-source-snapshot-cycle197.zip')
+          replace_once(p, '/tmp/file24-source-snapshot-cycle184.zip', '/tmp/file24-source-snapshot-cycle197.zip')
+          replace_once(p, 'file-24-sanitized-source-snapshot-cycle184', 'file-24-sanitized-source-snapshot-cycle197')
+          replace_once(p, '/tmp/file24-source-snapshot-cycle184.zip', '/tmp/file24-source-snapshot-cycle197.zip')
+          """
+          new = """ci_path = ROOT / '.github/workflows/ci.yml'
+          ci_text = ci_path.read_text()
+          if ci_text.count('/tmp/file24-source-snapshot-cycle184.zip') != 3:
+              raise SystemExit('CI snapshot path occurrence count changed unexpectedly')
+          if ci_text.count('file-24-sanitized-source-snapshot-cycle184') != 1:
+              raise SystemExit('CI snapshot artifact occurrence count changed unexpectedly')
+          ci_text = ci_text.replace('/tmp/file24-source-snapshot-cycle184.zip', '/tmp/file24-source-snapshot-cycle197.zip')
+          ci_text = ci_text.replace('file-24-sanitized-source-snapshot-cycle184', 'file-24-sanitized-source-snapshot-cycle197')
+          ci_path.write_text(ci_text)
+          """
+          if s.count(old) != 1:
+              raise SystemExit('bootstrap replacement block not found exactly once')
+          p.write_text(s.replace(old, new, 1))
+          PY
       - name: Apply exact reviewed remaining patches
         run: python3 tools/apply-cycle185-194-final-patches.py
       - name: Commit exact reviewed source
