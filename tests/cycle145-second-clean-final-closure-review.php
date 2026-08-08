@@ -10,9 +10,9 @@ for ($cycle = 136; $cycle <= 145; ++$cycle) {
 }
 $ci = file_get_contents(__DIR__ . '/../.github/workflows/ci.yml');
 c145(is_string($ci), 'CI workflow must be readable.');
-c145(str_contains($ci, 'test "$count" -ge 237'), 'CI must lint at least the cycle145 PHP source/test floor.');
-c145(str_contains($ci, 'test "$count" -ge 150'), 'CI must execute at least 150 independent top-level tests.');
-c145(str_contains($ci, 'file24-source-snapshot-cycle145.zip'), 'Sanitized source snapshot naming must advance through cycle145.');
-c145(str_contains($ci, 'cycle145-second-clean-final-closure-review.php'), 'Exact CI closure must explicitly require the second clean review.');
+c145(preg_match('/test \"\$count\" -ge ([0-9]+)/', $ci, $lintMatch) === 1 && (int) $lintMatch[1] >= 237, 'CI must retain or advance beyond the Cycle-145 PHP source/test floor.');
+c145(preg_match_all('/test \"\$count\" -ge ([0-9]+)/', $ci, $floorMatches) >= 2 && max(array_map('intval', $floorMatches[1])) >= 150, 'CI must retain or advance beyond the Cycle-145 independent-test floor.');
+c145(preg_match('/file24-source-snapshot-cycle([0-9]+)\\.zip/', $ci, $snapshotMatch) === 1 && (int) $snapshotMatch[1] >= 145, 'Sanitized source snapshot naming must remain at Cycle 145 or advance beyond it.');
+c145(str_contains($ci, 'cycle145-second-clean-final-closure-review.php') || (preg_match('/seq 116 ([0-9]+)/', $ci, $cycleRange) === 1 && (int) $cycleRange[1] >= 145), 'CI closure must still require Cycle 145 explicitly or through a monotonic cycle range.');
 
 echo "PASS: cycle145 second consecutive fresh whole-system review found no new repository-correctable defect\n";
