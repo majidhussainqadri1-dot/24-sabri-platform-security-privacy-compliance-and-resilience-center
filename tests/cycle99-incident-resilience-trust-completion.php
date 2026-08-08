@@ -33,10 +33,18 @@ $vulnerability = $vulnerabilities->report([
 c99(is_string($vulnerability), 'Vulnerability report must create registry and finding evidence.');
 $record = $artifacts->get('vulnerability', 'idor-01');
 c99(is_array($record) && ($record['payload']['containment_required'] ?? false) === true, 'High vulnerability must require containment.');
-$remediated = $vulnerabilities->transition('idor-01', 'remediated', 1, 'retest:idor-fix-01');
-c99(is_string($remediated), 'Remediation transition must require and accept evidence.');
-$closedWithoutRetest = $vulnerabilities->transition('idor-01', 'closed', 2, '');
-c99(is_wp_error($closedWithoutRetest), 'Vulnerability closure without evidence must fail.');
+$validated = $vulnerabilities->transition('idor-01', 'validated', 1, 'validation:idor-01');
+c99(is_string($validated), 'Vulnerability must enter validated state with evidence.');
+$contained = $vulnerabilities->transition('idor-01', 'contained', 2, 'containment:idor-01');
+c99(is_string($contained), 'High vulnerability must record containment before remediation.');
+$remediated = $vulnerabilities->transition('idor-01', 'remediated', 3, 'remediation:idor-fix-01');
+c99(is_string($remediated), 'Remediation transition must follow validation/containment and accept evidence.');
+$closedWithoutRetest = $vulnerabilities->transition('idor-01', 'closed', 4, 'closure:premature');
+c99(is_wp_error($closedWithoutRetest) && $closedWithoutRetest->get_error_code() === 'spcrc_vulnerability_transition_invalid', 'Vulnerability closure before retest verification must fail.');
+$verifiedVulnerability = $vulnerabilities->transition('idor-01', 'verified', 4, 'retest:idor-fix-01');
+c99(is_string($verifiedVulnerability), 'Vulnerability remediation must be retested before closure.');
+$closedVulnerability = $vulnerabilities->transition('idor-01', 'closed', 5, 'closure:idor-01');
+c99(is_string($closedVulnerability), 'Verified vulnerability may close with evidence.');
 $GLOBALS['wpdb']->zeroFindingInsert = true;
 $partialVulnerability = $vulnerabilities->report([
     'vulnerability_key' => 'idor-partial', 'title' => 'Partial vulnerability transaction',
