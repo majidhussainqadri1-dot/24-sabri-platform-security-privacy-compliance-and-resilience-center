@@ -64,16 +64,23 @@ final class EndpointGuard
         }
 
         $rateScope = Sanitizer::key($policy['rate_scope'] ?? '', 80);
+        $requiresIdempotency = Sanitizer::boolean($policy['require_idempotency'] ?? false);
+        $principal = $userId > 0 ? 'user:' . $userId : '';
+        if ($principal === '' && ($rateScope !== '' || $requiresIdempotency)) {
+            $networkIdentifier = Sanitizer::text($request['network_identifier'] ?? '', 200);
+            if ($networkIdentifier === '') {
+                return new \WP_Error('spcrc_endpoint_network_identity_missing', 'Anonymous protected requests require a bounded network identity for rate and replay isolation.');
+            }
+            $principal = 'network:' . $networkIdentifier;
+        }
+
         if ($rateScope !== '') {
-            $identifier = $userId > 0
-                ? 'user:' . $userId
-                : 'network:' . Sanitizer::text($request['network_identifier'] ?? '', 200);
-            $rate = $this->rateLimiter->check(
-                $rateScope,
-                $identifier,
-                absint($policy['rate_limit'] ?? 30),
-                absint($policy['rate_window'] ?? 60)
-            );
+            $rateLimit = Sanitizer::strictInteger($policy['rate_limit'] ?? 30, 1, 10000);
+            $rateWindow = Sanitizer::strictInteger($policy['rate_window'] ?? 60, 1, 86400);
+            if ($rateLimit === null || $rateWindow === null) {
+                return new \WP_Error('spcrc_endpoint_rate_policy_invalid', 'Rate-limit policy values must be bounded positive whole numbers.');
+            }
+            $rate = $this->rateLimiter->check($rateScope, $principal, $rateLimit, $rateWindow);
             if (is_wp_error($rate)) {
                 return $rate;
             }
@@ -83,12 +90,13 @@ final class EndpointGuard
         }
 
         $idempotencyRef = '';
-        if (Sanitizer::boolean($policy['require_idempotency'] ?? false)) {
+        if ($requiresIdempotency) {
             $idempotency = Sanitizer::opaqueReference($request['idempotency_key'] ?? '', 180);
             if ($idempotency === '') {
                 return new \WP_Error('spcrc_endpoint_idempotency_missing', 'A bounded idempotency key is required.');
             }
-            $idempotencyRef = $this->claimIdempotency($rateScope !== '' ? $rateScope : 'endpoint', $idempotency);
+            $idempotencyScope = ($rateScope !== '' ? $rateScope : 'endpoint') . '|' . $principal;
+            $idempotencyRef = $this->claimIdempotency($idempotencyScope, $idempotency);
             if ($idempotencyRef === '') {
                 return new \WP_Error('spcrc_endpoint_replay_detected', 'Duplicate or replayed request was blocked.');
             }
@@ -118,14 +126,22 @@ final class EndpointGuard
         $provider = Sanitizer::key($provider, 80);
         $signature = strtolower(trim($signature));
         $tolerance = max(30, min(900, $tolerance));
-        if ($provider === '' || $body === '' || strlen($body) > 1048576 || abs(time() - $timestamp) > $tolerance) {
+        $now = time();
+        if ($provider === '' || $body === '' || strlen($body) > 1048576
+            || $timestamp < $now - $tolerance || $timestamp > $now + $tolerance
+        ) {
             return new \WP_Error('spcrc_webhook_request_invalid', 'Webhook identity, size or timestamp is invalid.');
         }
         if (preg_match('/^[a-f0-9]{64}$/', $signature) !== 1) {
             return new \WP_Error('spcrc_webhook_signature_invalid', 'Webhook signature format is invalid.');
         }
 
-        $secret = (string) $secretResolver($provider);
+        try {
+            $secret = (string) $secretResolver($provider);
+        } catch (\Throwable $error) {
+            do_action('spcrc/webhook_secret_resolution_failed', $provider, get_class($error));
+            return new \WP_Error('spcrc_webhook_secret_unavailable', 'Webhook verification secret is unavailable.');
+        }
         if ($secret === '' || strlen($secret) < 32) {
             return new \WP_Error('spcrc_webhook_secret_unavailable', 'Webhook verification secret is unavailable.');
         }
@@ -134,7 +150,6 @@ final class EndpointGuard
             return new \WP_Error('spcrc_webhook_signature_invalid', 'Webhook signature verification failed.');
         }
 
-        $now = time();
         $replayKey = 'spcrc_webhook_seen_' . substr(hash('sha256', $provider . '|' . $timestamp . '|' . $signature), 0, 40);
         if (! $this->claimExpiringOption($replayKey, ['expires_at' => $now + $tolerance], $now)) {
             return new \WP_Error('spcrc_webhook_replay_detected', 'Webhook replay was blocked.');
