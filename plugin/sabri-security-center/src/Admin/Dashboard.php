@@ -125,7 +125,7 @@ final class Dashboard
         $this->assertCapability('spcrc_manage_security_settings', 'You are not allowed to run repair.');
         check_admin_referer('spcrc_run_repair');
 
-        $result = $this->repair->run();
+        $result = $this->repair->run($this->postData());
         if (is_wp_error($result)) {
             $this->recordAudit('non_destructive_repair_failed', 'file-24-security-center', 'failed', 'high', ['error_code' => $result->get_error_code()]);
             $this->redirect('error', $result->get_error_message());
@@ -430,14 +430,22 @@ final class Dashboard
         if (! current_user_can('spcrc_manage_security_settings')) {
             return;
         }
+        $preview = $this->repair->preview();
         ?>
         <section class="spcrc-panel" aria-labelledby="spcrc-repair-heading">
             <h2 id="spcrc-repair-heading"><?php esc_html_e('Non-destructive repair', 'sabri-security-center'); ?></h2>
-            <p><?php esc_html_e('Recreates only File 24 tables and capabilities. It does not delete evidence or modify companion-module data.', 'sabri-security-center'); ?></p>
-            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+            <p><?php esc_html_e('Dry-run diagnostics cover only File 24-owned tables, capabilities, versions and recurring schedules. Companion-module data is never directly repaired here.', 'sabri-security-center'); ?></p>
+            <p><strong><?php esc_html_e('Dry-run:', 'sabri-security-center'); ?></strong> <?php echo esc_html((string) ($preview['schema_health'] ?? 'unknown')); ?> — <?php echo esc_html((string) ($preview['potential_table_count'] ?? 0)); ?> <?php esc_html_e('owned tables and', 'sabri-security-center'); ?> <?php echo esc_html((string) ($preview['potential_capability_count'] ?? 0)); ?> <?php esc_html_e('capabilities potentially checked/reapplied.', 'sabri-security-center'); ?></p>
+            <form class="spcrc-form-grid" method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
                 <input type="hidden" name="action" value="spcrc_run_repair">
+                <input type="hidden" name="preview_hash" value="<?php echo esc_attr((string) ($preview['preview_hash'] ?? '')); ?>">
                 <?php wp_nonce_field('spcrc_run_repair'); ?>
-                <?php submit_button(__('Run non-destructive repair', 'sabri-security-center'), 'secondary', 'submit', false); ?>
+                <p><label><?php esc_html_e('Reason', 'sabri-security-center'); ?><input required maxlength="500" name="reason" type="text"></label></p>
+                <p><label><?php esc_html_e('Backup checkpoint reference', 'sabri-security-center'); ?><input required maxlength="255" name="backup_checkpoint_ref" type="text" placeholder="backup:checkpoint-id"></label></p>
+                <p><label><?php esc_html_e('Rollback reference', 'sabri-security-center'); ?><input required maxlength="255" name="rollback_ref" type="text" placeholder="rollback:plan-id"></label></p>
+                <p><label><?php esc_html_e('File 00 step-up reference', 'sabri-security-center'); ?><input required maxlength="255" name="step_up_reference" type="text" placeholder="assertion:recent-step-up"></label></p>
+                <p><label><?php esc_html_e('Type REPAIR FILE 24', 'sabri-security-center'); ?><input required maxlength="32" name="typed_confirmation" type="text" autocomplete="off"></label></p>
+                <?php submit_button(__('Apply verified non-destructive repair', 'sabri-security-center'), 'secondary', 'submit', false); ?>
             </form>
         </section>
         <?php
