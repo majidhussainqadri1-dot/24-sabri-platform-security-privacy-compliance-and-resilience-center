@@ -71,15 +71,15 @@ jobs:
             echo "::error file=.github/workflows/cycle185-194-bootstrap.yml,title=Cycle185-194 bootstrap::${one_line}"
             exit "$rc"
           fi
-      - name: Preserve bootstrap files for token-safe commit
+      - name: Preserve workflow and bootstrap files for token-safe commit
         run: |
-          git checkout HEAD -- .github/workflows/cycle185-194-bootstrap.yml tools/apply-cycle185-194-final-patches.py
-      - name: Commit exact reviewed source
+          git checkout HEAD -- .github/workflows/ci.yml .github/workflows/cycle185-194-bootstrap.yml tools/apply-cycle185-194-final-patches.py
+      - name: Commit reviewed non-workflow source
         run: |
           set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -A
-          git diff --cached --quiet && { echo 'No patch changes produced'; exit 1; }
+          git diff --cached --quiet && { echo 'No non-workflow patch changes produced'; exit 1; }
           git commit -m 'Complete File 24 cycles 185-197 reviewed source'
           git push origin HEAD:file24-ten-round-review-185-194
