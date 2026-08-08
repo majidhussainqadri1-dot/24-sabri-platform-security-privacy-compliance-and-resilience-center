@@ -172,7 +172,10 @@ final class GovernedArtifactRegistry
             return $gate;
         }
 
-        $ownerUserId = absint($data['owner_user_id'] ?? get_current_user_id());
+        $ownerUserId = Sanitizer::strictInteger($data['owner_user_id'] ?? get_current_user_id(), 0, PHP_INT_MAX);
+        if ($ownerUserId === null) {
+            return new \WP_Error('spcrc_artifact_owner_invalid', 'Artifact owner must be a non-negative whole user identifier.');
+        }
         $moduleKey = Sanitizer::key($data['module_key'] ?? 'file-24-security-center', 120);
         if ($moduleKey === '') {
             $moduleKey = 'file-24-security-center';
@@ -523,7 +526,7 @@ final class GovernedArtifactRegistry
             'title' => Sanitizer::text($record['title'] ?? '', 200),
             'status' => Sanitizer::key($record['status'] ?? '', 40),
             'classification' => strtoupper(Sanitizer::text($record['classification'] ?? 'C1', 2)),
-            'owner_user_id' => absint($record['owner_user_id'] ?? 0),
+            'owner_user_id' => Sanitizer::strictInteger($record['owner_user_id'] ?? 0, 0, PHP_INT_MAX) ?? 0,
             'version' => max(1, absint($record['version'] ?? 1)),
             'payload' => is_array($record['payload'] ?? null) ? $record['payload'] : [],
             'evidence_ref' => Sanitizer::opaqueReference($record['evidence_ref'] ?? ''),
