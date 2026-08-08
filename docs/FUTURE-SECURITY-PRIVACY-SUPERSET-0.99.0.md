@@ -49,25 +49,25 @@ The future layer is coded as a repository-level assurance/control plane. Externa
 
 ### FutureSecurityAssurance
 
-`FutureSecurityAssurance` maps every future ID to a minimum evidence shape. A capability is `verified` only when all required evidence controls are present, the evidence locator is a bounded opaque reference, and the review timestamp is parseable and fresh. Unknown IDs, missing controls, path-like evidence references and stale/invalid review time fail closed.
+`FutureSecurityAssurance` maps every future ID to a minimum evidence shape. A capability is `verified` only when all required evidence controls are meaningful, nested evidence is bounded and free of sensitive material/non-finite numerics, the evidence locator is a bounded opaque reference, and the review timestamp is parseable and fresh. Unknown IDs, missing/structurally empty controls, path-like evidence references, stale/invalid review time and unsafe nested evidence fail closed.
 
 This evaluator deliberately does not fabricate real provider, legal, staging, cryptographic, restore, penetration-test or operational evidence.
 
 ### SecurityKnowledgeGraph + AttackPathEngine
 
-The graph supports bounded typed nodes for users/roles/capabilities/modules/endpoints/data classes/secret references/vendors/regions/vulnerabilities/controls/evidence/risks/workloads/AI assets/releases/backups/policies. Labels containing sensitive material are rejected. Edges are bounded and deduplicated. Attack-path analysis performs bounded reachability and scores reachable paths using likelihood, reachability, data sensitivity, user harm and blast radius.
+The graph supports bounded typed nodes for users/roles/capabilities/modules/endpoints/data classes/secret references/vendors/regions/vulnerabilities/controls/evidence/risks/workloads/AI assets/releases/backups/policies. Labels containing sensitive material are rejected. Exact duplicate nodes deduplicate; conflicting duplicate IDs are treated as ambiguous and removed with their dependent edges. Reachability only traverses registered graph nodes, preventing phantom-node paths. Attack-path analysis performs bounded reachability and finite, deterministic risk scoring using likelihood, reachability, data sensitivity, user harm and blast radius.
 
 ### PolicyAsCodeEngine
 
-The policy engine accepts only a small declarative operator set (`equals`, `present`, `in`, `gte`, `lte`). Unknown operators or malformed policies fail closed. There is no `eval`, dynamic code execution or hidden privilege grant. Runtime enforcement remains native.
+The policy engine accepts only a small declarative operator set (`equals`, `present`, `in`, `gte`, `lte`). Unknown operators or malformed policies fail closed. `equals` is type-strict, and numeric comparisons reject non-finite values. There is no `eval`, dynamic code execution or hidden privilege grant. Runtime enforcement remains native.
 
 ### PrivacyEgressGuard
 
-The egress decision contract requires an approved destination class, explicit purpose, lawful basis/consent, native authorization and minimum-necessary proof for sensitive data outside the approved clean room. It returns an assurance decision; the native module performs enforcement.
+The egress decision contract requires a recognized `C0..C5` data classification, an approved destination class, explicit purpose, lawful basis/consent and native authorization. Sensitive C3–C5/category-detected egress additionally requires minimum-necessary proof **even when the destination is an approved clean room**. Unknown or missing data classification fails closed. The native module performs enforcement.
 
 ### PrivacyAnalyticsGuard
 
-Privacy-preserving analytics are gated by bounded epsilon, remaining privacy budget, minimum cohort, contribution clipping, prohibition of raw-row output and clean-room execution. It can approve an aggregate query and calculate the remaining privacy budget; it cannot export raw records.
+Privacy-preserving analytics are gated by **finite** bounded epsilon and remaining privacy budget, minimum cohort, contribution clipping, prohibition of raw-row output and clean-room execution. NaN/Infinity/negative budget states fail closed. The guard can approve an aggregate query and calculate the remaining privacy budget; it cannot export raw records.
 
 ### ArtifactProvenanceVerifier
 
@@ -75,11 +75,11 @@ The verifier requires a 40-hex source commit, 64-hex artifact SHA-256, opaque bu
 
 ### AgenticAiSecurity
 
-Agentic/AI plans are bounded by agent identity, tool allowlist, network allowlist, maximum tool calls, monetary/cost budget, AI-BOM registration and source-citation policy. C4/C5 data and high-risk/destructive operations require human approval. Native action authorization remains mandatory.
+Agentic/AI plans are bounded by agent identity, tool allowlist, a declared recognized `C0..C5` data scope, network allowlist, maximum tool calls, finite monetary/cost budget, AI-BOM registration and source-citation policy. Missing/unknown data classes and non-finite cost budgets fail closed. C4/C5 data and high-risk/destructive operations require human approval. Native action authorization remains mandatory.
 
 ### AutomatedRemediationPolicy
 
-The Security Autopilot never performs domain mutation directly. It may issue a recommendation only when reversibility, preview and rollback evidence are present. A narrow low-risk allowlist may be auto-recommended; medium-risk actions require a human approval plus step-up; high/critical actions require dual approval plus step-up. Actual execution remains with the native owner.
+The Security Autopilot never performs domain mutation directly. It may issue a recommendation only when reversibility, preview and rollback evidence are present. A narrow low-risk allowlist may be auto-recommended; medium-risk actions require one **distinct opaque human approval reference** plus step-up; high/critical actions require two **distinct opaque human approval references** plus step-up. A self-reported approval count without matching distinct evidence is rejected. Actual execution remains with the native owner.
 
 ## Standards-readiness basis
 
@@ -109,14 +109,24 @@ File 24 may define policy/evidence contracts for the future capabilities, but ca
 
 ## Repository test closure
 
+Initial Future Superset closure:
+
 - **Cycle 114 — positive closure:** 25/25 catalogue, native-ownership invariants, graph/attack paths, policy-as-code, DLP/egress, differential privacy, provenance, bounded AI and low-risk remediation recommendation.
 - **Cycle 115 — adversarial closure:** unknown IDs, unsafe evidence references, sensitive graph labels, unknown policy operators, C5 unapproved egress, privacy-budget/cohort/raw-row failures, invalid provenance, unbounded AI and under-approved critical remediation.
 
-Every new PHP source file is part of the repository-wide PHP 8.0/8.3 lint matrix and every new top-level test is automatically executed by the complete CI suite.
+Fresh ten-round re-audit:
+
+- **Cycle 116 — clean:** catalogue/ownership/ID parity.
+- **Cycles 117–122 — defects corrected:** evidence-shape safety, graph ambiguity/phantom paths, attack numeric determinism, policy type confusion, DLP classification/minimum-necessary and differential-privacy non-finite values.
+- **Cycle 123 — clean:** provenance/VEX boundary.
+- **Cycle 124 — defects corrected:** Agentic AI data-scope/cost bounds.
+- **Cycle 125 — defects corrected:** distinct human remediation approval evidence plus explicit Future Superset CI/package/documentation gates.
+
+Every new PHP source file is part of the repository-wide PHP 8.0/8.3 lint matrix and every top-level test is automatically executed by the complete CI suite. `tests/cycle116-*` through `tests/cycle125-*` are permanent independent regressions. The detailed defect register is `docs/REVIEW-AND-CORRECTION-FUTURE-SECURITY-CYCLES-116-125.md`.
 
 ## Truth boundary and release status
 
-**Repository coding:** the 25 future capability identifiers and their executable assurance primitives are represented in source/tests/docs.
+**Repository coding:** the 25 future capability identifiers and their executable assurance primitives are represented in source/tests/docs and are subject to the ten-round hardened CI gate.
 
 **Not claimed by this addendum:** real post-quantum provider support, real external attack-surface telemetry, production DLP coverage, production clean-room infrastructure, hardware-backed workload identity, real cyber vault immutability, real chaos/BAS exercises, deployed honeytokens, live VEX feeds, externally signed SLSA provenance, production AI-agent providers, independent security certification, Hostinger staging acceptance, live deployment or operational acceptance.
 
