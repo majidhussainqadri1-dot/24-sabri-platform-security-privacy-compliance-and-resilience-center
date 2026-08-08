@@ -14,6 +14,7 @@ final class DeletionReplayManager
 {
     public const EVENT = 'spcrc_privacy_deletion_replay';
     private const LOCK = 'spcrc_deletion_replay_lock';
+    private const IN_FLIGHT_STALE_SECONDS = 600;
 
     public function __construct(
         private GovernedArtifactRegistry $artifacts,
@@ -77,12 +78,16 @@ final class DeletionReplayManager
 
         try {
             foreach ($this->artifacts->recent('deletion-ledger', max(1, min(200, $limit))) as $record) {
-                if (! in_array($record['status'] ?? '', ['pending', 'failed', 'dispatching', 'blocked-hold'], true)) {
+                $recordStatus = Sanitizer::key($record['status'] ?? '', 30);
+                if (! in_array($recordStatus, ['pending', 'failed', 'dispatching', 'blocked-hold'], true)) {
                     continue;
                 }
                 $payload = is_array($record['payload'] ?? null) ? $record['payload'] : [];
+                if ($recordStatus === 'dispatching' && ! $this->inFlightStale($payload, 'dispatch_started_at')) {
+                    continue;
+                }
                 $nextRetryAt = Sanitizer::isoTime($payload['next_retry_at'] ?? '');
-                if (($record['status'] ?? '') === 'failed' && $nextRetryAt !== '') {
+                if ($recordStatus === 'failed' && $nextRetryAt !== '') {
                     $nextRetryTimestamp = strtotime($nextRetryAt);
                     if ($nextRetryTimestamp !== false && $nextRetryTimestamp > time()) {
                         continue;
@@ -91,6 +96,10 @@ final class DeletionReplayManager
                 ++$counts['processed'];
                 $holdRef = Sanitizer::opaqueReference($payload['legal_hold_ref'] ?? '');
                 if ($holdRef !== '' && Sanitizer::boolean(apply_filters('spcrc/privacy_legal_hold_active', false, $holdRef, $record))) {
+                    if ($recordStatus === 'blocked-hold') {
+                        ++$counts['held'];
+                        continue;
+                    }
                     $held = $this->artifacts->transition('deletion-ledger', (string) $record['artifact_key'], 'blocked-hold', (int) $record['version'], [
                         'last_error_code' => 'legal_hold_active',
                     ]);
@@ -204,6 +213,18 @@ final class DeletionReplayManager
                 do_action('spcrc/privacy_deletion_replay_lock_release_failed', $token);
             }
         }
+    }
+
+
+    /** @param array<string,mixed> $payload */
+    private function inFlightStale(array $payload, string $field): bool
+    {
+        $startedAt = Sanitizer::isoTime($payload[$field] ?? '');
+        if ($startedAt === '') {
+            return true;
+        }
+        $timestamp = strtotime($startedAt);
+        return $timestamp === false || $timestamp <= time() - self::IN_FLIGHT_STALE_SECONDS;
     }
 
     /** @param array<string,mixed> $record */
