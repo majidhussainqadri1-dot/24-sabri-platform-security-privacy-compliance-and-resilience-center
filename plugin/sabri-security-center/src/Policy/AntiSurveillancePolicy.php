@@ -39,7 +39,7 @@ final class AntiSurveillancePolicy
     }
 
     /** @param array<string,mixed> $processing @return array<string,mixed> */
-    public static function evaluate(array $processing): array
+    public static function evaluate(array $processing, ?int $now = null): array
     {
         $uses = Sanitizer::textList($processing['uses'] ?? [], 50, 100);
         $controls = Sanitizer::textList($processing['controls'] ?? [], 80, 100);
@@ -48,7 +48,7 @@ final class AntiSurveillancePolicy
         $evidenceRef = Sanitizer::opaqueReference($processing['evidence_ref'] ?? '');
         $reviewedAt = Sanitizer::isoTime($processing['reviewed_at'] ?? '');
         $nextReviewAt = Sanitizer::isoTime($processing['next_review_at'] ?? '');
-        $annualReviewValid = IslamicGovernanceCharter::annualReviewValid($reviewedAt, $nextReviewAt);
+        $annualReviewValid = IslamicGovernanceCharter::annualReviewValid($reviewedAt, $nextReviewAt, $now);
         $state = $violations === [] && $missing === [] && $evidenceRef !== '' && $annualReviewValid
             ? 'verified'
             : (($uses === [] && $controls === []) ? 'unassessed' : 'blocked');
