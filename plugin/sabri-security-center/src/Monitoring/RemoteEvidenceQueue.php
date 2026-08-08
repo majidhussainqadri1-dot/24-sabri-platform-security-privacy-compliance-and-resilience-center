@@ -14,6 +14,7 @@ final class RemoteEvidenceQueue
 {
     public const EVENT = 'spcrc_remote_evidence_delivery';
     private const LOCK = 'spcrc_remote_evidence_queue_lock';
+    private const IN_FLIGHT_STALE_SECONDS = 600;
     private bool $guard = false;
 
     public function __construct(private GovernedArtifactRegistry $artifacts)
@@ -140,10 +141,14 @@ final class RemoteEvidenceQueue
         $this->guard = true;
         try {
             foreach ($this->artifacts->recent('remote-evidence', max(1, min(200, $limit))) as $record) {
-                if (! in_array($record['status'] ?? '', ['queued', 'retry'], true)) {
+                $recordStatus = Sanitizer::key($record['status'] ?? '', 30);
+                if (! in_array($recordStatus, ['queued', 'retry', 'delivering'], true)) {
                     continue;
                 }
                 $payload = is_array($record['payload'] ?? null) ? $record['payload'] : [];
+                if ($recordStatus === 'delivering' && ! $this->inFlightStale($payload, 'delivery_started_at')) {
+                    continue;
+                }
                 $nextAt = Sanitizer::isoTime($payload['next_attempt_at'] ?? '');
                 if ($nextAt !== '' && strtotime($nextAt) > time()) {
                     continue;
@@ -236,6 +241,18 @@ final class RemoteEvidenceQueue
             $this->guard = false;
             AtomicOptionLock::release(self::LOCK, $token);
         }
+    }
+
+
+    /** @param array<string,mixed> $payload */
+    private function inFlightStale(array $payload, string $field): bool
+    {
+        $startedAt = Sanitizer::isoTime($payload[$field] ?? '');
+        if ($startedAt === '') {
+            return true;
+        }
+        $timestamp = strtotime($startedAt);
+        return $timestamp === false || $timestamp <= time() - self::IN_FLIGHT_STALE_SECONDS;
     }
 
     /** @param array<string,mixed> $record */
