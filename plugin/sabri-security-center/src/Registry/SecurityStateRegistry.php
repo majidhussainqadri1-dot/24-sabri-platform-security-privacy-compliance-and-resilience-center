@@ -292,9 +292,16 @@ final class SecurityStateRegistry
                 $requestedBy = absint($request['requested_by'] ?? 0);
                 $requestedAt = Sanitizer::isoTime($request['requested_at'] ?? '');
                 $expiresAt = Sanitizer::isoTime($request['expires_at'] ?? '');
+                $now = time();
+                $requestedTimestamp = $requestedAt === '' ? false : strtotime($requestedAt);
+                $expiresTimestamp = $expiresAt === '' ? false : strtotime($expiresAt);
                 if ($moduleKey === '' || ! $this->modules->has($moduleKey) || ! in_array($state, self::ALLOWED_STATES, true)
                     || $reason === '' || Sanitizer::containsSensitiveMaterial($reason) || $requestedBy < 1
-                    || $requestedAt === '' || $expiresAt === '' || strtotime($expiresAt) <= time()) {
+                    || $requestedTimestamp === false || $expiresTimestamp === false
+                    || $requestedTimestamp > $now + 300
+                    || $expiresTimestamp <= $now
+                    || $expiresTimestamp <= $requestedTimestamp
+                    || $expiresTimestamp > $now + self::MAX_TTL) {
                     continue;
                 }
                 $external[$requestId] = [
