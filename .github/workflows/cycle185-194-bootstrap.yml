@@ -58,7 +58,16 @@ jobs:
           p.write_text(s.replace(old_ci, new_ci, 1))
           PY
       - name: Apply exact reviewed remaining patches
-        run: python3 tools/apply-cycle185-194-final-patches.py
+        run: |
+          set +e
+          output=$(python3 tools/apply-cycle185-194-final-patches.py 2>&1)
+          rc=$?
+          printf '%s\n' "$output"
+          if [ "$rc" -ne 0 ]; then
+            one_line=$(printf '%s' "$output" | tr '\n' ' ' | cut -c1-800)
+            echo "::error file=.github/workflows/cycle185-194-bootstrap.yml,title=Cycle185-194 bootstrap::${one_line}"
+            exit "$rc"
+          fi
       - name: Commit exact reviewed source
         run: |
           set -euo pipefail
