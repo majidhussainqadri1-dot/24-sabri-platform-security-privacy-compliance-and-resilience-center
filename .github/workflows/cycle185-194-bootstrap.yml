@@ -71,6 +71,9 @@ jobs:
             echo "::error file=.github/workflows/cycle185-194-bootstrap.yml,title=Cycle185-194 bootstrap::${one_line}"
             exit "$rc"
           fi
+      - name: Preserve bootstrap files for token-safe commit
+        run: |
+          git checkout HEAD -- .github/workflows/cycle185-194-bootstrap.yml tools/apply-cycle185-194-final-patches.py
       - name: Commit exact reviewed source
         run: |
           set -euo pipefail
