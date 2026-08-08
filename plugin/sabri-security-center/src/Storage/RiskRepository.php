@@ -42,8 +42,11 @@ final class RiskRepository
 
         $title = Sanitizer::text($data['title'] ?? '', 200);
         $moduleKey = Sanitizer::key($data['module_key'] ?? 'file-24-security-center', 120);
-        $likelihood = max(1, min(5, absint($data['likelihood'] ?? 1)));
-        $impact = max(1, min(5, absint($data['impact'] ?? 1)));
+        $likelihood = Sanitizer::strictInteger($data['likelihood'] ?? 1, 1, 5);
+        $impact = Sanitizer::strictInteger($data['impact'] ?? 1, 1, 5);
+        if ($likelihood === null || $impact === null) {
+            return new \WP_Error('spcrc_risk_score_invalid', 'Risk likelihood and impact must each be whole numbers from 1 through 5.');
+        }
         $treatment = Sanitizer::key($data['treatment'] ?? 'mitigate', 30);
         if (! in_array($treatment, ['avoid', 'mitigate', 'transfer'], true)) {
             if ($treatment === 'accept') {
