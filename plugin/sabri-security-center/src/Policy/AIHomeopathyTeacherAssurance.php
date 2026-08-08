@@ -38,10 +38,11 @@ final class AIHomeopathyTeacherAssurance
         $identity = Sanitizer::key($evidence['identity_type'] ?? '', 60);
         $launchAt = Sanitizer::isoTime($evidence['launch_at'] ?? '');
         $launch = $launchAt === '' ? false : strtotime($launchAt);
-        $launchValid = $launch !== false && $launch <= $now + 300;
-        $withinReviewWindow = $launchValid && $launch <= $now && ($now - $launch) < self::HUMAN_REVIEW_DAYS * DAY_IN_SECONDS;
+        $launchValid = $launch !== false && $launch <= $now;
+        $withinReviewWindow = $launchValid && ($now - $launch) < self::HUMAN_REVIEW_DAYS * DAY_IN_SECONDS;
         $humanReviewEnabled = ! empty($evidence['human_review_enabled']);
-        $dailyPostCap = absint($evidence['daily_post_cap'] ?? 0);
+        $parsedDailyPostCap = Sanitizer::strictInteger($evidence['daily_post_cap'] ?? null, 1, self::DEFAULT_MAX_DAILY_POSTS);
+        $dailyPostCap = $parsedDailyPostCap ?? 0;
         $evidenceRef = Sanitizer::opaqueReference($evidence['evidence_ref'] ?? '');
         $testedAt = Sanitizer::isoTime($evidence['tested_at'] ?? '');
         $tested = $testedAt === '' ? false : strtotime($testedAt);
@@ -49,7 +50,7 @@ final class AIHomeopathyTeacherAssurance
             && $tested <= $now + 300
             && $tested >= $now - (self::MAX_EVIDENCE_AGE_DAYS * DAY_IN_SECONDS);
         $identityValid = $identity === 'institutional-ai';
-        $cadenceValid = $dailyPostCap >= 1 && $dailyPostCap <= self::DEFAULT_MAX_DAILY_POSTS;
+        $cadenceValid = $parsedDailyPostCap !== null;
         $reviewValid = $launchValid && (! $withinReviewWindow || $humanReviewEnabled);
         $state = $missing === [] && $identityValid && $cadenceValid && $reviewValid && $evidenceFresh && $evidenceRef !== ''
             ? 'verified'
