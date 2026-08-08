@@ -45,11 +45,14 @@ jobs:
           """
           new_ci = """ci_path = ROOT / '.github/workflows/ci.yml'
           ci_text = ci_path.read_text()
-          if ci_text.count('/tmp/file24-source-snapshot-cycle184.zip') != 3:
-              raise SystemExit('CI snapshot path occurrence count changed unexpectedly')
+          if ci_text.count('/tmp/file24-source-snapshot-cycle184.zip') != 2:
+              raise SystemExit('CI absolute snapshot path occurrence count changed unexpectedly')
+          if ci_text.count('(cd /tmp && zip -X -q -r file24-source-snapshot-cycle184.zip file24-source)') != 1:
+              raise SystemExit('CI package snapshot command occurrence count changed unexpectedly')
           if ci_text.count('file-24-sanitized-source-snapshot-cycle184') != 1:
               raise SystemExit('CI snapshot artifact occurrence count changed unexpectedly')
           ci_text = ci_text.replace('/tmp/file24-source-snapshot-cycle184.zip', '/tmp/file24-source-snapshot-cycle197.zip')
+          ci_text = ci_text.replace('(cd /tmp && zip -X -q -r file24-source-snapshot-cycle184.zip file24-source)', '(cd /tmp && zip -X -q -r file24-source-snapshot-cycle197.zip file24-source)')
           ci_text = ci_text.replace('file-24-sanitized-source-snapshot-cycle184', 'file-24-sanitized-source-snapshot-cycle197')
           ci_path.write_text(ci_text)
           """
