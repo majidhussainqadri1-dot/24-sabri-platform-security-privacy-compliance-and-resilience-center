@@ -33,7 +33,7 @@ jobs:
             php -l "$source_file"
             count=$((count + 1))
           done < <(find plugin tests -type f -name '*.php' -print0 | sort -z)
-          test "$count" -ge 257
+          test "$count" -ge 259
           echo "Linted $count PHP files."
 
       - name: Run the complete historical and code-complete suites
@@ -45,7 +45,7 @@ jobs:
             php "$test_file"
             count=$((count + 1))
           done < <(find tests -maxdepth 1 -type f -name '*.php' ! -name 'bootstrap.php' -print0 | sort -z)
-          test "$count" -ge 170
+          test "$count" -ge 172
           echo "Executed $count independent PHP test programs."
 
       - name: Reject secrets, private operations material and unsafe PHP
@@ -167,7 +167,7 @@ jobs:
           for class in FutureSecurityCapabilityCatalog FutureSecurityAssurance SecurityKnowledgeGraph AttackPathEngine PolicyAsCodeEngine PrivacyEgressGuard PrivacyAnalyticsGuard ArtifactProvenanceVerifier AgenticAiSecurity AutomatedRemediationPolicy; do
             test -f "plugin/sabri-security-center/src/Future/${class}.php"
           done
-          for cycle in $(seq 116 165); do
+          for cycle in $(seq 116 167); do
             find tests -maxdepth 1 -type f -name "cycle${cycle}-*.php" | grep -q .
           done
           test -f docs/FUTURE-SECURITY-PRIVACY-SUPERSET-0.99.0.md
@@ -184,11 +184,13 @@ jobs:
           grep -q 'Defect-bearing cycles | **146, 147, 148, 149, 150, 151, 152, 153, 155**' docs/REVIEW-AND-CORRECTION-FUTURE-SECURITY-CYCLES-146-155.md
           grep -q 'Clean cycles | **154**' docs/REVIEW-AND-CORRECTION-FUTURE-SECURITY-CYCLES-146-155.md
           grep -q 'Known unresolved repository-correctable defects after fixes/retests | **0**' docs/REVIEW-AND-CORRECTION-FUTURE-SECURITY-CYCLES-146-155.md
-          grep -q 'Defect-bearing cycles | **156, 157, 158, 159, 160, 161, 162, 163**' docs/REVIEW-AND-CORRECTION-FUTURE-SECURITY-CYCLES-156-165.md
-          grep -q 'Clean cycles | **164, 165**' docs/REVIEW-AND-CORRECTION-FUTURE-SECURITY-CYCLES-156-165.md
-          grep -q 'Consecutive clean closing cycles | **164, 165**' docs/REVIEW-AND-CORRECTION-FUTURE-SECURITY-CYCLES-156-165.md
-          grep -q 'Known unresolved repository-correctable defects after fixes/retests | **0**' docs/REVIEW-AND-CORRECTION-FUTURE-SECURITY-CYCLES-156-165.md
-          test -f tests/cycle165-second-clean-current-plan-closure-review.php
+          grep -Fq 'Defect-bearing cycles | **156, 157, 158, 159, 160, 161, 162, 163, 165**' docs/REVIEW-AND-CORRECTION-FUTURE-SECURITY-CYCLES-156-165.md
+          grep -Fq 'Clean cycles | **164**' docs/REVIEW-AND-CORRECTION-FUTURE-SECURITY-CYCLES-156-165.md
+          grep -Fq '**Consecutive clean post-fix closing cycles: 166, 167.**' docs/REVIEW-AND-CORRECTION-FUTURE-SECURITY-CYCLES-156-165.md
+          grep -Fq 'Known unresolved repository-correctable defects after fixes/retests | **0**' docs/REVIEW-AND-CORRECTION-FUTURE-SECURITY-CYCLES-156-165.md
+          test -f tests/cycle165-exact-head-closure-regex-review.php
+          test -f tests/cycle166-first-post-ci-clean-review.php
+          test -f tests/cycle167-second-post-ci-clean-closure-review.php
           grep -q 'spcrc_upload_scan_hash_mismatch' plugin/sabri-security-center/src/Security/UploadPolicy.php
           grep -q 'evidence_fresh' plugin/sabri-security-center/src/Security/TransferDownloadAssurance.php
           grep -q 'launch_valid' plugin/sabri-security-center/src/Policy/AIHomeopathyTeacherAssurance.php
@@ -244,7 +246,7 @@ jobs:
         run: |
           set -euo pipefail
           git ls-files -z | sort -z | xargs -0 sha256sum > /tmp/file24-source-checksums.sha256
-          test "$(wc -l < /tmp/file24-source-checksums.sha256)" -ge 426
+          test "$(wc -l < /tmp/file24-source-checksums.sha256)" -ge 428
           sha256sum -c /tmp/file24-source-checksums.sha256
           echo "path=/tmp/file24-source-checksums.sha256" >> "$GITHUB_OUTPUT"
 
@@ -286,15 +288,15 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          rm -rf /tmp/file24-source /tmp/file24-source-snapshot-cycle165.zip
+          rm -rf /tmp/file24-source /tmp/file24-source-snapshot-cycle167.zip
           mkdir -p /tmp/file24-source
           rsync -a --exclude='.git' --exclude='build' ./ /tmp/file24-source/
-          (cd /tmp && zip -X -q -r file24-source-snapshot-cycle165.zip file24-source)
+          (cd /tmp && zip -X -q -r file24-source-snapshot-cycle167.zip file24-source)
 
       - name: Upload sanitized code-complete source snapshot
         if: matrix.php == '8.3'
         uses: actions/upload-artifact@v4
         with:
-          name: file-24-sanitized-source-snapshot-cycle165
-          path: /tmp/file24-source-snapshot-cycle165.zip
+          name: file-24-sanitized-source-snapshot-cycle167
+          path: /tmp/file24-source-snapshot-cycle167.zip
           if-no-files-found: error
