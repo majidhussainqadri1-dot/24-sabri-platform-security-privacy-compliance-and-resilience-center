@@ -24,6 +24,9 @@ find "$STAGE" -exec touch -h -d "@${SOURCE_EPOCH}" {} +
   LC_ALL=C find sabri-security-center -type f -print | sort | zip -X -q "$ZIP" -@
 )
 unzip -t "$ZIP" >/dev/null
-unzip -l "$ZIP" | grep -q 'sabri-security-center/sabri-security-center.php'
+ENTRY_LIST="$BUILD_DIR/.package-entries.txt"
+unzip -Z1 "$ZIP" > "$ENTRY_LIST"
+grep -Fxq 'sabri-security-center/sabri-security-center.php' "$ENTRY_LIST"
+rm -f "$ENTRY_LIST"
 (cd "$BUILD_DIR" && sha256sum "$(basename "$ZIP")" > "$(basename "$ZIP").sha256")
 printf '%s\n' "$ZIP"
