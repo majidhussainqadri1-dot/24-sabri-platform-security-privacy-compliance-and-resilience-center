@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Sabri\Platform\Security\Monitoring;
 
 use Sabri\Platform\Security\Registry\GovernedArtifactRegistry;
+use Sabri\Platform\Security\Storage\AuditGapStore;
 use Sabri\Platform\Security\Support\AtomicOptionLock;
 use Sabri\Platform\Security\Support\Sanitizer;
 use Sabri\Platform\Security\Support\SecureIdentifier;
@@ -32,10 +33,29 @@ final class RemoteEvidenceQueue
         if (! function_exists('wp_next_scheduled') || ! function_exists('wp_schedule_event')) {
             return false;
         }
-        if (wp_next_scheduled(self::EVENT)) {
+        $next = wp_next_scheduled(self::EVENT);
+        if ($next !== false) {
+            return self::scheduleValid($next, 'hourly');
+        }
+        $scheduled = wp_schedule_event(time() + 120, 'hourly', self::EVENT);
+        return ! is_wp_error($scheduled) && $scheduled !== false
+            && self::scheduleValid(wp_next_scheduled(self::EVENT), 'hourly');
+    }
+
+    private static function scheduleValid(mixed $next, string $recurrence): bool
+    {
+        $now = time();
+        $timestamp = Sanitizer::strictInteger($next, $now + 1, $now + (2 * HOUR_IN_SECONDS));
+        if ($timestamp === null) {
+            return false;
+        }
+        if (! function_exists('wp_get_scheduled_event')) {
             return true;
         }
-        return wp_schedule_event(time() + 120, 'hourly', self::EVENT);
+        $event = wp_get_scheduled_event(self::EVENT);
+        return is_object($event)
+            && Sanitizer::key($event->schedule ?? '', 40) === $recurrence
+            && Sanitizer::strictInteger($event->timestamp ?? null, $now + 1, $now + (2 * HOUR_IN_SECONDS)) === $timestamp;
     }
 
     public static function unschedule(): void
@@ -56,7 +76,15 @@ final class RemoteEvidenceQueue
         if ($this->guard || ($event['event_type'] ?? '') === 'governed_artifact_saved') {
             return;
         }
-        $this->enqueue($event);
+        $queued = $this->enqueue($event);
+        if (is_wp_error($queued)) {
+            $eventUuid = Sanitizer::uuid($event['event_uuid'] ?? '');
+            AuditGapStore::record('spcrc_remote_evidence_audit_gap', 'remote-evidence-event', $eventUuid, 'enqueue_persistence_failed', [
+                'event_type' => Sanitizer::key($event['event_type'] ?? '', 120),
+                'error_code' => $queued->get_error_code(),
+            ]);
+            do_action('spcrc/remote_evidence_enqueue_failed', $eventUuid, $queued->get_error_code());
+        }
     }
 
     /** @param array<string,mixed> $event @return string|\WP_Error */
@@ -138,7 +166,7 @@ final class RemoteEvidenceQueue
                     $saved = $this->artifacts->save($updated, (int) $record['version']);
                     if (is_wp_error($saved)) {
                         ++$counts['persistence_failed'];
-                        do_action('spcrc/remote_evidence_persistence_failed', $record['artifact_key'] ?? '', $saved->get_error_code());
+                        $this->recordPersistenceGap($record, 'delivery_state_persistence_failed', $saved);
                     } else {
                         ++$counts['delivered'];
                     }
@@ -153,7 +181,7 @@ final class RemoteEvidenceQueue
                 ]);
                 if (is_wp_error($transitioned)) {
                     ++$counts['persistence_failed'];
-                    do_action('spcrc/remote_evidence_persistence_failed', $record['artifact_key'] ?? '', $transitioned->get_error_code());
+                    $this->recordPersistenceGap($record, 'retry_state_persistence_failed', $transitioned);
                 } else {
                     $counts[$status === 'dead-letter' ? 'dead_letter' : 'retry']++;
                 }
@@ -163,6 +191,16 @@ final class RemoteEvidenceQueue
             $this->guard = false;
             AtomicOptionLock::release(self::LOCK, $token);
         }
+    }
+
+    /** @param array<string,mixed> $record */
+    private function recordPersistenceGap(array $record, string $reason, \WP_Error $error): void
+    {
+        $artifactKey = Sanitizer::key($record['artifact_key'] ?? '', 120);
+        AuditGapStore::record('spcrc_remote_evidence_audit_gap', 'remote-evidence', $artifactKey, $reason, [
+            'error_code' => $error->get_error_code(),
+        ]);
+        do_action('spcrc/remote_evidence_persistence_failed', $artifactKey, $error->get_error_code());
     }
 
     public function depth(): int
