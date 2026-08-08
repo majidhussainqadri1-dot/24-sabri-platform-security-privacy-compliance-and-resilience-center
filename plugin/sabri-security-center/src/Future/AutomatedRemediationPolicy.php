@@ -20,25 +20,59 @@ final class AutomatedRemediationPolicy
         $reversible = Sanitizer::boolean($request['reversible'] ?? false);
         $previewed = Sanitizer::boolean($request['previewed'] ?? false);
         $rollback = Sanitizer::opaqueReference($request['rollback_reference'] ?? '');
-        $approvals = max(0, (int) ($request['human_approvals'] ?? 0));
+        $reportedApprovals = max(0, (int) ($request['human_approvals'] ?? 0));
+        $approvalRefs = $this->approvalReferences($request['human_approval_refs'] ?? []);
+        $approvals = count($approvalRefs);
         $stepUp = Sanitizer::boolean($request['step_up_verified'] ?? false);
         $reasons = [];
+
         if ($action === '' || ! in_array($risk, ['low','medium','high','critical'], true)) $reasons[] = 'invalid_action_or_risk';
         if (! $reversible || ! $previewed || $rollback === '') $reasons[] = 'reversibility_evidence_missing';
+        if ($reportedApprovals !== $approvals) $reasons[] = 'approval_evidence_mismatch';
 
         if ($reasons === []) {
-            if ($risk === 'low' && in_array($action, self::LOW_RISK_ALLOWLIST, true)) {
-                return ['decision' => 'auto_recommend', 'execute_by' => 'native_owner', 'reasons' => [], 'rollback_reference' => $rollback];
+            if ($risk === 'low' && in_array($action, self::LOW_RISK_ALLOWLIST, true) && $approvals === 0) {
+                return $this->result('auto_recommend', 'native_owner', [], $rollback, $approvals);
             }
             if ($risk === 'medium' && $approvals >= 1 && $stepUp) {
-                return ['decision' => 'approved_recommendation', 'execute_by' => 'native_owner', 'reasons' => [], 'rollback_reference' => $rollback];
+                return $this->result('approved_recommendation', 'native_owner', [], $rollback, $approvals);
             }
             if (in_array($risk, ['high','critical'], true) && $approvals >= 2 && $stepUp) {
-                return ['decision' => 'dual_approved_recommendation', 'execute_by' => 'native_owner', 'reasons' => [], 'rollback_reference' => $rollback];
+                return $this->result('dual_approved_recommendation', 'native_owner', [], $rollback, $approvals);
             }
             $reasons[] = 'human_approval_policy_not_satisfied';
         }
 
-        return ['decision' => 'block', 'execute_by' => 'none', 'reasons' => $reasons, 'rollback_reference' => $rollback];
+        return $this->result('block', 'none', array_values(array_unique($reasons)), $rollback, $approvals);
+    }
+
+    /** @return string[] */
+    private function approvalReferences(mixed $value): array
+    {
+        if (! is_array($value)) {
+            return [];
+        }
+        $refs = [];
+        foreach (array_slice($value, 0, 10) as $candidate) {
+            $ref = Sanitizer::opaqueReference($candidate, 180);
+            if ($ref !== '') {
+                $refs[$ref] = true;
+            }
+        }
+        return array_keys($refs);
+    }
+
+    /** @param string[] $reasons
+     *  @return array<string,mixed>
+     */
+    private function result(string $decision, string $executeBy, array $reasons, string $rollback, int $approvals): array
+    {
+        return [
+            'decision' => $decision,
+            'execute_by' => $executeBy,
+            'reasons' => $reasons,
+            'rollback_reference' => $rollback,
+            'distinct_human_approval_count' => $approvals,
+        ];
     }
 }
