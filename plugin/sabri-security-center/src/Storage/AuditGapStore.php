@@ -45,6 +45,9 @@ final class AuditGapStore
         'retention' => 'spcrc_retention_audit_gap',
         'admin' => 'spcrc_admin_audit_gap',
         'security-state' => 'spcrc_security_state_audit_gap',
+        'detection' => 'spcrc_detection_audit_gap',
+        'remote-evidence' => 'spcrc_remote_evidence_audit_gap',
+        'deletion-replay' => 'spcrc_deletion_replay_audit_gap',
     ];
 
     /** @param array<string,mixed> $context */

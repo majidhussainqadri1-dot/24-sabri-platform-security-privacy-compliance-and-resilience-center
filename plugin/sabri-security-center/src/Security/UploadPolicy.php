@@ -31,12 +31,12 @@ final class UploadPolicy
             return new \WP_Error('spcrc_upload_purpose_invalid', 'Upload purpose is not approved.');
         }
         $name = Sanitizer::text($file['name'] ?? '', 255);
-        $size = absint($file['size'] ?? 0);
+        $size = Sanitizer::strictInteger($file['size'] ?? null, 1, (int) self::PURPOSES[$purpose]['max']);
         $declared = strtolower(Sanitizer::text($file['declared_mime'] ?? '', 120));
         $detected = strtolower(Sanitizer::text($file['detected_mime'] ?? '', 120));
         $sha256 = strtolower(Sanitizer::text($file['sha256'] ?? '', 64));
 
-        if ($name === '' || $size < 1 || $size > (int) self::PURPOSES[$purpose]['max']) {
+        if ($name === '' || $size === null) {
             return new \WP_Error('spcrc_upload_size_invalid', 'Upload name or size is invalid for the selected purpose.');
         }
         if (preg_match('/[\x00-\x1f\x7f]/', $name) === 1 || preg_match('/\.(php\d*|phtml|phar|cgi|pl|py|sh|exe|dll|js|html?)$/i', $name) === 1) {

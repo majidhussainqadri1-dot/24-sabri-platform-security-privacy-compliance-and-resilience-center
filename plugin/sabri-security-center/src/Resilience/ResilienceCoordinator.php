@@ -49,10 +49,29 @@ final class ResilienceCoordinator
         if (! function_exists('wp_next_scheduled') || ! function_exists('wp_schedule_event')) {
             return false;
         }
-        if (wp_next_scheduled(self::DRILL_EVENT)) {
+        $next = wp_next_scheduled(self::DRILL_EVENT);
+        if ($next !== false) {
+            return self::scheduleValid($next, 'daily');
+        }
+        $scheduled = wp_schedule_event(time() + DAY_IN_SECONDS, 'daily', self::DRILL_EVENT);
+        return ! is_wp_error($scheduled) && $scheduled !== false
+            && self::scheduleValid(wp_next_scheduled(self::DRILL_EVENT), 'daily');
+    }
+
+    private static function scheduleValid(mixed $next, string $recurrence): bool
+    {
+        $now = time();
+        $timestamp = Sanitizer::strictInteger($next, $now + 1, $now + (2 * DAY_IN_SECONDS));
+        if ($timestamp === null) {
+            return false;
+        }
+        if (! function_exists('wp_get_scheduled_event')) {
             return true;
         }
-        return (bool) wp_schedule_event(time() + DAY_IN_SECONDS, 'daily', self::DRILL_EVENT);
+        $event = wp_get_scheduled_event(self::DRILL_EVENT);
+        return is_object($event)
+            && Sanitizer::key($event->schedule ?? '', 40) === $recurrence
+            && Sanitizer::strictInteger($event->timestamp ?? null, $now + 1, $now + (2 * DAY_IN_SECONDS)) === $timestamp;
     }
 
     public static function unschedule(): void

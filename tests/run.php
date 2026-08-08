@@ -120,7 +120,16 @@ $backup = $assurance->upsert([
 expect(is_string($backup) && $assurance->count('backup') === 1, 'Verified backup assurance must persist with restore evidence.');
 
 $repair = new Repair();
-$repairResult = $repair->run();
+$repairPreview = $repair->preview();
+add_filter('spcrc/verify_step_up_assurance', '__return_true', 10, 4);
+$repairResult = $repair->run([
+    'preview_hash' => $repairPreview['preview_hash'] ?? '',
+    'reason' => 'Repository regression repair verification',
+    'backup_checkpoint_ref' => 'backup:regression-checkpoint',
+    'rollback_ref' => 'rollback:regression-plan',
+    'step_up_reference' => 'assertion:regression-step-up',
+    'typed_confirmation' => 'REPAIR FILE 24',
+]);
 expect(is_array($repairResult) && get_option('spcrc_schema_version') === '0.25.5', 'Non-destructive repair must verify schema and record version.');
 expect(($repairResult['retention_schedule_verified'] ?? false) && ($repairResult['privacy_recovery_schedule_verified'] ?? false), 'Repair must verify both required schedules.');
 expect(! empty($GLOBALS['administrator_role']->caps['spcrc_manage_risks']), 'Repair must reapply the bounded bootstrap Security Administrator capabilities.');

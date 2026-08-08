@@ -177,7 +177,17 @@ foreach ((new SystemCheck($registry))->run() as $check) {
 expectCycle9(($checkMap['upgrade_error']['status'] ?? '') === 'critical', 'Structured upgrade failure must remain critical.');
 expectCycle9(str_contains((string) ($checkMap['upgrade_error']['detail'] ?? ''), 'spcrc_test_failure'), 'Structured upgrade code must be rendered.');
 
-$repaired = (new Repair())->run();
+$repair = new Repair();
+$repairPreview = $repair->preview();
+add_filter('spcrc/verify_step_up_assurance', '__return_true', 10, 4);
+$repaired = $repair->run([
+    'preview_hash' => $repairPreview['preview_hash'] ?? '',
+    'reason' => 'Cycle 9 regression repair verification',
+    'backup_checkpoint_ref' => 'backup:cycle-nine-checkpoint',
+    'rollback_ref' => 'rollback:cycle-nine-plan',
+    'step_up_reference' => 'assertion:cycle-nine-step-up',
+    'typed_confirmation' => 'REPAIR FILE 24',
+]);
 expectCycle9(is_array($repaired), 'Non-destructive repair must complete when schedules are verified.');
 expectCycle9(($repaired['retention_schedule_verified'] ?? false) === true, 'Repair must verify retention schedule.');
 expectCycle9(($repaired['privacy_recovery_schedule_verified'] ?? false) === true, 'Repair must verify privacy recovery schedule.');

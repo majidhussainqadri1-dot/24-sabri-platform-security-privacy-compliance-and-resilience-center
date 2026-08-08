@@ -126,6 +126,35 @@ final class Sanitizer
         return $parsed === null ? false : $parsed;
     }
 
+    /**
+     * Parse an integer without coercing negative, floating, exponential,
+     * boolean or malformed input into a different valid value.
+     */
+    public static function strictInteger(mixed $value, int $minimum = PHP_INT_MIN, int $maximum = PHP_INT_MAX): ?int
+    {
+        if ($minimum > $maximum || is_bool($value) || is_float($value) || $value === null || is_array($value) || is_object($value)) {
+            return null;
+        }
+
+        if (is_int($value)) {
+            $parsed = $value;
+        } elseif (is_string($value)) {
+            $value = trim($value);
+            if ($value === '' || preg_match('/^-?(?:0|[1-9][0-9]*)$/D', $value) !== 1) {
+                return null;
+            }
+            $filtered = filter_var($value, FILTER_VALIDATE_INT);
+            if ($filtered === false) {
+                return null;
+            }
+            $parsed = (int) $filtered;
+        } else {
+            return null;
+        }
+
+        return $parsed >= $minimum && $parsed <= $maximum ? $parsed : null;
+    }
+
     public static function isoTime(mixed $value): string
     {
         if (! is_scalar($value) && $value !== null) {

@@ -142,7 +142,8 @@ final class StatusController
         // replace or forge claims after approval and expiry checks have completed.
         $safe = $this->sanitizeTrustPayload($payload);
         $response = new \WP_REST_Response($safe);
-        $response->header('Cache-Control', 'public, max-age=300');
+        $maxAge = $this->trustCacheMaxAge($safe);
+        $response->header('Cache-Control', 'public, max-age=' . $maxAge . ($maxAge === 0 ? ', must-revalidate' : ''));
         $response->header('X-Content-Type-Options', 'nosniff');
         return $response;
     }
@@ -174,6 +175,25 @@ final class StatusController
             'expires_at' => Sanitizer::isoTime($state['expires_at'] ?? ''),
             'status' => Sanitizer::key($state['status'] ?? 'open', 40),
         ];
+    }
+
+    /** @param array<string,mixed> $payload */
+    private function trustCacheMaxAge(array $payload): int
+    {
+        $now = time();
+        $maxAge = 300;
+        foreach (is_array($payload['claims'] ?? null) ? $payload['claims'] : [] as $claim) {
+            if (! is_array($claim)) {
+                continue;
+            }
+            $expiresAt = Sanitizer::isoTime($claim['expires_at'] ?? '');
+            $expires = $expiresAt === '' ? false : strtotime($expiresAt);
+            if ($expires === false) {
+                return 0;
+            }
+            $maxAge = min($maxAge, max(0, $expires - $now));
+        }
+        return max(0, min(300, $maxAge));
     }
 
     /** @param array<string,mixed> $payload @return array<string,mixed> */

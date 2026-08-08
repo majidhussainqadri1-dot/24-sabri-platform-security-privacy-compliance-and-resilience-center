@@ -24,6 +24,14 @@ final class GovernanceController
         'trust-claim',
     ];
 
+    /** @var string[] */
+    private const SENSITIVE_WRITE_TYPES = [
+        'legal-hold', 'vulnerability', 'secret-metadata', 'key-metadata',
+        'recovery-objective', 'drill', 'release-gate', 'security-test',
+        'deletion-ledger', 'incident-action', 'upload-assurance',
+        'private-delivery',
+    ];
+
     public function __construct(
         private GovernedArtifactRegistry $artifacts,
         private ?TrustCenterService $trustCenter = null
@@ -114,8 +122,22 @@ final class GovernanceController
             return new \WP_Error('spcrc_governance_read_forbidden', 'This governed artifact domain requires additional authority.');
         }
         $type = Sanitizer::key($this->param($request, 'artifact_type'), 60);
-        $limit = max(1, min(100, absint($this->param($request, 'limit') ?: 50)));
-        return $this->privateResponse(['artifacts' => $this->artifacts->recent($type !== '' ? $type : null, $limit)]);
+        $rawLimit = $this->param($request, 'limit');
+        $limit = $rawLimit === null || $rawLimit === '' ? 50 : Sanitizer::strictInteger($rawLimit, 1, 100);
+        if ($limit === null) {
+            return new \WP_Error('spcrc_governance_limit_invalid', 'Artifact list limit must be a whole number from 1 through 100.');
+        }
+
+        $records = $this->artifacts->recent($type !== '' ? $type : null, $limit);
+        if ($type !== '' && ! $this->hasFullReadAuthority($type)) {
+            $records = array_values(array_filter(
+                $records,
+                static fn (array $record): bool => in_array((string) ($record['classification'] ?? ''), ['C0', 'C1', 'C2'], true)
+            ));
+            $records = array_map([$this, 'overviewRecord'], $records);
+        }
+
+        return $this->privateResponse(['artifacts' => $records]);
     }
 
     public function saveArtifact(mixed $request): \WP_REST_Response|\WP_Error
@@ -125,13 +147,35 @@ final class GovernanceController
         }
         $data = $this->allParams($request);
         $type = Sanitizer::key($data['artifact_type'] ?? '', 60);
-        $data['owner_user_id'] = get_current_user_id();
+        $actor = get_current_user_id();
+        if ($actor < 1) {
+            return new \WP_Error('spcrc_governance_actor_invalid', 'Governed artifact changes require an authenticated attributable actor.');
+        }
+        $expectedVersion = Sanitizer::strictInteger($data['expected_version'] ?? 0, 0, PHP_INT_MAX);
+        if ($expectedVersion === null) {
+            return new \WP_Error('spcrc_governance_expected_version_invalid', 'Expected version must be a non-negative whole number.');
+        }
+        if ($this->requiresStepUp($type, $data)) {
+            $stepUpReference = Sanitizer::opaqueReference($data['step_up_reference'] ?? '');
+            $stepUpOk = $stepUpReference !== '' && Sanitizer::boolean(apply_filters(
+                'spcrc/verify_step_up_assurance',
+                false,
+                $actor,
+                'governed-artifact-write:' . $type,
+                $stepUpReference
+            ));
+            if (! $stepUpOk) {
+                return new \WP_Error('spcrc_governance_step_up_required', 'Fresh File 00 step-up assurance is required for this sensitive governance change.');
+            }
+        }
+        unset($data['step_up_reference']);
+        $data['owner_user_id'] = $actor;
         if ($type === 'trust-claim') {
             $data['claim_key'] = $data['claim_key'] ?? ($data['artifact_key'] ?? '');
         }
         $result = $type === 'trust-claim'
             ? $this->trustCenter?->saveClaim($data)
-            : $this->artifacts->save($data, absint($data['expected_version'] ?? 0));
+            : $this->artifacts->save($data, $expectedVersion);
         if ($result === null) {
             return new \WP_Error('spcrc_trust_claim_service_unavailable', 'Trust claims cannot be changed because the approval service is unavailable.');
         }
@@ -175,6 +219,48 @@ final class GovernanceController
             return is_array($params) ? $params : [];
         }
         return is_array($request) ? $request : [];
+    }
+
+    private function hasFullReadAuthority(string $type): bool
+    {
+        return current_user_can('spcrc_view_forensic_metadata')
+            || current_user_can(self::requiredCapability($type))
+            || ($type === 'trust-claim' && current_user_can('spcrc_approve_governance_decision'));
+    }
+
+    /** @param array<string,mixed> $record @return array<string,mixed> */
+    private function overviewRecord(array $record): array
+    {
+        return [
+            'artifact_uuid' => Sanitizer::uuid($record['artifact_uuid'] ?? ''),
+            'artifact_type' => Sanitizer::key($record['artifact_type'] ?? '', 60),
+            'artifact_key' => Sanitizer::key($record['artifact_key'] ?? '', 120),
+            'module_key' => Sanitizer::key($record['module_key'] ?? '', 120),
+            'title' => Sanitizer::text($record['title'] ?? '', 200),
+            'status' => Sanitizer::key($record['status'] ?? '', 40),
+            'classification' => strtoupper(Sanitizer::text($record['classification'] ?? 'C1', 2)),
+            'version' => Sanitizer::strictInteger($record['version'] ?? 1, 1, PHP_INT_MAX) ?? 1,
+            'effective_at' => Sanitizer::isoTime($record['effective_at'] ?? ''),
+            'expires_at' => Sanitizer::isoTime($record['expires_at'] ?? ''),
+            'reviewed_at' => Sanitizer::isoTime($record['reviewed_at'] ?? ''),
+            'next_review_at' => Sanitizer::isoTime($record['next_review_at'] ?? ''),
+            'updated_at' => Sanitizer::isoTime($record['updated_at'] ?? ''),
+        ];
+    }
+
+    /** @param array<string,mixed> $data */
+    private function requiresStepUp(string $type, array $data): bool
+    {
+        // Trust claims already have a dedicated two-person approval workflow;
+        // do not create a second identity ceremony for that public C0 domain.
+        if ($type === 'trust-claim') {
+            return false;
+        }
+        $classification = strtoupper(Sanitizer::text($data['classification'] ?? '', 2));
+        $status = Sanitizer::key($data['status'] ?? '', 40);
+        return in_array($type, self::SENSITIVE_WRITE_TYPES, true)
+            || in_array($classification, ['C4', 'C5'], true)
+            || in_array($status, ['approved', 'active', 'verified', 'passed', 'waived', 'closed', 'accepted'], true);
     }
 
     private static function requiredCapability(string $type): string
