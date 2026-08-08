@@ -82,8 +82,8 @@ final class PrivacyRequestPolicy
      */
     public function begin(array $request): array|\WP_Error
     {
-        $requesterUserId = absint($request['requester_user_id'] ?? 0);
-        if ($requesterUserId < 1 || ! get_userdata($requesterUserId)) {
+        $requesterUserId = Sanitizer::strictInteger($request['requester_user_id'] ?? null, 1, PHP_INT_MAX);
+        if ($requesterUserId === null || ! get_userdata($requesterUserId)) {
             return new \WP_Error('spcrc_privacy_subject_missing', 'An existing WordPress privacy subject is required before dispatch.');
         }
 
@@ -97,8 +97,8 @@ final class PrivacyRequestPolicy
             return new \WP_Error('spcrc_privacy_due_at_invalid', 'Privacy request due date is invalid.');
         }
 
-        $assignedUserId = absint($request['assigned_user_id'] ?? get_current_user_id());
-        if ($assignedUserId < 1 || ! get_userdata($assignedUserId)) {
+        $assignedUserId = Sanitizer::strictInteger($request['assigned_user_id'] ?? get_current_user_id(), 1, PHP_INT_MAX);
+        if ($assignedUserId === null || ! get_userdata($assignedUserId)) {
             return new \WP_Error('spcrc_privacy_assignee_invalid', 'A valid assigned privacy operator is required.');
         }
 
@@ -213,7 +213,7 @@ final class PrivacyRequestPolicy
             );
         }
 
-        if ($assignedUserId < 1 || ! get_userdata($assignedUserId)) {
+        if ($assignedUserId === null || ! get_userdata($assignedUserId)) {
             return new \WP_Error('spcrc_privacy_retry_assignee_invalid', 'A valid assigned privacy operator is required for retry.');
         }
 
@@ -387,7 +387,7 @@ final class PrivacyRequestPolicy
         $method = Sanitizer::key($request['verification_method'] ?? '', 40);
         $basis = Sanitizer::key($request['authority_basis'] ?? '', 40);
         $reference = Sanitizer::text($request['verification_reference'] ?? '', 200);
-        $verifiedBy = absint($request['verified_by_user_id'] ?? 0);
+        $verifiedBy = Sanitizer::strictInteger($request['verified_by_user_id'] ?? null, 1, PHP_INT_MAX);
         $verifiedAt = Sanitizer::isoTime($request['verified_at'] ?? '');
         $verifiedTimestamp = $verifiedAt === '' ? false : strtotime($verifiedAt);
 
@@ -403,7 +403,7 @@ final class PrivacyRequestPolicy
         if ($reference === '') {
             return new \WP_Error('spcrc_privacy_verification_reference_required', 'A bounded opaque verification reference is required. Raw identity documents must not be stored here.');
         }
-        if ($verifiedBy < 1 || ! get_userdata($verifiedBy)) {
+        if ($verifiedBy === null || ! get_userdata($verifiedBy)) {
             return new \WP_Error('spcrc_privacy_verifier_invalid', 'A valid verifying operator is required before dispatch.');
         }
         if ($verifiedTimestamp === false || $verifiedTimestamp > time() + 300) {

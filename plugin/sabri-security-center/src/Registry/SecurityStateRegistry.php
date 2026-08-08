@@ -69,7 +69,7 @@ final class SecurityStateRegistry
         }
 
         $actor = get_current_user_id();
-        $serviceActor = absint($context['actor_user_id'] ?? 0);
+        $serviceActor = Sanitizer::strictInteger($context['actor_user_id'] ?? null, 1, PHP_INT_MAX) ?? 0;
         $authorized = current_user_can('spcrc_manage_security_settings') || Sanitizer::boolean(apply_filters(
             'spcrc/authorize_security_state_request',
             false,
@@ -106,8 +106,15 @@ final class SecurityStateRegistry
         $now = time();
         $expiresAt = Sanitizer::isoTime($context['expires_at'] ?? '');
         if ($expiresAt === '') {
-            $ttl = (int) apply_filters('spcrc/security_state_default_ttl', HOUR_IN_SECONDS, $moduleKey, $state);
-            $expiresAt = gmdate('c', $now + max(300, min($ttl, self::MAX_TTL)));
+            $ttl = Sanitizer::strictInteger(
+                apply_filters('spcrc/security_state_default_ttl', HOUR_IN_SECONDS, $moduleKey, $state),
+                300,
+                self::MAX_TTL
+            );
+            if ($ttl === null) {
+                return false;
+            }
+            $expiresAt = gmdate('c', $now + $ttl);
         }
 
         $expiresTimestamp = strtotime($expiresAt);
@@ -289,7 +296,7 @@ final class SecurityStateRegistry
                 $moduleKey = Sanitizer::key($request['module_key'] ?? '', 120);
                 $state = Sanitizer::key($request['state'] ?? '', 40);
                 $reason = Sanitizer::text($request['reason'] ?? '', 500);
-                $requestedBy = absint($request['requested_by'] ?? 0);
+                $requestedBy = Sanitizer::strictInteger($request['requested_by'] ?? null, 1, PHP_INT_MAX) ?? 0;
                 $requestedAt = Sanitizer::isoTime($request['requested_at'] ?? '');
                 $expiresAt = Sanitizer::isoTime($request['expires_at'] ?? '');
                 $now = time();
@@ -335,7 +342,7 @@ final class SecurityStateRegistry
             $requestedAt = Sanitizer::isoTime($request['requested_at'] ?? '');
             $expiresAt = Sanitizer::isoTime($request['expires_at'] ?? '');
             $status = Sanitizer::key($request['status'] ?? '', 40);
-            $requestedBy = absint($request['requested_by'] ?? 0);
+            $requestedBy = Sanitizer::strictInteger($request['requested_by'] ?? null, 1, PHP_INT_MAX) ?? 0;
             if (
                 $requestId === ''
                 || $moduleKey === ''
@@ -347,6 +354,11 @@ final class SecurityStateRegistry
                 || $expiresAt === ''
                 || $status !== 'open'
                 || $requestedBy < 1
+                || ($requestedTimestamp = strtotime($requestedAt)) === false
+                || ($expiresTimestamp = strtotime($expiresAt)) === false
+                || $requestedTimestamp > time() + 300
+                || $expiresTimestamp <= $requestedTimestamp
+                || $expiresTimestamp > time() + self::MAX_TTL
             ) {
                 continue;
             }

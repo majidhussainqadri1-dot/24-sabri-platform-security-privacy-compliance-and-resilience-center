@@ -84,12 +84,12 @@ final class GovernanceRepository
         $module = Sanitizer::key($data['module_key'] ?? 'file-24-security-center', 120);
         $evidence = Sanitizer::opaqueReference($data['evidence_ref'] ?? '');
         $rationale = Sanitizer::text($data['rationale'] ?? '', 500);
-        $requester = absint($data['requester_user_id'] ?? get_current_user_id());
+        $requester = Sanitizer::strictInteger($data['requester_user_id'] ?? get_current_user_id(), 1, PHP_INT_MAX);
 
         if (! in_array($type, self::TYPES, true) || $subject === '' || $module === '') {
             return new \WP_Error('spcrc_governance_identity_invalid', 'Decision type, subject and module are required.');
         }
-        if ($requester < 1 || $requester !== get_current_user_id() || ! get_userdata($requester)) {
+        if ($requester === null || $requester !== get_current_user_id() || ! get_userdata($requester)) {
             return new \WP_Error('spcrc_governance_requester_invalid', 'The authenticated requester must own the request.');
         }
         if ($evidence === '') {
@@ -100,8 +100,12 @@ final class GovernanceRepository
         }
 
         $requestedAt = current_time('mysql', true);
+        $rawExpiry = is_scalar($data['expires_at'] ?? null) ? trim((string) ($data['expires_at'] ?? '')) : '';
         $expiry = Sanitizer::isoTime($data['expires_at'] ?? '');
-        $expiryTs = $expiry === '' ? time() + (7 * DAY_IN_SECONDS) : (int) strtotime($expiry);
+        if ($rawExpiry !== '' && $expiry === '') {
+            return new \WP_Error('spcrc_governance_expiry_invalid', 'Decision expiry must be an absolute ISO-8601 timestamp.');
+        }
+        $expiryTs = $rawExpiry === '' ? time() + (7 * DAY_IN_SECONDS) : (int) strtotime($expiry);
         if ($expiryTs <= time() || $expiryTs > time() + self::MAX_LIFETIME) {
             return new \WP_Error('spcrc_governance_expiry_invalid', 'Decision expiry must be in the future and no more than 30 days away.');
         }
@@ -231,7 +235,10 @@ final class GovernanceRepository
         if ($approver < 1 || $approver === (int) ($row['requester_user_id'] ?? 0)) {
             return new \WP_Error('spcrc_governance_separation_failed', 'Requester and approver must be different authenticated users.');
         }
-        $expectedLock = absint($context['expected_lock_version'] ?? -1);
+        $expectedLock = Sanitizer::strictInteger($context['expected_lock_version'] ?? null, 0, PHP_INT_MAX);
+        if ($expectedLock === null) {
+            return new \WP_Error('spcrc_governance_expected_lock_version_invalid', 'A non-negative whole expected lock version is required.');
+        }
         if ($expectedLock !== (int) ($row['lock_version'] ?? 0)) {
             return new \WP_Error('spcrc_governance_stale_decision', 'Governance decision changed before approval. Refresh and retry.');
         }

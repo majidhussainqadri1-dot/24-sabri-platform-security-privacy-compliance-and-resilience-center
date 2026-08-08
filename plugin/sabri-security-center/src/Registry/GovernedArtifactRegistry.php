@@ -421,7 +421,7 @@ final class GovernedArtifactRegistry
                     $listCount = 0;
                     foreach ($value as $item) {
                         if (++$listCount > 50) {
-                            break;
+                            return new \WP_Error('spcrc_artifact_payload_list_exceeded', 'Artifact payload list exceeds the bounded maximum and was not truncated.');
                         }
                         if (is_array($item)) {
                             $nested = $this->sanitizePayload($item, $depth + 1);
@@ -487,7 +487,7 @@ final class GovernedArtifactRegistry
             'performance-objective' => ['measured', 'approved', 'breached'],
             'release-gate' => ['passed', 'failed', 'waived'],
             'security-test' => ['passed', 'failed', 'accepted-risk'],
-            'deletion-ledger' => ['reconciled', 'failed', 'closed'],
+            'deletion-ledger' => ['reconciled', 'closed'],
         ];
         if (in_array($status, $requiresEvidence[$type] ?? [], true) && $evidenceRef === '') {
             return new \WP_Error('spcrc_artifact_evidence_required', 'An opaque evidence reference is required for this artifact determination.');
@@ -527,7 +527,7 @@ final class GovernedArtifactRegistry
             'status' => Sanitizer::key($record['status'] ?? '', 40),
             'classification' => strtoupper(Sanitizer::text($record['classification'] ?? 'C1', 2)),
             'owner_user_id' => Sanitizer::strictInteger($record['owner_user_id'] ?? 0, 0, PHP_INT_MAX) ?? 0,
-            'version' => max(1, absint($record['version'] ?? 1)),
+            'version' => Sanitizer::strictInteger($record['version'] ?? null, 1, PHP_INT_MAX) ?? 0,
             'payload' => is_array($record['payload'] ?? null) ? $record['payload'] : [],
             'evidence_ref' => Sanitizer::opaqueReference($record['evidence_ref'] ?? ''),
             'effective_at' => Sanitizer::isoTime($record['effective_at'] ?? ''),

@@ -85,8 +85,8 @@ final class AssuranceRepository
             return new \WP_Error('spcrc_assurance_status_invalid', 'Assurance status is invalid for the selected record type.');
         }
 
-        $ownerUserId = absint($data['owner_user_id'] ?? get_current_user_id());
-        if ($ownerUserId < 1 || ! get_userdata($ownerUserId)) {
+        $ownerUserId = Sanitizer::strictInteger($data['owner_user_id'] ?? get_current_user_id(), 1, PHP_INT_MAX);
+        if ($ownerUserId === null || ! get_userdata($ownerUserId)) {
             return new \WP_Error('spcrc_assurance_owner_invalid', 'A valid assurance owner is required.');
         }
 
@@ -141,6 +141,9 @@ final class AssuranceRepository
         if ($timeBoundDetermination && $nextReviewAt === null) {
             return new \WP_Error('spcrc_assurance_next_review_missing', 'Current compliance and vendor determinations require a future review date.');
         }
+        if ($timeBoundDetermination && $nextReviewAt !== null && strtotime($nextReviewAt . ' UTC') <= time()) {
+            return new \WP_Error('spcrc_assurance_next_review_expired', 'Current compliance and vendor determinations require an unexpired future review date.');
+        }
 
         if ($type !== 'backup') {
             $backupCompletedAt = null;
@@ -182,7 +185,14 @@ final class AssuranceRepository
             }
         }
 
-        $dataClasses = Sanitizer::textList($data['data_classes'] ?? [], 20, 80);
+        $rawDataClasses = $data['data_classes'] ?? [];
+        if (! is_array($rawDataClasses) || count($rawDataClasses) > 20) {
+            return new \WP_Error('spcrc_assurance_data_classes_invalid', 'Assurance data classes must be an explicit bounded list of at most 20 entries.');
+        }
+        $dataClasses = Sanitizer::textList($rawDataClasses, 20, 80);
+        if (count($dataClasses) !== count(array_unique($rawDataClasses, SORT_REGULAR))) {
+            return new \WP_Error('spcrc_assurance_data_classes_invalid', 'Assurance data classes contain empty, malformed, duplicate or unsupported list values.');
+        }
         $dataClassesJson = wp_json_encode($dataClasses, JSON_UNESCAPED_SLASHES);
         if (! is_string($dataClassesJson)) {
             return new \WP_Error('spcrc_assurance_data_classes_invalid', 'Assurance data classes could not be encoded.');
@@ -536,7 +546,7 @@ final class AssuranceRepository
             'record_key' => Sanitizer::key($row['record_key'] ?? '', 120),
             'title' => Sanitizer::text($row['title'] ?? '', 200),
             'status' => Sanitizer::key($row['status'] ?? '', 40),
-            'owner_user_id' => absint($row['owner_user_id'] ?? 0),
+            'owner_user_id' => Sanitizer::strictInteger($row['owner_user_id'] ?? null, 1, PHP_INT_MAX) ?? 0,
             'jurisdiction' => Sanitizer::text($row['jurisdiction'] ?? '', 80),
             'data_classes' => Sanitizer::textList(is_array($classes) ? $classes : [], 20, 80),
             'evidence_ref' => Sanitizer::opaqueReference($row['evidence_ref'] ?? ''),
@@ -560,7 +570,7 @@ final class AssuranceRepository
         $comparisons = [
             'title' => Sanitizer::text($record['title'] ?? '', 200),
             'status' => Sanitizer::key($record['status'] ?? '', 40),
-            'owner_user_id' => absint($record['owner_user_id'] ?? 0),
+            'owner_user_id' => Sanitizer::strictInteger($record['owner_user_id'] ?? null, 1, PHP_INT_MAX) ?? 0,
             'jurisdiction' => Sanitizer::text($record['jurisdiction'] ?? '', 80),
             'evidence_ref' => Sanitizer::opaqueReference($record['evidence_ref'] ?? ''),
             'notes' => Sanitizer::text($record['notes'] ?? '', 500),
