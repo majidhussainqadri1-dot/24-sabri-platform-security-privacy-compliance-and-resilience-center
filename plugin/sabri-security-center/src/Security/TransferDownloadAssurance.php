@@ -13,6 +13,7 @@ use Sabri\Platform\Security\Support\Sanitizer;
 final class TransferDownloadAssurance
 {
     public const VERIFIED_TRANSFER_MAX_BYTES = 1073741824;
+    public const MAX_EVIDENCE_AGE_DAYS = 90;
 
     /** @var list<string> */
     private const TRANSFER_CONTROLS = [
@@ -55,7 +56,7 @@ final class TransferDownloadAssurance
     ];
 
     /** @param array<string,mixed> $evidence @return array<string,mixed> */
-    public static function evaluateTransfer(array $evidence): array
+    public static function evaluateTransfer(array $evidence, ?int $now = null): array
     {
         $controls = Sanitizer::textList($evidence['controls'] ?? [], 100, 100);
         $missing = array_values(array_diff(self::TRANSFER_CONTROLS, $controls));
@@ -63,7 +64,8 @@ final class TransferDownloadAssurance
         $sizeValid = $maxBytes > 0 && $maxBytes <= self::VERIFIED_TRANSFER_MAX_BYTES;
         $evidenceRef = Sanitizer::opaqueReference($evidence['evidence_ref'] ?? '');
         $testedAt = Sanitizer::isoTime($evidence['tested_at'] ?? '');
-        $state = $missing === [] && $sizeValid && $evidenceRef !== '' && $testedAt !== ''
+        $evidenceFresh = self::evidenceFresh($testedAt, $now);
+        $state = $missing === [] && $sizeValid && $evidenceRef !== '' && $evidenceFresh
             ? 'verified'
             : ($controls === [] ? 'unassessed' : 'blocked');
 
@@ -72,27 +74,39 @@ final class TransferDownloadAssurance
             'missing_controls' => $missing,
             'max_bytes_per_file' => $maxBytes,
             'one_gib_limit_valid' => $sizeValid,
+            'evidence_fresh' => $evidenceFresh,
             'evidence_ref' => $evidenceRef,
             'transfer_allowed' => $state === 'verified',
         ];
     }
 
     /** @param array<string,mixed> $evidence @return array<string,mixed> */
-    public static function evaluateDownload(array $evidence): array
+    public static function evaluateDownload(array $evidence, ?int $now = null): array
     {
         $controls = Sanitizer::textList($evidence['controls'] ?? [], 100, 100);
         $missing = array_values(array_diff(self::DOWNLOAD_CONTROLS, $controls));
         $evidenceRef = Sanitizer::opaqueReference($evidence['evidence_ref'] ?? '');
         $testedAt = Sanitizer::isoTime($evidence['tested_at'] ?? '');
-        $state = $missing === [] && $evidenceRef !== '' && $testedAt !== ''
+        $evidenceFresh = self::evidenceFresh($testedAt, $now);
+        $state = $missing === [] && $evidenceRef !== '' && $evidenceFresh
             ? 'verified'
             : ($controls === [] ? 'unassessed' : 'blocked');
 
         return [
             'state' => $state,
             'missing_controls' => $missing,
+            'evidence_fresh' => $evidenceFresh,
             'evidence_ref' => $evidenceRef,
             'download_allowed' => $state === 'verified',
         ];
+    }
+
+    private static function evidenceFresh(string $testedAt, ?int $now): bool
+    {
+        $tested = $testedAt === '' ? false : strtotime($testedAt);
+        $now ??= time();
+        return $tested !== false
+            && $tested <= $now + 300
+            && $tested >= $now - (self::MAX_EVIDENCE_AGE_DAYS * DAY_IN_SECONDS);
     }
 }
