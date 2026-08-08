@@ -47,6 +47,8 @@ foreach ($ciMarkers as $marker) {
 
 c155(! str_contains($ci, 'file24-source-snapshot-cycle145.zip'), 'Current CI must not package a stale Cycle-145 source snapshot.');
 c155(! str_contains($ci, 'file-24-sanitized-source-snapshot-cycle145'), 'Current CI must not publish a stale Cycle-145 artifact name.');
+c155(str_contains($ci, "grep -Fq 'Defect-bearing cycles | **146, 147, 148, 149, 150, 151, 152, 153, 155**'"), 'Markdown review-register assertions with asterisks must use fixed-string grep rather than regex matching.');
+c155(str_contains($ci, "grep -Fq 'Clean cycles | **154**'"), 'Clean-cycle Markdown assertion must use fixed-string matching.');
 
 $reviewMarkers = [
     'Defect-bearing cycles | **146, 147, 148, 149, 150, 151, 152, 153, 155**',
