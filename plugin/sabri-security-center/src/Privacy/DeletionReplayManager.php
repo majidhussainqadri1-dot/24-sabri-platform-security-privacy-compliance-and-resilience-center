@@ -60,8 +60,15 @@ final class DeletionReplayManager
                 if (! in_array($record['status'] ?? '', ['pending', 'failed', 'dispatching', 'blocked-hold'], true)) {
                     continue;
                 }
-                ++$counts['processed'];
                 $payload = is_array($record['payload'] ?? null) ? $record['payload'] : [];
+                $nextRetryAt = Sanitizer::isoTime($payload['next_retry_at'] ?? '');
+                if (($record['status'] ?? '') === 'failed' && $nextRetryAt !== '') {
+                    $nextRetryTimestamp = strtotime($nextRetryAt);
+                    if ($nextRetryTimestamp !== false && $nextRetryTimestamp > time()) {
+                        continue;
+                    }
+                }
+                ++$counts['processed'];
                 $holdRef = Sanitizer::opaqueReference($payload['legal_hold_ref'] ?? '');
                 if ($holdRef !== '' && Sanitizer::boolean(apply_filters('spcrc/privacy_legal_hold_active', false, $holdRef, $record))) {
                     $this->artifacts->transition('deletion-ledger', (string) $record['artifact_key'], 'blocked-hold', (int) $record['version'], [
