@@ -98,8 +98,14 @@ final class ResilienceCoordinator
             return new \WP_Error('spcrc_recovery_tier_invalid', 'A supported recovery tier is required.');
         }
         $status = Sanitizer::key($data['status'] ?? 'provisional', 30);
-        $rpo = max(0, absint($data['rpo_seconds'] ?? self::PROVISIONAL_OBJECTIVES[$tier]['rpo']));
-        $rto = max(0, absint($data['rto_seconds'] ?? self::PROVISIONAL_OBJECTIVES[$tier]['rto']));
+        $rpo = self::secondsValue($data['rpo_seconds'] ?? self::PROVISIONAL_OBJECTIVES[$tier]['rpo'], 'rpo_seconds');
+        if (is_wp_error($rpo)) {
+            return $rpo;
+        }
+        $rto = self::secondsValue($data['rto_seconds'] ?? self::PROVISIONAL_OBJECTIVES[$tier]['rto'], 'rto_seconds');
+        if (is_wp_error($rto)) {
+            return $rto;
+        }
         if ($status === 'approved' && Sanitizer::opaqueReference($data['evidence_ref'] ?? '') === '') {
             return new \WP_Error('spcrc_recovery_evidence_missing', 'Approved recovery objectives require measured drill evidence.');
         }
@@ -152,6 +158,14 @@ final class ResilienceCoordinator
         if (in_array($status, ['passed', 'failed'], true) && $evidenceRef === '') {
             return new \WP_Error('spcrc_drill_evidence_missing', 'Completed drills require opaque evidence.');
         }
+        $measuredRpo = self::secondsValue($data['measured_rpo_seconds'] ?? 0, 'measured_rpo_seconds');
+        if (is_wp_error($measuredRpo)) {
+            return $measuredRpo;
+        }
+        $measuredRto = self::secondsValue($data['measured_rto_seconds'] ?? 0, 'measured_rto_seconds');
+        if (is_wp_error($measuredRto)) {
+            return $measuredRto;
+        }
         $saved = $this->artifacts->save([
             'artifact_type' => 'drill',
             'artifact_key' => $data['drill_key'] ?? '',
@@ -164,8 +178,8 @@ final class ResilienceCoordinator
             'next_review_at' => $data['next_review_at'] ?? '',
             'payload' => [
                 'scenario' => Sanitizer::key($data['scenario'] ?? '', 80),
-                'measured_rpo_seconds' => absint($data['measured_rpo_seconds'] ?? 0),
-                'measured_rto_seconds' => absint($data['measured_rto_seconds'] ?? 0),
+                'measured_rpo_seconds' => $measuredRpo,
+                'measured_rto_seconds' => $measuredRto,
                 'corrective_actions' => Sanitizer::textList($data['corrective_actions'] ?? [], 50, 140),
             ],
         ]);
@@ -191,6 +205,22 @@ final class ResilienceCoordinator
             }
         }
         return $saved;
+    }
+
+    /** @return int|\WP_Error */
+    private static function secondsValue(mixed $value, string $field): int|\WP_Error
+    {
+        if (is_int($value)) {
+            $seconds = $value;
+        } elseif (is_string($value) && preg_match('/^\d+$/', $value) === 1) {
+            $seconds = (int) $value;
+        } else {
+            return new \WP_Error('spcrc_resilience_measurement_invalid', 'Resilience time measurements must be finite non-negative whole seconds.', ['field' => $field]);
+        }
+        if ($seconds < 0) {
+            return new \WP_Error('spcrc_resilience_measurement_invalid', 'Resilience time measurements must be finite non-negative whole seconds.', ['field' => $field]);
+        }
+        return $seconds;
     }
 
     /** @return array<string,int> */
