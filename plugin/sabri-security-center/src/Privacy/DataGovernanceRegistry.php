@@ -157,19 +157,25 @@ final class DataGovernanceRegistry
         $origin = Sanitizer::text($data['origin_region'] ?? '', 80);
         $destination = Sanitizer::text($data['destination_region'] ?? '', 80);
         $vendorRef = Sanitizer::opaqueReference($data['vendor_ref'] ?? '');
-        $classes = Sanitizer::textList($data['data_classes'] ?? [], 6, 2);
+        $classes = array_values(array_unique(array_map('strtoupper', Sanitizer::textList($data['data_classes'] ?? [], 6, 2))));
         if ($origin === '' || $destination === '' || $vendorRef === '' || $classes === []) {
             return new \WP_Error('spcrc_transfer_invalid', 'Origin, destination, vendor reference and data classes are required.');
         }
-        if (in_array('C5', $classes, true) && Sanitizer::key($data['location_assurance'] ?? '', 40) !== 'verified') {
-            return new \WP_Error('spcrc_transfer_c5_location_unknown', 'C5 data cannot be transferred to an unverified provider location.');
+        foreach ($classes as $dataClass) {
+            if (! in_array($dataClass, ['C0', 'C1', 'C2', 'C3', 'C4', 'C5'], true)) {
+                return new \WP_Error('spcrc_transfer_data_class_invalid', 'International transfers require recognized C0-C5 data classifications.');
+            }
+        }
+        $locationAssurance = Sanitizer::key($data['location_assurance'] ?? '', 40);
+        if (array_intersect($classes, ['C4', 'C5']) !== [] && $locationAssurance !== 'verified') {
+            return new \WP_Error('spcrc_transfer_restricted_location_unknown', 'C4/C5 data cannot be transferred to an unverified provider location.');
         }
         return $this->artifacts->save([
             'artifact_type' => 'processing-activity',
             'artifact_key' => $data['transfer_key'] ?? '',
             'title' => $data['title'] ?? 'International transfer assessment',
             'status' => $data['status'] ?? 'under-review',
-            'classification' => in_array('C5', $classes, true) ? 'C5' : 'C3',
+            'classification' => in_array('C5', $classes, true) ? 'C5' : (in_array('C4', $classes, true) ? 'C4' : 'C3'),
             'module_key' => $data['module_key'] ?? 'file-24-security-center',
             'owner_user_id' => $data['owner_user_id'] ?? get_current_user_id(),
             'evidence_ref' => $data['evidence_ref'] ?? '',
@@ -187,7 +193,7 @@ final class DataGovernanceRegistry
                 'onward_transfer' => Sanitizer::boolean($data['onward_transfer'] ?? false),
                 'deletion_plan_ref' => Sanitizer::opaqueReference($data['deletion_plan_ref'] ?? ''),
                 'exit_plan_ref' => Sanitizer::opaqueReference($data['exit_plan_ref'] ?? ''),
-                'location_assurance' => Sanitizer::key($data['location_assurance'] ?? '', 40),
+                'location_assurance' => $locationAssurance,
             ],
         ], absint($data['expected_version'] ?? 0));
     }

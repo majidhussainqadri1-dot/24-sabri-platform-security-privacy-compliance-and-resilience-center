@@ -100,7 +100,7 @@ final class IncidentCoordinator
     }
 
     /** @return bool|\WP_Error */
-    public function advance(string $incidentUuid, string $targetStatus, string $reason, string $evidenceRef): bool|\WP_Error
+    public function advance(string $incidentUuid, string $targetStatus, string $reason, string $evidenceRef, array $approvalRefs = []): bool|\WP_Error
     {
         if (! current_user_can('spcrc_manage_incidents')) {
             return new \WP_Error('spcrc_incident_transition_forbidden', 'Incident transition requires incident-management authority.');
@@ -112,16 +112,47 @@ final class IncidentCoordinator
         }
 
         $targetStatus = Sanitizer::key($targetStatus, 40);
-        if (in_array($targetStatus, ['closed', 'cancelled'], true)
-            && in_array((string) ($incident['severity'] ?? ''), ['sev0', 'sev1'], true)
-            && ! current_user_can('spcrc_close_critical_incidents')
-        ) {
-            return new \WP_Error('spcrc_critical_incident_close_forbidden', 'Closing a critical incident requires separately delegated authority.');
+        $criticalClosure = in_array($targetStatus, ['closed', 'cancelled'], true)
+            && in_array((string) ($incident['severity'] ?? ''), ['sev0', 'sev1'], true);
+        $normalizedApprovals = [];
+
+        if ($criticalClosure) {
+            if (! current_user_can('spcrc_close_critical_incidents')) {
+                return new \WP_Error('spcrc_critical_incident_close_forbidden', 'Closing a critical incident requires separately delegated authority.');
+            }
+            foreach (array_slice($approvalRefs, 0, 6) as $approvalRef) {
+                $normalized = Sanitizer::opaqueReference($approvalRef);
+                if ($normalized !== '' && ! in_array($normalized, $normalizedApprovals, true)) {
+                    $normalizedApprovals[] = $normalized;
+                }
+            }
+            if (count($normalizedApprovals) < 2) {
+                return new \WP_Error('spcrc_critical_incident_dual_approval_required', 'SEV0/SEV1 closure requires two distinct opaque human approval references.');
+            }
+
+            $approvalEvidence = $this->artifacts->save([
+                'artifact_type' => 'incident-action',
+                'artifact_key' => 'dual-close-' . substr(hash('sha256', $incidentUuid . '|' . $targetStatus . '|' . $evidenceRef), 0, 32),
+                'title' => 'Critical incident dual-control closure approval',
+                'status' => 'completed',
+                'classification' => 'C5',
+                'owner_user_id' => get_current_user_id(),
+                'evidence_ref' => $evidenceRef,
+                'payload' => [
+                    'incident_uuid' => Sanitizer::uuid($incidentUuid),
+                    'target_status' => $targetStatus,
+                    'approval_refs' => $normalizedApprovals,
+                ],
+            ]);
+            if (is_wp_error($approvalEvidence)) {
+                return new \WP_Error('spcrc_critical_incident_approval_evidence_failed', 'Critical incident closure approval evidence could not be persisted.', ['cause' => $approvalEvidence->get_error_code()]);
+            }
         }
 
         return $this->incidents->transition($incidentUuid, $targetStatus, [
             'reason' => $reason,
             'evidence_ref' => $evidenceRef,
+            'dual_approval_refs' => $normalizedApprovals,
         ]);
     }
 

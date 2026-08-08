@@ -212,7 +212,16 @@ final class AuditLogger
             return '';
         }
 
-        $salt = function_exists('wp_salt') ? wp_salt('auth') : hash('sha256', __FILE__);
+        $salt = defined('AUTH_SALT') ? (string) AUTH_SALT : '';
+        if (strlen($salt) < 16 && function_exists('wp_salt')) {
+            $salt = (string) wp_salt('auth');
+        }
+        if (strlen($salt) < 16) {
+            $salt = (string) apply_filters('spcrc/audit_pseudonymization_key', '');
+        }
+        if (strlen($salt) < 16) {
+            return '[REDACTED]';
+        }
         return 'sha256:' . hash_hmac('sha256', $value, $salt . '|' . $purpose);
     }
 

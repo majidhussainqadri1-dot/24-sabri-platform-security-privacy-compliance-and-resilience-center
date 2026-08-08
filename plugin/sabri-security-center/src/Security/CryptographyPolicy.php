@@ -31,6 +31,10 @@ final class CryptographyPolicy
         if ($rotationAt === '') {
             return new \WP_Error('spcrc_crypto_rotation_missing', 'A bounded key-rotation date is required.');
         }
+        $rotationTimestamp = strtotime($rotationAt);
+        if ($rotationTimestamp === false || $rotationTimestamp <= time()) {
+            return new \WP_Error('spcrc_crypto_rotation_overdue', 'Approved cryptographic metadata requires a key-rotation due date that has not already expired.');
+        }
         if (in_array($purpose, ['master-key', 'private-evidence', 'clinical', 'identity-document'], true) && $recoveryRef === '') {
             return new \WP_Error('spcrc_crypto_recovery_evidence_missing', 'High-impact key metadata requires opaque recovery evidence.');
         }

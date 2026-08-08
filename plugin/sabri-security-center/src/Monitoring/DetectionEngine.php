@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Sabri\Platform\Security\Monitoring;
 
 use Sabri\Platform\Security\Registry\GovernedArtifactRegistry;
+use Sabri\Platform\Security\Storage\AuditGapStore;
 use Sabri\Platform\Security\Support\Sanitizer;
 
 final class DetectionEngine
@@ -68,23 +69,30 @@ final class DetectionEngine
             if ($minimumRank === null || $riskRank < $minimumRank || ! in_array($eventType, $events, true)) {
                 continue;
             }
-            $this->createAlert($ruleKey, $event, $risk);
+            $alert = $this->createAlert($ruleKey, $event, $risk);
+            if (is_wp_error($alert)) {
+                AuditGapStore::record('spcrc_detection_audit_gap', 'detection-rule', $ruleKey, 'alert_persistence_failed', [
+                    'event_uuid' => Sanitizer::uuid($event['event_uuid'] ?? ''),
+                    'error_code' => $alert->get_error_code(),
+                ]);
+                do_action('spcrc/detection_alert_persistence_failed', $ruleKey, $alert->get_error_code());
+            }
         }
     }
 
-    /** @param array<string,mixed> $event */
-    private function createAlert(string $ruleKey, array $event, string $risk): void
+    /** @param array<string,mixed> $event @return string|\WP_Error */
+    private function createAlert(string $ruleKey, array $event, string $risk): string|\WP_Error
     {
         $ruleKey = Sanitizer::key($ruleKey, 80);
         $eventUuid = Sanitizer::uuid($event['event_uuid'] ?? '');
         if ($ruleKey === '' || $eventUuid === '') {
-            return;
+            return new \WP_Error('spcrc_detection_event_invalid', 'Detection alerts require a valid rule and event identifier.');
         }
         $bucket = gmdate('YmdH');
         $key = $ruleKey . '-' . substr(hash('sha256', $eventUuid . '|' . $bucket), 0, 24);
         $this->guard = true;
         try {
-            $this->artifacts->save([
+            return $this->artifacts->save([
                 'artifact_type' => 'alert',
                 'artifact_key' => $key,
                 'title' => 'Security detection: ' . $ruleKey,
