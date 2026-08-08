@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Sabri\Platform\Security\Privacy;
 
 use Sabri\Platform\Security\Registry\GovernedArtifactRegistry;
+use Sabri\Platform\Security\Storage\AuditGapStore;
 use Sabri\Platform\Security\Storage\AuditLogger;
 use Sabri\Platform\Security\Support\AtomicOptionLock;
 use Sabri\Platform\Security\Support\Sanitizer;
@@ -33,10 +34,29 @@ final class DeletionReplayManager
         if (! function_exists('wp_next_scheduled') || ! function_exists('wp_schedule_event')) {
             return false;
         }
-        if (wp_next_scheduled(self::EVENT)) {
+        $next = wp_next_scheduled(self::EVENT);
+        if ($next !== false) {
+            return self::scheduleValid($next, 'hourly');
+        }
+        $scheduled = wp_schedule_event(time() + 300, 'hourly', self::EVENT);
+        return ! is_wp_error($scheduled) && $scheduled !== false
+            && self::scheduleValid(wp_next_scheduled(self::EVENT), 'hourly');
+    }
+
+    private static function scheduleValid(mixed $next, string $recurrence): bool
+    {
+        $now = time();
+        $timestamp = Sanitizer::strictInteger($next, $now + 1, $now + (2 * HOUR_IN_SECONDS));
+        if ($timestamp === null) {
+            return false;
+        }
+        if (! function_exists('wp_get_scheduled_event')) {
             return true;
         }
-        return wp_schedule_event(time() + 300, 'hourly', self::EVENT);
+        $event = wp_get_scheduled_event(self::EVENT);
+        return is_object($event)
+            && Sanitizer::key($event->schedule ?? '', 40) === $recurrence
+            && Sanitizer::strictInteger($event->timestamp ?? null, $now + 1, $now + (2 * HOUR_IN_SECONDS)) === $timestamp;
     }
 
     public static function unschedule(): void
@@ -71,10 +91,15 @@ final class DeletionReplayManager
                 ++$counts['processed'];
                 $holdRef = Sanitizer::opaqueReference($payload['legal_hold_ref'] ?? '');
                 if ($holdRef !== '' && Sanitizer::boolean(apply_filters('spcrc/privacy_legal_hold_active', false, $holdRef, $record))) {
-                    $this->artifacts->transition('deletion-ledger', (string) $record['artifact_key'], 'blocked-hold', (int) $record['version'], [
+                    $held = $this->artifacts->transition('deletion-ledger', (string) $record['artifact_key'], 'blocked-hold', (int) $record['version'], [
                         'last_error_code' => 'legal_hold_active',
                     ]);
-                    ++$counts['held'];
+                    if (is_wp_error($held)) {
+                        ++$counts['failed'];
+                        $this->recordPersistenceGap($record, 'legal_hold_state_persistence_failed', $held);
+                    } else {
+                        ++$counts['held'];
+                    }
                     continue;
                 }
 
@@ -102,6 +127,7 @@ final class DeletionReplayManager
                         ++$counts['reconciled'];
                     } else {
                         ++$counts['failed'];
+                        $this->recordPersistenceGap($record, 'reconciled_state_persistence_failed', $saved);
                     }
                     continue;
                 }
@@ -112,15 +138,35 @@ final class DeletionReplayManager
                     'next_retry_at' => gmdate('c', time() + min(86400, 300 * (2 ** min(8, $attempts)))),
                 ]);
                 if (is_wp_error($failed)) {
-                    do_action('spcrc/privacy_deletion_replay_persistence_failed', $record['artifact_key'] ?? '', $failed->get_error_code());
+                    $this->recordPersistenceGap($record, 'failed_state_persistence_failed', $failed);
                 }
                 ++$counts['failed'];
             }
 
-            $this->audit->record('privacy_deletion_replay_completed', 'file-24-security-center', 'completed', 'medium', $counts);
+            $audit = $this->audit->record('privacy_deletion_replay_completed', 'file-24-security-center', 'completed', 'medium', $counts);
+            if (is_wp_error($audit)) {
+                AuditGapStore::record('spcrc_deletion_replay_audit_gap', 'deletion-replay-run', gmdate('YmdHis'), 'completion_audit_failed', [
+                    'error_code' => $audit->get_error_code(),
+                    'processed' => $counts['processed'],
+                    'failed' => $counts['failed'],
+                ]);
+                do_action('spcrc/privacy_deletion_replay_audit_failed', $audit->get_error_code(), $counts);
+            }
             return $counts;
         } finally {
-            AtomicOptionLock::release(self::LOCK, $token);
+            if (! AtomicOptionLock::release(self::LOCK, $token)) {
+                do_action('spcrc/privacy_deletion_replay_lock_release_failed', $token);
+            }
         }
+    }
+
+    /** @param array<string,mixed> $record */
+    private function recordPersistenceGap(array $record, string $reason, \WP_Error $error): void
+    {
+        $artifactKey = Sanitizer::key($record['artifact_key'] ?? '', 120);
+        AuditGapStore::record('spcrc_deletion_replay_audit_gap', 'deletion-ledger', $artifactKey, $reason, [
+            'error_code' => $error->get_error_code(),
+        ]);
+        do_action('spcrc/privacy_deletion_replay_persistence_failed', $artifactKey, $error->get_error_code());
     }
 }
