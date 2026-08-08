@@ -5,9 +5,12 @@ declare(strict_types=1);
 namespace Sabri\Platform\Security\System;
 
 use Sabri\Platform\Security\Capabilities;
+use Sabri\Platform\Security\Future\FutureSecurityAssurance;
+use Sabri\Platform\Security\Future\FutureSecurityCapabilityCatalog;
 use Sabri\Platform\Security\Incident\IncidentCoordinator;
 use Sabri\Platform\Security\Policy\BoundaryPolicyCatalog;
 use Sabri\Platform\Security\Registry\ChatDirectiveCatalog;
+use Sabri\Platform\Security\Registry\ContinuousValueRequirementCatalog;
 use Sabri\Platform\Security\Registry\GovernedArtifactRegistry;
 use Sabri\Platform\Security\Registry\PlatformIntegrationMatrix;
 use Sabri\Platform\Security\Registry\RequirementCatalog;
@@ -44,6 +47,22 @@ final class CompletionCheck
             'All-Chats v2.1 File 24 directives repository traceability complete',
             ($chatSummary['repository_coding_complete'] ?? false) === true,
             (int) ($chatSummary['repository_implemented'] ?? 0) . '/' . (int) ($chatSummary['total'] ?? 0) . ' directives mapped'
+        );
+        $continuous = ContinuousValueRequirementCatalog::summary();
+        $checks[] = $this->check(
+            'continuous_value_traceability',
+            'CV-262–CV-285 plus F24-CEN-01 repository traceability complete',
+            ($continuous['repository_coding_complete'] ?? false) === true,
+            (int) ($continuous['total'] ?? 0) . '/25 current-plan requirements mapped'
+        );
+        $future = FutureSecurityCapabilityCatalog::all();
+        $futureComplete = FutureSecurityCapabilityCatalog::repositoryCodingComplete()
+            && FutureSecurityAssurance::supportedIds() === array_keys($future);
+        $checks[] = $this->check(
+            'future_security_traceability',
+            'F24-FUT-001–F24-FUT-025 repository traceability complete',
+            $futureComplete,
+            count($future) . '/25 future-security capabilities mapped with exact assurance parity'
         );
         $checks[] = $this->check(
             'integration_matrix',

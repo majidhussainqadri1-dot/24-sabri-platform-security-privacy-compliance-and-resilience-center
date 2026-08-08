@@ -59,7 +59,7 @@ $double = $uploads->validate([
     'detected_mime' => 'image/jpeg', 'sha256' => str_repeat('a', 64),
 ], 'private-document');
 c98(is_wp_error($double), 'Executable/double-extension upload must fail.');
-$scan = $uploads->scannerResult(['status' => 'clean', 'engine' => 'scanner-v1', 'scanned_at' => gmdate('c'), 'evidence_ref' => 'scan:result-01']);
+$scan = $uploads->scannerResult(['status' => 'clean', 'engine' => 'scanner-v1', 'sha256' => str_repeat('a', 64), 'scanned_at' => gmdate('c'), 'evidence_ref' => 'scan:result-01'], str_repeat('a', 64));
 c98(is_array($scan) && ! empty($scan['delivery_allowed']), 'Only clean evidenced scan may permit delivery.');
 
 $delivery = new PrivateDeliveryPolicy();

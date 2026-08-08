@@ -33,7 +33,7 @@ jobs:
             php -l "$source_file"
             count=$((count + 1))
           done < <(find plugin tests -type f -name '*.php' -print0 | sort -z)
-          test "$count" -ge 209
+          test "$count" -ge 227
           echo "Linted $count PHP files."
 
       - name: Run the complete historical and code-complete suites
@@ -45,7 +45,7 @@ jobs:
             php "$test_file"
             count=$((count + 1))
           done < <(find tests -maxdepth 1 -type f -name '*.php' ! -name 'bootstrap.php' -print0 | sort -z)
-          test "$count" -ge 124
+          test "$count" -ge 140
           echo "Executed $count independent PHP test programs."
 
       - name: Reject secrets, private operations material and unsafe PHP
@@ -81,6 +81,9 @@ jobs:
           set -euo pipefail
           php -r 'require "tests/bootstrap.php"; if (Sabri\Platform\Security\Registry\RequirementCatalog::count() !== 100 || !Sabri\Platform\Security\Registry\RequirementCatalog::repositoryCodingComplete()) { exit(1); }'
           php -r 'require "tests/bootstrap.php"; if (Sabri\Platform\Security\Registry\ChatDirectiveCatalog::count() !== 18 || !Sabri\Platform\Security\Registry\ChatDirectiveCatalog::repositoryCodingComplete()) { exit(1); }'
+          php -r 'require "tests/bootstrap.php"; if (Sabri\Platform\Security\Registry\ContinuousValueRequirementCatalog::count() !== 25 || !Sabri\Platform\Security\Registry\ContinuousValueRequirementCatalog::repositoryCodingComplete()) { exit(1); }'
+          php -r 'require "tests/bootstrap.php"; $f=Sabri\Platform\Security\Future\FutureSecurityCapabilityCatalog::all(); if (count($f) !== 25 || !Sabri\Platform\Security\Future\FutureSecurityCapabilityCatalog::repositoryCodingComplete() || Sabri\Platform\Security\Future\FutureSecurityAssurance::supportedIds() !== array_keys($f)) { exit(1); }'
+          php -r 'require "tests/bootstrap.php"; if (!Sabri\Platform\Security\Release\ReleaseStatus::repositoryCodingComplete()) { exit(1); }'
           php -r 'require "tests/bootstrap.php"; if (count(Sabri\Platform\Security\Registry\PlatformIntegrationMatrix::all()) !== 27 || !Sabri\Platform\Security\Registry\PlatformIntegrationMatrix::complete()) { exit(1); }'
           php -r 'require "tests/bootstrap.php"; if (count(Sabri\Platform\Security\Registry\GovernedArtifactRegistry::types()) !== 28) { exit(1); }'
           php -r 'require "tests/bootstrap.php"; if (count(Sabri\Platform\Security\Policy\BoundaryPolicyCatalog::all()) !== 11) { exit(1); }'
@@ -104,9 +107,11 @@ jobs:
           grep -q 'final class RankingFairnessPolicy' plugin/sabri-security-center/src/Policy/RankingFairnessPolicy.php
           grep -q 'final class AIHomeopathyTeacherAssurance' plugin/sabri-security-center/src/Policy/AIHomeopathyTeacherAssurance.php
           grep -q 'VERIFIED_TRANSFER_MAX_BYTES = 1073741824' plugin/sabri-security-center/src/Security/TransferDownloadAssurance.php
-          grep -q 'spcrc_private_delivery_consume_failed' plugin/sabri-security-center/src/Security/PrivateDeliveryPolicy.php
+          grep -q 'spcrc_private_delivery_consume_contended' plugin/sabri-security-center/src/Security/PrivateDeliveryPolicy.php
+          grep -q 'homeEffectivePort' plugin/sabri-security-center/src/Security/NetworkPolicy.php
           grep -q 'dns_get_record' plugin/sabri-security-center/src/Security/NetworkPolicy.php
-          grep -q 'spcrc_vulnerability_finding_failed' plugin/sabri-security-center/src/Security/VulnerabilityManager.php
+          grep -q 'spcrc_vulnerability_transition_invalid' plugin/sabri-security-center/src/Security/VulnerabilityManager.php
+          grep -q 'spcrc_vulnerability_containment_required' plugin/sabri-security-center/src/Security/VulnerabilityManager.php
           grep -q 'spcrc_incident_declaration_partial' plugin/sabri-security-center/src/Incident/IncidentCoordinator.php
           grep -q 'spcrc_drill_finding_failed' plugin/sabri-security-center/src/Resilience/ResilienceCoordinator.php
           grep -q 'persistence_failed' plugin/sabri-security-center/src/Monitoring/RemoteEvidenceQueue.php
@@ -130,14 +135,19 @@ jobs:
           for class in FutureSecurityCapabilityCatalog FutureSecurityAssurance SecurityKnowledgeGraph AttackPathEngine PolicyAsCodeEngine PrivacyEgressGuard PrivacyAnalyticsGuard ArtifactProvenanceVerifier AgenticAiSecurity AutomatedRemediationPolicy; do
             test -f "plugin/sabri-security-center/src/Future/${class}.php"
           done
-          for cycle in $(seq 116 125); do
+          for cycle in $(seq 116 135); do
             find tests -maxdepth 1 -type f -name "cycle${cycle}-*.php" | grep -q .
           done
           test -f docs/FUTURE-SECURITY-PRIVACY-SUPERSET-0.99.0.md
           test -f docs/REVIEW-AND-CORRECTION-FUTURE-SECURITY-CYCLES-116-125.md
+          test -f docs/REVIEW-AND-CORRECTION-FUTURE-SECURITY-CYCLES-126-135.md
           test -f plugin/sabri-security-center/docs/FUTURE-SECURITY-PRIVACY-SUPERSET.md
           grep -q 'F24-FUT-025' docs/FUTURE-SECURITY-PRIVACY-SUPERSET-0.99.0.md
           grep -q 'Defect-bearing rounds' docs/REVIEW-AND-CORRECTION-FUTURE-SECURITY-CYCLES-116-125.md
+          grep -q 'Defect-bearing cycles' docs/REVIEW-AND-CORRECTION-FUTURE-SECURITY-CYCLES-126-135.md
+          grep -q 'spcrc_upload_scan_hash_mismatch' plugin/sabri-security-center/src/Security/UploadPolicy.php
+          grep -q 'evidence_fresh' plugin/sabri-security-center/src/Security/TransferDownloadAssurance.php
+          grep -q 'launch_valid' plugin/sabri-security-center/src/Policy/AIHomeopathyTeacherAssurance.php
           grep -q 'distinct_human_approval_count' plugin/sabri-security-center/src/Future/AutomatedRemediationPolicy.php
           grep -q 'ambiguous_node_count' plugin/sabri-security-center/src/Future/SecurityKnowledgeGraph.php
           grep -q 'unknown_data_classes' plugin/sabri-security-center/src/Future/PrivacyEgressGuard.php
@@ -159,7 +169,7 @@ jobs:
             SOURCE-MANIFEST-0.99.0.json THREE-PLAN-HARMONIZATION-0.99.0.md \
             CHAT-DIRECTIVES-TRACEABILITY-0.99.0.md FILES-00-26-INTEGRATION-MATRIX-0.99.0.md \
             REVIEW-AND-CORRECTION-ALL-CHATS-ROUND-1.md REVIEW-AND-CORRECTION-ALL-CHATS-ROUND-2.md \
-            FUTURE-SECURITY-PRIVACY-SUPERSET-0.99.0.md REVIEW-AND-CORRECTION-FUTURE-SECURITY-CYCLES-116-125.md; do
+            FUTURE-SECURITY-PRIVACY-SUPERSET-0.99.0.md REVIEW-AND-CORRECTION-FUTURE-SECURITY-CYCLES-116-125.md REVIEW-AND-CORRECTION-FUTURE-SECURITY-CYCLES-126-135.md; do
             test -f "docs/$doc"
           done
           for manual in \
@@ -190,7 +200,7 @@ jobs:
         run: |
           set -euo pipefail
           git ls-files -z | sort -z | xargs -0 sha256sum > /tmp/file24-source-checksums.sha256
-          test "$(wc -l < /tmp/file24-source-checksums.sha256)" -ge 382
+          test "$(wc -l < /tmp/file24-source-checksums.sha256)" -ge 393
           sha256sum -c /tmp/file24-source-checksums.sha256
           echo "path=/tmp/file24-source-checksums.sha256" >> "$GITHUB_OUTPUT"
 
@@ -232,15 +242,15 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          rm -rf /tmp/file24-source /tmp/file24-source-snapshot-cycle125.zip
+          rm -rf /tmp/file24-source /tmp/file24-source-snapshot-cycle135.zip
           mkdir -p /tmp/file24-source
           rsync -a --exclude='.git' --exclude='build' ./ /tmp/file24-source/
-          (cd /tmp && zip -X -q -r file24-source-snapshot-cycle125.zip file24-source)
+          (cd /tmp && zip -X -q -r file24-source-snapshot-cycle135.zip file24-source)
 
       - name: Upload sanitized code-complete source snapshot
         if: matrix.php == '8.3'
         uses: actions/upload-artifact@v4
         with:
-          name: file-24-sanitized-source-snapshot-cycle125
-          path: /tmp/file24-source-snapshot-cycle125.zip
+          name: file-24-sanitized-source-snapshot-cycle135
+          path: /tmp/file24-source-snapshot-cycle135.zip
           if-no-files-found: error

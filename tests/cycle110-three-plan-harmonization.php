@@ -34,11 +34,12 @@ c110(str_contains((string) ($file20['native_owner'] ?? ''), 'welcome invocation/
 c110(str_contains((string) ($file25['native_owner'] ?? ''), 'welcome visual/RTL/accessibility'), 'File 25 must own welcome visual, RTL and accessibility.');
 c110(($file26['criticality'] ?? '') === 'high-risk' && ($file26['contract_filter'] ?? '') === 'spcrc/file26_contract_state', 'File 26 must be a high-risk versioned integration.');
 
+$now = strtotime('2026-08-05T10:00:00Z');
 $hierarchy = GovernancePolicyService::hierarchy();
 c110(($hierarchy['islamic-supremacy-charter'] ?? 99) === 0, 'Islamic Supremacy Charter must be the highest policy level.');
 c110(($hierarchy['master-plan'] ?? 0) > ($hierarchy['islamic-supremacy-charter'] ?? 99), 'Master Plan must remain subordinate to the Islamic charter.');
-c110(IslamicGovernanceCharter::annualReviewValid('2026-01-01T00:00:00Z', '2026-12-31T00:00:00Z'), 'Charter review within twelve months must be valid.');
-c110(! IslamicGovernanceCharter::annualReviewValid('2026-01-01T00:00:00Z', '2027-02-01T00:00:00Z'), 'Charter review beyond twelve months must fail.');
+c110(IslamicGovernanceCharter::annualReviewValid('2026-01-01T00:00:00Z', '2026-12-31T00:00:00Z', $now), 'Charter review within twelve months must be valid.');
+c110(! IslamicGovernanceCharter::annualReviewValid('2026-01-01T00:00:00Z', '2027-02-01T00:00:00Z', $now), 'Charter review beyond twelve months must fail.');
 
 $privacy = AntiSurveillancePolicy::evaluate([
     'uses' => ['security_and_abuse_prevention'],
@@ -46,7 +47,7 @@ $privacy = AntiSurveillancePolicy::evaluate([
     'evidence_ref' => 'vault:privacy-policy-2026',
     'reviewed_at' => '2026-01-01T00:00:00Z',
     'next_review_at' => '2026-12-31T00:00:00Z',
-]);
+], $now);
 c110(($privacy['state'] ?? '') === 'verified', 'Purpose-bound minimized processing must pass anti-surveillance assurance.');
 $privacyBlocked = AntiSurveillancePolicy::evaluate([
     'uses' => ['hidden_profiling'],
@@ -54,10 +55,9 @@ $privacyBlocked = AntiSurveillancePolicy::evaluate([
     'evidence_ref' => 'vault:bad-purpose',
     'reviewed_at' => '2026-01-01T00:00:00Z',
     'next_review_at' => '2026-12-31T00:00:00Z',
-]);
+], $now);
 c110(($privacyBlocked['processing_allowed'] ?? true) === false, 'Hidden profiling must be blocked.');
 
-$now = strtotime('2026-08-05T10:00:00Z');
 $ranking = RankingFairnessPolicy::evaluate([
     'controls' => ['file26_owner_contract', 'versioned_policy', 'explainability', 'audit_log', 'appeal_path', 'manipulation_resistance', 'verified_review_weighting', 'monthly_recomputation', 'donation_independence', 'payment_independence', 'founder_non_favoritism'],
     'influences' => ['qualifications', 'experience', 'verified_reviews', 'knowledge_contribution'],
@@ -94,7 +94,7 @@ $transfer = TransferDownloadAssurance::evaluateTransfer([
     'max_bytes_per_file' => TransferDownloadAssurance::VERIFIED_TRANSFER_MAX_BYTES,
     'evidence_ref' => 'vault:transfer-assurance-1',
     'tested_at' => '2026-08-05T09:00:00Z',
-]);
+], $now);
 c110(($transfer['state'] ?? '') === 'verified', 'Verified-user one-GiB resumable transfer assurance must pass complete evidence.');
 
 $downloadControls = ['native_owner_eligibility', 'queue', 'progress', 'pause_resume', 'retry', 'checksum', 'range_requests', 'weak_connection_recovery', 'click_time_authorization', 'history', 'audit', 'expiry', 'revocation'];
@@ -102,7 +102,7 @@ $download = TransferDownloadAssurance::evaluateDownload([
     'controls' => $downloadControls,
     'evidence_ref' => 'vault:download-assurance-1',
     'tested_at' => '2026-08-05T09:00:00Z',
-]);
+], $now);
 c110(($download['state'] ?? '') === 'verified', 'Universal eligible download assurance must pass complete evidence.');
 
 c110(count(BoundaryPolicyCatalog::all()) === 11, 'Boundary catalogue must include five new All-Chats domains.');

@@ -96,7 +96,7 @@ final class BoundaryPolicyCatalog
     }
 
     /** @param array<string,mixed> $evidence @return array<string,mixed> */
-    public static function evaluate(string $domain, array $evidence): array
+    public static function evaluate(string $domain, array $evidence, ?int $now = null): array
     {
         $policy = self::get($domain);
         if (! is_array($policy)) {
@@ -113,7 +113,13 @@ final class BoundaryPolicyCatalog
 
         $evidenceRef = Sanitizer::opaqueReference($evidence['evidence_ref'] ?? '');
         $testedAt = Sanitizer::isoTime($evidence['tested_at'] ?? '');
-        $state = $missing === [] && $evidenceRef !== '' && $testedAt !== '' && strtotime($testedAt) <= time() + 300
+        $now ??= time();
+        $maxAgeDays = max(1, min(365, (int) apply_filters('spcrc/boundary_evidence_max_age_days', 90, Sanitizer::key($domain, 60))));
+        $tested = $testedAt === '' ? false : strtotime($testedAt);
+        $evidenceFresh = $tested !== false
+            && $tested <= $now + 300
+            && $tested >= $now - ($maxAgeDays * DAY_IN_SECONDS);
+        $state = $missing === [] && $evidenceRef !== '' && $evidenceFresh
             ? 'verified'
             : ($implemented === [] ? 'unassessed' : 'incomplete');
 
@@ -123,6 +129,8 @@ final class BoundaryPolicyCatalog
             'missing_controls' => $missing,
             'evidence_ref' => $evidenceRef,
             'tested_at' => $testedAt,
+            'evidence_fresh' => $evidenceFresh,
+            'max_evidence_age_days' => $maxAgeDays,
             'native_owners' => $policy['native_owners'],
             'write_allowed' => $state === 'verified',
         ];

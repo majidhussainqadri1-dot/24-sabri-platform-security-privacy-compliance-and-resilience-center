@@ -13,6 +13,7 @@ use Sabri\Platform\Security\Registry\PlatformIntegrationMatrix;
 use Sabri\Platform\Security\Security\TransferDownloadAssurance;
 
 $count = 0;
+$now = strtotime('2026-08-05T10:00:00Z');
 function c111(bool $condition, string $message): void { global $count; ++$count; if (! $condition) { fwrite(STDERR, "FAIL: $message\n"); exit(1); } }
 
 c111(ChatDirectiveCatalog::get('CHAT-UNKNOWN-999') === null, 'Unknown chat directive must not receive a permissive fallback.');
@@ -31,7 +32,7 @@ $staleRanking = RankingFairnessPolicy::evaluate([
     'evidence_ref' => 'vault:stale-ranking',
     'tested_at' => '2026-08-05T09:00:00Z',
     'recomputed_at' => '2026-06-01T00:00:00Z',
-], strtotime('2026-08-05T10:00:00Z'));
+], $now);
 c111(($staleRanking['write_allowed'] ?? true) === false && empty($staleRanking['recomputation_fresh']), 'Stale doctor ranking must fail closed.');
 
 $aiImpersonation = AIHomeopathyTeacherAssurance::evaluate([
@@ -42,7 +43,7 @@ $aiImpersonation = AIHomeopathyTeacherAssurance::evaluate([
     'daily_post_cap' => 5,
     'evidence_ref' => 'vault:ai-bad',
     'tested_at' => '2026-08-05T09:00:00Z',
-], strtotime('2026-08-05T10:00:00Z'));
+], $now);
 c111(($aiImpersonation['publication_allowed'] ?? true) === false, 'AI human/doctor impersonation, excessive cadence and absent launch review must block publication.');
 c111(empty($aiImpersonation['identity_valid']) && empty($aiImpersonation['daily_post_cap_valid']) && empty($aiImpersonation['human_review_valid']), 'AI assurance must identify each independent launch defect.');
 
@@ -51,14 +52,14 @@ $oversizeTransfer = TransferDownloadAssurance::evaluateTransfer([
     'max_bytes_per_file' => TransferDownloadAssurance::VERIFIED_TRANSFER_MAX_BYTES + 1,
     'evidence_ref' => 'vault:oversize',
     'tested_at' => '2026-08-05T09:00:00Z',
-]);
+], $now);
 c111(($oversizeTransfer['transfer_allowed'] ?? true) === false && empty($oversizeTransfer['one_gib_limit_valid']), 'A transfer larger than one GiB must be blocked.');
 
 $weakDownload = TransferDownloadAssurance::evaluateDownload([
     'controls' => ['queue', 'progress'],
     'evidence_ref' => 'vault:weak-download',
     'tested_at' => '2026-08-05T09:00:00Z',
-]);
+], $now);
 c111(($weakDownload['download_allowed'] ?? true) === false, 'Download without authorization, checksum, recovery and revocation must fail closed.');
 c111(in_array('click_time_authorization', $weakDownload['missing_controls'] ?? [], true), 'Download failure must identify click-time authorization as missing.');
 
@@ -68,7 +69,7 @@ $surveillance = AntiSurveillancePolicy::evaluate([
     'evidence_ref' => 'vault:surveillance-bad',
     'reviewed_at' => '2026-01-01T00:00:00Z',
     'next_review_at' => '2026-12-31T00:00:00Z',
-]);
+], $now);
 c111(count($surveillance['prohibited_uses_detected'] ?? []) === 2, 'Personal-data sale and security-log monetization must both be detected.');
 c111(($surveillance['processing_allowed'] ?? true) === false, 'Prohibited surveillance processing must remain blocked despite partial controls.');
 

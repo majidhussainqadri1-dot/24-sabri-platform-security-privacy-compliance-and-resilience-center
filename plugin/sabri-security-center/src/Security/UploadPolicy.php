@@ -12,6 +12,8 @@ use Sabri\Platform\Security\Support\Sanitizer;
  */
 final class UploadPolicy
 {
+    private const MAX_SCAN_AGE_SECONDS = DAY_IN_SECONDS;
+
     /** @var array<string,array<string,mixed>> */
     private const PURPOSES = [
         'public-image' => ['max' => 15728640, 'mimes' => ['image/jpeg', 'image/png', 'image/webp', 'image/avif']],
@@ -65,14 +67,24 @@ final class UploadPolicy
     }
 
     /** @param array<string,mixed> $scanner @return array<string,mixed>|\WP_Error */
-    public function scannerResult(array $scanner): array|\WP_Error
+    public function scannerResult(array $scanner, string $expectedSha256, ?int $now = null): array|\WP_Error
     {
         $status = Sanitizer::key($scanner['status'] ?? '', 30);
         $evidenceRef = Sanitizer::opaqueReference($scanner['evidence_ref'] ?? '');
         $scannedAt = Sanitizer::isoTime($scanner['scanned_at'] ?? '');
         $engine = Sanitizer::key($scanner['engine'] ?? '', 80);
-        if (! in_array($status, ['clean', 'infected', 'unsupported', 'error'], true) || $scannedAt === '' || $engine === '') {
+        $scanHash = strtolower(Sanitizer::text($scanner['sha256'] ?? '', 64));
+        $expectedSha256 = strtolower(Sanitizer::text($expectedSha256, 64));
+        $scanned = $scannedAt === '' ? false : strtotime($scannedAt);
+        $now ??= time();
+        if (! in_array($status, ['clean', 'infected', 'unsupported', 'error'], true) || $scanned === false || $engine === '') {
             return new \WP_Error('spcrc_upload_scan_invalid', 'Scanner status, engine and timestamp are required.');
+        }
+        if ($scanned > $now + 300 || $scanned < $now - self::MAX_SCAN_AGE_SECONDS) {
+            return new \WP_Error('spcrc_upload_scan_stale', 'Scanner result is stale or has an invalid future timestamp.');
+        }
+        if (preg_match('/^[a-f0-9]{64}$/', $scanHash) !== 1 || preg_match('/^[a-f0-9]{64}$/', $expectedSha256) !== 1 || ! hash_equals($expectedSha256, $scanHash)) {
+            return new \WP_Error('spcrc_upload_scan_hash_mismatch', 'Scanner result is not bound to the expected source SHA-256.');
         }
         if ($evidenceRef === '') {
             return new \WP_Error('spcrc_upload_scan_evidence_missing', 'Scanner result requires an opaque evidence reference.');
@@ -80,6 +92,7 @@ final class UploadPolicy
         return [
             'status' => $status,
             'engine' => $engine,
+            'sha256' => $scanHash,
             'scanned_at' => $scannedAt,
             'evidence_ref' => $evidenceRef,
             'delivery_allowed' => $status === 'clean',

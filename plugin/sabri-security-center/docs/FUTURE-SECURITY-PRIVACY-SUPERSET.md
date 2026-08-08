@@ -24,3 +24,7 @@ File 24 provides **assurance, correlation, evidence, risk, governance and bounde
 ## Ten-round closure
 
 Fresh repository review cycles `116..125` permanently test catalogue parity, evidence safety, graph integrity, attack scoring, policy type safety, DLP/egress, differential-privacy numeric safety, provenance/VEX boundaries, Agentic AI data scope and human-governed remediation. See root `docs/REVIEW-AND-CORRECTION-FUTURE-SECURITY-CYCLES-116-125.md` for the defect register.
+
+## Second ten-round hardening — Cycles 126–135
+
+A second fresh ten-round review corrected release-scope parity, stale boundary evidence, vulnerability lifecycle skipping, expired governance review windows, AI launch/evidence timing, non-finite/mixed-unit performance evidence, stale transfer/download assurance, unbound upload scanner evidence, private-delivery consume races and same-host/different-port origin confusion. All ten rounds were defect-bearing and each has a permanent `cycle126`–`cycle135` regression. Repository completion remains distinct from staging/live/operational evidence.

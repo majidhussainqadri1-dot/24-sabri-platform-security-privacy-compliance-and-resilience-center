@@ -48,14 +48,18 @@ final class IslamicGovernanceCharter
         ];
     }
 
-    public static function annualReviewValid(string $reviewedAt, string $nextReviewAt): bool
+    public static function annualReviewValid(string $reviewedAt, string $nextReviewAt, ?int $now = null): bool
     {
         if ($reviewedAt === '' || $nextReviewAt === '') {
             return false;
         }
         $reviewed = strtotime($reviewedAt);
         $next = strtotime($nextReviewAt);
+        $now ??= time();
         if ($reviewed === false || $next === false || $next <= $reviewed) {
+            return false;
+        }
+        if ($reviewed > $now + 300 || $next <= $now) {
             return false;
         }
         return ($next - $reviewed) <= 366 * DAY_IN_SECONDS;

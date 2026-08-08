@@ -131,3 +131,7 @@ Every new PHP source file is part of the repository-wide PHP 8.0/8.3 lint matrix
 **Not claimed by this addendum:** real post-quantum provider support, real external attack-surface telemetry, production DLP coverage, production clean-room infrastructure, hardware-backed workload identity, real cyber vault immutability, real chaos/BAS exercises, deployed honeytokens, live VEX feeds, externally signed SLSA provenance, production AI-agent providers, independent security certification, Hostinger staging acceptance, live deployment or operational acceptance.
 
 Those are evidence gates, not repository-coding gaps.
+
+## Cycles 126–135 — second fresh ten-round hardening
+
+The post-Cycle-125 repository was reopened for ten further independent reviews. Defects were found and corrected in **all ten cycles 126–135**: release-scope parity; boundary evidence freshness; vulnerability state-transition enforcement; annual governance-review expiry; AI Teacher future-launch/stale-evidence blocking; performance finite/unit integrity; transfer/download evidence freshness; upload scan SHA-256/freshness binding; atomic private-delivery consumption; and exact HTTPS origin scheme/port matching. Each cycle has an independent regression test and the complete historical suite remains mandatory. Detailed evidence: `docs/REVIEW-AND-CORRECTION-FUTURE-SECURITY-CYCLES-126-135.md`.

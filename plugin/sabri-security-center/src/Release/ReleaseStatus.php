@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace Sabri\Platform\Security\Release;
 
+use Sabri\Platform\Security\Future\FutureSecurityAssurance;
+use Sabri\Platform\Security\Future\FutureSecurityCapabilityCatalog;
 use Sabri\Platform\Security\Policy\BoundaryPolicyCatalog;
 use Sabri\Platform\Security\Registry\ChatDirectiveCatalog;
+use Sabri\Platform\Security\Registry\ContinuousValueRequirementCatalog;
 use Sabri\Platform\Security\Registry\PlatformIntegrationMatrix;
 use Sabri\Platform\Security\Registry\RequirementCatalog;
 use Sabri\Platform\Security\Support\Sanitizer;
@@ -19,11 +22,18 @@ final class ReleaseStatus
     /** @return array<string,array<string,mixed>> */
     public static function all(): array
     {
+        $futureParity = FutureSecurityAssurance::supportedIds() === array_keys(FutureSecurityCapabilityCatalog::all());
         $specified = RequirementCatalog::count() === 100
             && ChatDirectiveCatalog::count() === 18
+            && ContinuousValueRequirementCatalog::count() === 25
+            && FutureSecurityCapabilityCatalog::count() === 25
+            && $futureParity
             && PlatformIntegrationMatrix::complete();
         $coded = RequirementCatalog::repositoryCodingComplete()
             && ChatDirectiveCatalog::repositoryCodingComplete()
+            && ContinuousValueRequirementCatalog::repositoryCodingComplete()
+            && FutureSecurityCapabilityCatalog::repositoryCodingComplete()
+            && $futureParity
             && PlatformIntegrationMatrix::complete()
             && count(BoundaryPolicyCatalog::all()) === 11
             && defined('SPCRC_VERSION')
@@ -37,8 +47,8 @@ final class ReleaseStatus
         $operational = $live && Sanitizer::boolean(apply_filters('spcrc/release_evidence_operational', false, $version));
 
         return [
-            'specified' => ['complete' => $specified, 'evidence' => $specified ? 'F24-R001–F24-R100 plus All-Chats v2.1 File 24 directives catalogued' : 'Requirement catalogue incomplete'],
-            'coded' => ['complete' => $coded, 'evidence' => $coded ? 'Three-plan repository code-complete candidate ' . $version : 'Repository coding incomplete'],
+            'specified' => ['complete' => $specified, 'evidence' => $specified ? 'F24-R001–R100 + 18 CHAT + 25 CV/CEN + 25 Future requirements catalogued with File 00–26 integration' : 'Current governing requirement catalogue incomplete'],
+            'coded' => ['complete' => $coded, 'evidence' => $coded ? 'Current governing repository scope code-complete candidate ' . $version : 'Repository coding incomplete'],
             'packaged' => ['complete' => $packaged, 'evidence' => $packaged ? 'Exact package evidence supplied' : 'Runtime package evidence not asserted'],
             'automated_qa_green' => ['complete' => $automatedQa, 'evidence' => $automatedQa ? 'Exact-head automated QA evidence supplied' : 'Runtime CI evidence not asserted'],
             'staging_accepted' => ['complete' => $staging, 'evidence' => $staging ? 'Founder-approved staging evidence supplied' : 'Hostinger staging acceptance pending'],
