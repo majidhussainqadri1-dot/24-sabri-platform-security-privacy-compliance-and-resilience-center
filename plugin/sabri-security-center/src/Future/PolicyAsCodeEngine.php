@@ -36,16 +36,46 @@ final class PolicyAsCodeEngine
     {
         $field = Sanitizer::key($rule['field'] ?? '', 80);
         $operator = Sanitizer::key($rule['operator'] ?? '', 30);
-        if ($field === '' || ! array_key_exists($field, $context)) return false;
+        if ($field === '' || ! array_key_exists($field, $context)) {
+            return false;
+        }
         $actual = $context[$field];
         $expected = $rule['value'] ?? null;
+
         return match ($operator) {
-            'equals' => is_scalar($actual) && is_scalar($expected) && (string) $actual === (string) $expected,
+            'equals' => $this->strictScalarEquals($actual, $expected),
             'present' => $actual !== null && $actual !== '' && $actual !== [],
             'in' => is_array($expected) && in_array($actual, $expected, true),
-            'gte' => is_numeric($actual) && is_numeric($expected) && (float) $actual >= (float) $expected,
-            'lte' => is_numeric($actual) && is_numeric($expected) && (float) $actual <= (float) $expected,
+            'gte' => $this->finiteNumber($actual) !== null
+                && $this->finiteNumber($expected) !== null
+                && $this->finiteNumber($actual) >= $this->finiteNumber($expected),
+            'lte' => $this->finiteNumber($actual) !== null
+                && $this->finiteNumber($expected) !== null
+                && $this->finiteNumber($actual) <= $this->finiteNumber($expected),
             default => false,
         };
+    }
+
+    private function strictScalarEquals(mixed $actual, mixed $expected): bool
+    {
+        if (! is_scalar($actual) || ! is_scalar($expected)) {
+            return false;
+        }
+        if (gettype($actual) !== gettype($expected)) {
+            return false;
+        }
+        if (is_float($actual) && (! is_finite($actual) || ! is_finite((float) $expected))) {
+            return false;
+        }
+        return $actual === $expected;
+    }
+
+    private function finiteNumber(mixed $value): ?float
+    {
+        if ((! is_int($value) && ! is_float($value) && ! is_string($value)) || ! is_numeric($value)) {
+            return null;
+        }
+        $number = (float) $value;
+        return is_finite($number) ? $number : null;
     }
 }

@@ -42,9 +42,9 @@ expectFutureAdv($prov['state'] === 'blocked' && count($prov['missing']) >= 6, 'U
 $ai = (new AgenticAiSecurity())->evaluate(['agent_id'=>'danger','tool_allowlist'=>['delete'],'data_classes'=>['C5'],'network_allowlist'=>[],'max_tool_calls'=>999,'cost_budget'=>0,'high_risk_or_destructive'=>true,'human_approval'=>false,'aibom_registered'=>false,'source_citations_required'=>false]);
 expectFutureAdv($ai['decision'] === 'block' && count($ai['reasons']) >= 6, 'Unbounded agentic AI must be blocked.');
 
-$high = (new AutomatedRemediationPolicy())->decide(['action_type'=>'disable_account','risk_level'=>'critical','reversible'=>true,'previewed'=>true,'rollback_reference'=>'rollback:acct-1','human_approvals'=>1,'step_up_verified'=>true]);
+$high = (new AutomatedRemediationPolicy())->decide(['action_type'=>'disable_account','risk_level'=>'critical','reversible'=>true,'previewed'=>true,'rollback_reference'=>'rollback:acct-1','human_approvals'=>1,'human_approval_refs'=>['approval:user-1'],'step_up_verified'=>true]);
 expectFutureAdv($high['decision'] === 'block', 'Critical remediation requires dual approval.');
-$dual = (new AutomatedRemediationPolicy())->decide(['action_type'=>'disable_account','risk_level'=>'critical','reversible'=>true,'previewed'=>true,'rollback_reference'=>'rollback:acct-1','human_approvals'=>2,'step_up_verified'=>true]);
+$dual = (new AutomatedRemediationPolicy())->decide(['action_type'=>'disable_account','risk_level'=>'critical','reversible'=>true,'previewed'=>true,'rollback_reference'=>'rollback:acct-1','human_approvals'=>2,'human_approval_refs'=>['approval:user-1','approval:user-2'],'step_up_verified'=>true]);
 expectFutureAdv($dual['decision'] === 'dual_approved_recommendation' && $dual['execute_by'] === 'native_owner', 'Dual-approved critical remediation remains native-owner execution.');
 
 echo "PASS: cycle115 future-security adversarial closure\n";

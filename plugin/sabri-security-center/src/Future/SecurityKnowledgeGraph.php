@@ -20,14 +20,25 @@ final class SecurityKnowledgeGraph
     public function build(array $nodes, array $edges): array
     {
         $safeNodes = [];
+        $ambiguousNodeIds = [];
         foreach (array_slice($nodes, 0, 2000) as $node) {
             $id = Sanitizer::key($node['id'] ?? '', 120);
             $type = Sanitizer::key($node['type'] ?? '', 40);
             $label = Sanitizer::text($node['label'] ?? '', 160);
-            if ($id === '' || ! in_array($type, self::NODE_TYPES, true) || $label === '' || Sanitizer::containsSensitiveMaterial($label)) {
+            if ($id === '' || isset($ambiguousNodeIds[$id]) || ! in_array($type, self::NODE_TYPES, true) || $label === '' || Sanitizer::containsSensitiveMaterial($label)) {
                 continue;
             }
-            $safeNodes[$id] = ['id' => $id, 'type' => $type, 'label' => $label];
+
+            $candidate = ['id' => $id, 'type' => $type, 'label' => $label];
+            if (isset($safeNodes[$id])) {
+                if ($safeNodes[$id] === $candidate) {
+                    continue;
+                }
+                unset($safeNodes[$id]);
+                $ambiguousNodeIds[$id] = true;
+                continue;
+            }
+            $safeNodes[$id] = $candidate;
         }
 
         $safeEdges = [];
@@ -47,7 +58,13 @@ final class SecurityKnowledgeGraph
             $safeEdges[] = ['from' => $from, 'to' => $to, 'relation' => $relation];
         }
 
-        return ['nodes' => array_values($safeNodes), 'edges' => $safeEdges, 'node_count' => count($safeNodes), 'edge_count' => count($safeEdges)];
+        return [
+            'nodes' => array_values($safeNodes),
+            'edges' => $safeEdges,
+            'node_count' => count($safeNodes),
+            'edge_count' => count($safeEdges),
+            'ambiguous_node_count' => count($ambiguousNodeIds),
+        ];
     }
 
     /** @param array<string,mixed> $graph
@@ -62,22 +79,46 @@ final class SecurityKnowledgeGraph
             return ['reachable' => false, 'path' => [], 'depth' => 0];
         }
 
+        $nodeIds = [];
+        foreach (($graph['nodes'] ?? []) as $node) {
+            if (! is_array($node)) {
+                continue;
+            }
+            $id = Sanitizer::key($node['id'] ?? '', 120);
+            if ($id !== '') {
+                $nodeIds[$id] = true;
+            }
+        }
+        if (! isset($nodeIds[$from], $nodeIds[$to])) {
+            return ['reachable' => false, 'path' => [], 'depth' => 0];
+        }
+
         $adj = [];
         foreach (($graph['edges'] ?? []) as $edge) {
-            if (! is_array($edge)) continue;
+            if (! is_array($edge)) {
+                continue;
+            }
             $a = Sanitizer::key($edge['from'] ?? '', 120);
             $b = Sanitizer::key($edge['to'] ?? '', 120);
-            if ($a !== '' && $b !== '') $adj[$a][] = $b;
+            if ($a !== '' && $b !== '' && isset($nodeIds[$a], $nodeIds[$b]) && $a !== $b) {
+                $adj[$a][] = $b;
+            }
         }
 
         $queue = [[$from, [$from], 0]];
         $visited = [$from => true];
         while ($queue !== []) {
             [$node, $path, $depth] = array_shift($queue);
-            if ($node === $to) return ['reachable' => true, 'path' => $path, 'depth' => $depth];
-            if ($depth >= $maxDepth) continue;
+            if ($node === $to) {
+                return ['reachable' => true, 'path' => $path, 'depth' => $depth];
+            }
+            if ($depth >= $maxDepth) {
+                continue;
+            }
             foreach (array_values(array_unique($adj[$node] ?? [])) as $next) {
-                if (isset($visited[$next])) continue;
+                if (isset($visited[$next])) {
+                    continue;
+                }
                 $visited[$next] = true;
                 $queue[] = [$next, [...$path, $next], $depth + 1];
             }

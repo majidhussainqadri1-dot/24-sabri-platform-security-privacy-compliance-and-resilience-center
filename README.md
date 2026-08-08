@@ -11,7 +11,8 @@ File 24 is the cross-platform security-governance and assurance plane for the Sa
 - Recovered directives: **18/18 CHAT-* repository-implemented**
 - Later central-plan delta: **CV-262–CV-285 = 24/24** plus **F24-CEN-01 = 1/1 repository-implemented**
 - Future Security & Privacy Superset: **F24-FUT-001–F24-FUT-025 = 25/25 repository-implemented**
-- Final current-plan repository reviews: **Cycles 112–115**
+- Current-plan/Future-Superset repository reviews: **Cycles 112–125**
+- Latest ten-round re-audit: **Cycles 116–125; defects in 8 rounds, clean in 2; zero known unresolved repository defects after correction/retest**
 
 This status means the approved repository-coding scope, including the later Continuous Value / Top-20 File-24 delta and the Future Security & Privacy Superset, is implemented, traceable, reviewed, testable and packageable. It does **not** mean Hostinger staging acceptance, independent certification, penetration-test acceptance, restore-drill acceptance, live deployment or operational acceptance.
 
@@ -30,6 +31,7 @@ This status means the approved repository-coding scope, including the later Cont
 - `CV-262..CV-285` explicit traceability for zero trust, encryption, secrets, audit, privacy, cookies, secure SDLC, vulnerability management, compliance, backup/DR, incidents, SLOs, performance, observability, graceful degradation, RPO/RTO, release rings, support, capacity, migrations, vendor resilience and runbooks;
 - `F24-CEN-01` Assurance Center contract: controls/evidence/exceptions/incidents/disaster-recovery assurance with native authorization/encryption/rate-limiting/validation preserved;
 - `F24-FUT-001..F24-FUT-025` Future Security & Privacy Superset covering post-quantum readiness, crypto agility/inventory, security graph/attack paths, attack-surface/control monitoring, policy-as-code, DSPM/DLP, differential privacy/clean rooms, workload/JIT identity, cyber recovery/chaos/BAS/deception, exploitability/VEX/SLSA, agentic AI/AIBOM, assurance cases and bounded remediation;
+- ten-round hardening for nested evidence safety, graph identity integrity, finite/deterministic attack scoring, type-safe policy evaluation, fail-closed data classification, finite privacy budgets, bounded Agentic AI data scope, and distinct-human remediation approval evidence;
 - capability-protected wp-admin fallback, private REST APIs, security headers and truthful seven-status reporting;
 - public-safe architecture, RTM, schema/threat/integration manifests, manuals, SBOM, license inventory, checksums and deterministic build tooling.
 
@@ -39,7 +41,7 @@ This status means the approved repository-coding scope, including the later Cont
 
 `FutureSecurityCapabilityCatalog` fixes the future-superset inventory at 25/25. `FutureSecurityAssurance` provides fail-closed evidence shapes for every future ID. Dedicated primitives implement bounded Security Knowledge Graph/attack-path analysis, declarative Policy-as-Code, privacy egress/DLP decisions, differential-privacy/clean-room budgets, artifact provenance/VEX verification, bounded agentic-AI controls and human-governed automated-remediation recommendations.
 
-Cycles 112 and 113 close the final current-plan delta; Cycles 114 and 115 provide positive and adversarial closure for the future-security layer.
+Cycles 112 and 113 close the final current-plan delta; Cycles 114 and 115 provide the first positive/adversarial Future-Superset closure; Cycles 116–125 are the fresh ten-round re-audit. The detailed defect register is `docs/REVIEW-AND-CORRECTION-FUTURE-SECURITY-CYCLES-116-125.md`.
 
 ## Public/private boundary
 
@@ -56,7 +58,7 @@ sha256sum -c CHECKSUMS.sha256
 ./tools/build-release.sh
 ```
 
-The build creates an installable ZIP and SHA-256 receipt under `build/`.
+The build creates an installable ZIP and SHA-256 receipt under `build/`. CI also requires all ten `cycle116`–`cycle125` regressions and includes the packaged `FUTURE-SECURITY-PRIVACY-SUPERSET.md` operator document.
 
 ## External gates deliberately deferred
 

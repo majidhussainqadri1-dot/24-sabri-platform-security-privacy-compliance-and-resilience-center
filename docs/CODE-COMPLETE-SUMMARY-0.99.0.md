@@ -26,7 +26,7 @@ The repository now contains executable implementations and contracts for:
 - privacy-safe Security Knowledge Graph and bounded attack-path intelligence;
 - external attack-surface/control-monitoring, policy-as-code, DSPM/DLP and privacy-preserving analytics/clean-room assurance contracts;
 - workload/JIT identity, cyber-recovery, chaos/BAS/deception, exploitability/VEX/SLSA, agentic-AI/AIBOM and assurance-case evidence contracts;
-- bounded automated-remediation recommendations with reversible preview/rollback and dual human approval for high/critical actions; native owner execution remains mandatory;
+- bounded automated-remediation recommendations with reversible preview/rollback and **distinct dual human approval evidence** for high/critical actions; native owner execution remains mandatory;
 - capability-protected wp-admin fallback, private REST governance APIs and public-safe documentation;
 - deterministic packaging, SBOM, license inventory, checksums, schema manifest, migration/rollback guidance, QA and release receipts.
 
@@ -42,18 +42,28 @@ The repository now has five explicit requirement layers without rewriting histor
 
 `ContinuousValueRequirementCatalog` enforces the 25-record later-plan closure. `ContinuousValueAssurance` requires explicit evidence shapes and fails closed for missing controls, invalid timestamps or unsafe evidence references. `AssuranceCenterContract` rejects native-control takeover, a File-24 security single point of failure and public exposure of private operations material.
 
-`FutureSecurityCapabilityCatalog` enforces the 25-record Future Security Superset. `FutureSecurityAssurance` fails closed on unknown IDs, incomplete evidence, unsafe evidence references or stale/invalid review timestamps. Dedicated future primitives implement bounded knowledge-graph/attack-path analysis, safe declarative policy evaluation, DLP/egress and differential-privacy/clean-room decisions, provenance/VEX validation, bounded agentic-AI assurance and human-governed remediation recommendations.
+`FutureSecurityCapabilityCatalog` enforces the 25-record Future Security Superset. `FutureSecurityAssurance` fails closed on unknown IDs, incomplete/unsafe nested evidence, unsafe evidence references, non-finite numeric evidence or stale/invalid review timestamps. Dedicated future primitives implement ambiguity-safe graph/attack-path analysis, type-safe declarative policy evaluation, classified DLP/egress, finite differential-privacy budgets, provenance/VEX validation, bounded agentic-AI assurance and distinct-human-governed remediation recommendations.
 
 Hybrid requirements do not fabricate external provider, legal, penetration-test, restore-drill, cryptographic-provider, attack-surface, staging, performance or live evidence.
 
 ## Fresh current-plan and future-superset reviews
 
-- **Cycle 112** — positive current-plan closure: complete inventory, ownership boundaries, current-plan assurance fixtures and `F24-CEN-01` compatibility.
-- **Cycle 113** — adversarial current-plan closure: unknown IDs, missing consent withdrawal, unsafe evidence references, invalid review time, fail-open degradation, incomplete release rings, vendor lock-in, native-control takeover, single-point-of-failure and private-operations exposure.
-- **Cycle 114** — positive Future Security closure: 25/25 catalogue, native-ownership invariants, graph/attack paths, policy-as-code, DLP, differential privacy, provenance, bounded AI and low-risk remediation recommendation.
-- **Cycle 115** — adversarial Future Security closure: unknown future IDs, unsafe evidence, sensitive graph labels, policy injection attempts, unapproved C5 egress, privacy-budget abuse, invalid provenance, excessive AI agency and under-approved critical remediation.
+- **Cycle 112** — positive current-plan closure.
+- **Cycle 113** — adversarial current-plan closure.
+- **Cycle 114** — positive Future Security closure.
+- **Cycle 115** — adversarial Future Security closure.
+- **Cycle 116** — clean catalogue/ownership/ID-parity review.
+- **Cycle 117** — evidence-shape defects corrected and retested.
+- **Cycle 118** — graph ambiguity/phantom-path defects corrected and retested.
+- **Cycle 119** — attack numeric/determinism defects corrected and retested.
+- **Cycle 120** — Policy-as-Code type-confusion defects corrected and retested.
+- **Cycle 121** — DLP classification/minimum-necessary defects corrected and retested.
+- **Cycle 122** — differential-privacy non-finite numeric defects corrected and retested.
+- **Cycle 123** — clean provenance/VEX review.
+- **Cycle 124** — Agentic AI data-scope/cost-budget defects corrected and retested.
+- **Cycle 125** — distinct-human remediation approval plus CI/package/documentation gate defects corrected and retested.
 
-These form two successive review → correction → retest → fresh adversarial review → correction/confirmation → retest sequences for the later central-plan delta and the Future Security Superset.
+For the latest requested ten rounds, defects were found in **8/10 rounds: 117, 118, 119, 120, 121, 122, 124 and 125**. No new repository-correctable defect was found in **116 and 123**. The full register is `REVIEW-AND-CORRECTION-FUTURE-SECURITY-CYCLES-116-125.md`.
 
 ## Release boundary
 
@@ -61,10 +71,10 @@ The following remain deliberately outside repository coding and are separate evi
 
 ## Repository verification profile
 
-The exact final counts are enforced by CI rather than frozen here because each corrective test/document changes the source tree. The invariant gates are:
+The invariant gates now include:
 
-- PHP source/test files: **at least 199**, all lint-clean on PHP 8.0 and PHP 8.3;
-- independent top-level PHP test programs: **at least 114**, all executed;
+- PHP source/test files: **at least 209**, all lint-clean on PHP 8.0 and PHP 8.3;
+- independent top-level PHP test programs: **at least 124**, all executed;
 - base requirement catalogue: **100/100**;
 - recovered directive catalogue: **18/18**;
 - Continuous Value / final-plan catalogue: **25/25** (`CV-262..CV-285` + `F24-CEN-01`);
@@ -72,7 +82,8 @@ The exact final counts are enforced by CI rather than frozen here because each c
 - Files 00–26 integration rows: **27/27**;
 - governed logical domains: **28**;
 - release phases encoded: **24A–24L (12/12)**;
-- current-plan and future-superset review evidence: **Cycles 112–115**, with permanent regression tests;
+- current-plan and future-superset review evidence: **Cycles 112–125**, with permanent regression tests;
+- explicit CI existence/parity gates for all ten Future Security implementation classes, the Future Superset root/package docs, and cycles `116..125`;
 - deterministic package build, SHA-256 receipt and package/source integrity gates remain mandatory.
 
-**Repository coding result:** 100% of the identified current governing File-24 coding scope plus the approved Future Security & Privacy Superset is represented and gated, with zero known unresolved repository defect in this closure. Later staging/live/operational statuses remain unclaimed until independently evidenced.
+**Repository coding result:** 100% of the identified current governing File-24 coding scope plus the approved Future Security & Privacy Superset is represented and gated, with zero known unresolved repository defect after the ten fresh review/correction rounds. Later staging/live/operational statuses remain unclaimed until independently evidenced.
