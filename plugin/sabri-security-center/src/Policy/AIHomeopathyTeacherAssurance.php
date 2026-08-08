@@ -11,6 +11,7 @@ final class AIHomeopathyTeacherAssurance
 {
     public const HUMAN_REVIEW_DAYS = 30;
     public const DEFAULT_MAX_DAILY_POSTS = 4;
+    public const MAX_EVIDENCE_AGE_DAYS = 90;
 
     /** @var list<string> */
     private const REQUIRED_CONTROLS = [
@@ -37,15 +38,20 @@ final class AIHomeopathyTeacherAssurance
         $identity = Sanitizer::key($evidence['identity_type'] ?? '', 60);
         $launchAt = Sanitizer::isoTime($evidence['launch_at'] ?? '');
         $launch = $launchAt === '' ? false : strtotime($launchAt);
-        $withinReviewWindow = $launch !== false && $launch <= $now && ($now - $launch) < self::HUMAN_REVIEW_DAYS * DAY_IN_SECONDS;
+        $launchValid = $launch !== false && $launch <= $now + 300;
+        $withinReviewWindow = $launchValid && $launch <= $now && ($now - $launch) < self::HUMAN_REVIEW_DAYS * DAY_IN_SECONDS;
         $humanReviewEnabled = ! empty($evidence['human_review_enabled']);
         $dailyPostCap = absint($evidence['daily_post_cap'] ?? 0);
         $evidenceRef = Sanitizer::opaqueReference($evidence['evidence_ref'] ?? '');
         $testedAt = Sanitizer::isoTime($evidence['tested_at'] ?? '');
+        $tested = $testedAt === '' ? false : strtotime($testedAt);
+        $evidenceFresh = $tested !== false
+            && $tested <= $now + 300
+            && $tested >= $now - (self::MAX_EVIDENCE_AGE_DAYS * DAY_IN_SECONDS);
         $identityValid = $identity === 'institutional-ai';
         $cadenceValid = $dailyPostCap >= 1 && $dailyPostCap <= self::DEFAULT_MAX_DAILY_POSTS;
-        $reviewValid = ! $withinReviewWindow || $humanReviewEnabled;
-        $state = $missing === [] && $identityValid && $cadenceValid && $reviewValid && $evidenceRef !== '' && $testedAt !== ''
+        $reviewValid = $launchValid && (! $withinReviewWindow || $humanReviewEnabled);
+        $state = $missing === [] && $identityValid && $cadenceValid && $reviewValid && $evidenceFresh && $evidenceRef !== ''
             ? 'verified'
             : (($controls === [] && $identity === '') ? 'unassessed' : 'blocked');
 
@@ -53,9 +59,11 @@ final class AIHomeopathyTeacherAssurance
             'state' => $state,
             'missing_controls' => $missing,
             'identity_valid' => $identityValid,
+            'launch_valid' => $launchValid,
             'daily_post_cap_valid' => $cadenceValid,
             'within_initial_review_window' => $withinReviewWindow,
             'human_review_valid' => $reviewValid,
+            'evidence_fresh' => $evidenceFresh,
             'evidence_ref' => $evidenceRef,
             'publication_allowed' => $state === 'verified',
         ];
