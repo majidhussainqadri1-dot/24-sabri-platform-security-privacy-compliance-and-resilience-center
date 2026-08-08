@@ -33,7 +33,7 @@ jobs:
             php -l "$source_file"
             count=$((count + 1))
           done < <(find plugin tests -type f -name '*.php' -print0 | sort -z)
-          test "$count" -ge 184
+          test "$count" -ge 209
           echo "Linted $count PHP files."
 
       - name: Run the complete historical and code-complete suites
@@ -45,7 +45,7 @@ jobs:
             php "$test_file"
             count=$((count + 1))
           done < <(find tests -maxdepth 1 -type f -name '*.php' ! -name 'bootstrap.php' -print0 | sort -z)
-          test "$count" -ge 110
+          test "$count" -ge 124
           echo "Executed $count independent PHP test programs."
 
       - name: Reject secrets, private operations material and unsafe PHP
@@ -122,6 +122,26 @@ jobs:
           grep -q 'spcrc_critical_incident_close_forbidden' plugin/sabri-security-center/src/Incident/IncidentCoordinator.php
           grep -q 'minimum_risk' plugin/sabri-security-center/src/Monitoring/DetectionEngine.php
 
+      - name: Verify Future Security Superset and ten-round closure
+        shell: bash
+        run: |
+          set -euo pipefail
+          php -r 'require "tests/bootstrap.php"; $c=Sabri\Platform\Security\Future\FutureSecurityCapabilityCatalog::all(); if (count($c)!==25 || !Sabri\Platform\Security\Future\FutureSecurityCapabilityCatalog::repositoryCodingComplete() || Sabri\Platform\Security\Future\FutureSecurityAssurance::supportedIds()!==array_keys($c)) { exit(1); }'
+          for class in FutureSecurityCapabilityCatalog FutureSecurityAssurance SecurityKnowledgeGraph AttackPathEngine PolicyAsCodeEngine PrivacyEgressGuard PrivacyAnalyticsGuard ArtifactProvenanceVerifier AgenticAiSecurity AutomatedRemediationPolicy; do
+            test -f "plugin/sabri-security-center/src/Future/${class}.php"
+          done
+          for cycle in $(seq 116 125); do
+            find tests -maxdepth 1 -type f -name "cycle${cycle}-*.php" | grep -q .
+          done
+          test -f docs/FUTURE-SECURITY-PRIVACY-SUPERSET-0.99.0.md
+          test -f docs/REVIEW-AND-CORRECTION-FUTURE-SECURITY-CYCLES-116-125.md
+          test -f plugin/sabri-security-center/docs/FUTURE-SECURITY-PRIVACY-SUPERSET.md
+          grep -q 'F24-FUT-025' docs/FUTURE-SECURITY-PRIVACY-SUPERSET-0.99.0.md
+          grep -q 'Defect-bearing rounds' docs/REVIEW-AND-CORRECTION-FUTURE-SECURITY-CYCLES-116-125.md
+          grep -q 'distinct_human_approval_count' plugin/sabri-security-center/src/Future/AutomatedRemediationPolicy.php
+          grep -q 'ambiguous_node_count' plugin/sabri-security-center/src/Future/SecurityKnowledgeGraph.php
+          grep -q 'unknown_data_classes' plugin/sabri-security-center/src/Future/PrivacyEgressGuard.php
+
       - name: Verify complete public-safe documentation and manuals
         shell: bash
         run: |
@@ -138,7 +158,8 @@ jobs:
             REVIEW-AND-CORRECTION-0.99.0-ROUND-3.md REVIEW-AND-CORRECTION-0.99.0-ROUND-4.md \
             SOURCE-MANIFEST-0.99.0.json THREE-PLAN-HARMONIZATION-0.99.0.md \
             CHAT-DIRECTIVES-TRACEABILITY-0.99.0.md FILES-00-26-INTEGRATION-MATRIX-0.99.0.md \
-            REVIEW-AND-CORRECTION-ALL-CHATS-ROUND-1.md REVIEW-AND-CORRECTION-ALL-CHATS-ROUND-2.md; do
+            REVIEW-AND-CORRECTION-ALL-CHATS-ROUND-1.md REVIEW-AND-CORRECTION-ALL-CHATS-ROUND-2.md \
+            FUTURE-SECURITY-PRIVACY-SUPERSET-0.99.0.md REVIEW-AND-CORRECTION-FUTURE-SECURITY-CYCLES-116-125.md; do
             test -f "docs/$doc"
           done
           for manual in \
@@ -148,7 +169,7 @@ jobs:
             INCIDENT-RESPONSE-PLAN.md DISASTER-RECOVERY-PLAN.md BACKUP-RESTORE-GUIDE.md KEY-GOVERNANCE-GUIDE.md \
             LOGICAL-DATA-MODEL.md THREAT-MODEL.md INTEGRATION-MATRIX.md RETENTION-MATRIX.md MIGRATION-ROLLBACK.md \
             KNOWN-LIMITATIONS.md SCHEMA-MANIFEST.json SOURCE-MANIFEST.json THREE-PLAN-HARMONIZATION.md \
-            CHAT-DIRECTIVES-TRACEABILITY.md; do
+            CHAT-DIRECTIVES-TRACEABILITY.md FUTURE-SECURITY-PRIVACY-SUPERSET.md; do
             test -f "plugin/sabri-security-center/docs/$manual"
           done
 
@@ -169,7 +190,7 @@ jobs:
         run: |
           set -euo pipefail
           git ls-files -z | sort -z | xargs -0 sha256sum > /tmp/file24-source-checksums.sha256
-          test "$(wc -l < /tmp/file24-source-checksums.sha256)" -ge 370
+          test "$(wc -l < /tmp/file24-source-checksums.sha256)" -ge 382
           sha256sum -c /tmp/file24-source-checksums.sha256
           echo "path=/tmp/file24-source-checksums.sha256" >> "$GITHUB_OUTPUT"
 
@@ -190,6 +211,7 @@ jobs:
           unzip -l "$PACKAGE_TWO" | grep -q 'sabri-security-center/SBOM.spdx.json'
           unzip -l "$PACKAGE_TWO" | grep -q 'sabri-security-center/docs/ADMINISTRATOR-MANUAL.md'
           unzip -l "$PACKAGE_TWO" | grep -q 'sabri-security-center/docs/THREE-PLAN-HARMONIZATION.md'
+          unzip -l "$PACKAGE_TWO" | grep -q 'sabri-security-center/docs/FUTURE-SECURITY-PRIVACY-SUPERSET.md'
           (cd "$(dirname "$PACKAGE_TWO")" && sha256sum -c "$(basename "$PACKAGE_TWO").sha256")
           echo "path=$PACKAGE_TWO" >> "$GITHUB_OUTPUT"
           echo "sha256=$HASH_TWO" >> "$GITHUB_OUTPUT"
@@ -210,15 +232,15 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          rm -rf /tmp/file24-source /tmp/file24-source-snapshot-cycle102.zip
+          rm -rf /tmp/file24-source /tmp/file24-source-snapshot-cycle125.zip
           mkdir -p /tmp/file24-source
           rsync -a --exclude='.git' --exclude='build' ./ /tmp/file24-source/
-          (cd /tmp && zip -X -q -r file24-source-snapshot-cycle102.zip file24-source)
+          (cd /tmp && zip -X -q -r file24-source-snapshot-cycle125.zip file24-source)
 
       - name: Upload sanitized code-complete source snapshot
         if: matrix.php == '8.3'
         uses: actions/upload-artifact@v4
         with:
-          name: file-24-sanitized-source-snapshot-cycle102
-          path: /tmp/file24-source-snapshot-cycle102.zip
+          name: file-24-sanitized-source-snapshot-cycle125
+          path: /tmp/file24-source-snapshot-cycle125.zip
           if-no-files-found: error
