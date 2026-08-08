@@ -16,18 +16,34 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Correct bootstrap multi-occurrence replacement
+      - name: Correct bootstrap repeated replacements
         run: |
           python3 - <<'PY'
           from pathlib import Path
           p = Path('tools/apply-cycle185-194-final-patches.py')
           s = p.read_text()
-          old = """replace_once(p, '/tmp/file24-source-snapshot-cycle184.zip', '/tmp/file24-source-snapshot-cycle197.zip')
+
+          old_state = """replace_once(p, "$requestedBy = absint($request['requested_by'] ?? 0);", "$requestedBy = Sanitizer::strictInteger($request['requested_by'] ?? null, 1, PHP_INT_MAX) ?? 0;")
+          replace_once(p, "$requestedBy = absint($request['requested_by'] ?? 0);", "$requestedBy = Sanitizer::strictInteger($request['requested_by'] ?? null, 1, PHP_INT_MAX) ?? 0;")
+          """
+          new_state = """state_path = ROOT / 'plugin/sabri-security-center/src/Registry/SecurityStateRegistry.php'
+          state_text = state_path.read_text()
+          state_old = "$requestedBy = absint($request['requested_by'] ?? 0);"
+          state_new = "$requestedBy = Sanitizer::strictInteger($request['requested_by'] ?? null, 1, PHP_INT_MAX) ?? 0;"
+          if state_text.count(state_old) != 2:
+              raise SystemExit('SecurityState requested_by occurrence count changed unexpectedly')
+          state_path.write_text(state_text.replace(state_old, state_new))
+          """
+          if s.count(old_state) != 1:
+              raise SystemExit('bootstrap SecurityState repeated block not found exactly once')
+          s = s.replace(old_state, new_state, 1)
+
+          old_ci = """replace_once(p, '/tmp/file24-source-snapshot-cycle184.zip', '/tmp/file24-source-snapshot-cycle197.zip')
           replace_once(p, '/tmp/file24-source-snapshot-cycle184.zip', '/tmp/file24-source-snapshot-cycle197.zip')
           replace_once(p, 'file-24-sanitized-source-snapshot-cycle184', 'file-24-sanitized-source-snapshot-cycle197')
           replace_once(p, '/tmp/file24-source-snapshot-cycle184.zip', '/tmp/file24-source-snapshot-cycle197.zip')
           """
-          new = """ci_path = ROOT / '.github/workflows/ci.yml'
+          new_ci = """ci_path = ROOT / '.github/workflows/ci.yml'
           ci_text = ci_path.read_text()
           if ci_text.count('/tmp/file24-source-snapshot-cycle184.zip') != 3:
               raise SystemExit('CI snapshot path occurrence count changed unexpectedly')
@@ -37,9 +53,9 @@ jobs:
           ci_text = ci_text.replace('file-24-sanitized-source-snapshot-cycle184', 'file-24-sanitized-source-snapshot-cycle197')
           ci_path.write_text(ci_text)
           """
-          if s.count(old) != 1:
-              raise SystemExit('bootstrap replacement block not found exactly once')
-          p.write_text(s.replace(old, new, 1))
+          if s.count(old_ci) != 1:
+              raise SystemExit('bootstrap CI repeated block not found exactly once')
+          p.write_text(s.replace(old_ci, new_ci, 1))
           PY
       - name: Apply exact reviewed remaining patches
         run: python3 tools/apply-cycle185-194-final-patches.py
