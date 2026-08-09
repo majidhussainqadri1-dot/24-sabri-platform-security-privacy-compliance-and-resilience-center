@@ -51,7 +51,10 @@ final class PrivacyEgressGuard
     /** @return array{0:string[],1:bool} */
     private function strictTextList(mixed $value, int $maxItems, int $maxLength): array
     {
-        if (! is_array($value) || $value === [] || count($value) > $maxItems || array_keys($value) !== range(0, count($value) - 1)) {
+        if (! is_array($value) || count($value) > $maxItems) {
+            return [[], false];
+        }
+        if ($value !== [] && array_keys($value) !== range(0, count($value) - 1)) {
             return [[], false];
         }
         $clean = Sanitizer::textList($value, $maxItems, $maxLength);
