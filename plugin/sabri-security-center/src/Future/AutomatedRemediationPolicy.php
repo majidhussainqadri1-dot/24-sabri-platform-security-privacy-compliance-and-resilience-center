@@ -51,7 +51,10 @@ final class AutomatedRemediationPolicy
     /** @return array{0:string[],1:bool} */
     private function approvalReferences(mixed $value): array
     {
-        if (! is_array($value) || count($value) > 10 || array_keys($value) !== range(0, count($value) - 1)) {
+        if (! is_array($value) || count($value) > 10) {
+            return [[], false];
+        }
+        if ($value !== [] && array_keys($value) !== range(0, count($value) - 1)) {
             return [[], false];
         }
         $refs = [];
