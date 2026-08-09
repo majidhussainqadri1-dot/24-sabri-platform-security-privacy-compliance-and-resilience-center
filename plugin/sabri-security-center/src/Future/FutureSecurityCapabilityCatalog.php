@@ -81,9 +81,9 @@ final class FutureSecurityCapabilityCatalog
                 || ! is_string($item['family'] ?? null) || trim((string) $item['family']) === ''
                 || ! is_bool($item['external_evidence'] ?? null)
                 || ($item['owner'] ?? '') !== 'File 24 assurance'
-                || ($item['native_enforcement_preserved'] ?? null) !== true
-                || ($item['security_single_point_of_failure_forbidden'] ?? null) !== true
-                || ($item['public_safe_evidence_only'] ?? null) !== true
+                || ! (($item['native_enforcement_preserved'] ?? null) === true)
+                || ! (($item['security_single_point_of_failure_forbidden'] ?? null) === true)
+                || ! (($item['public_safe_evidence_only'] ?? null) === true)
             ) {
                 return false;
             }
