@@ -107,8 +107,8 @@ final class FutureSecurityAssurance
             }
 
             $hasMeaningfulValue = false;
-            foreach ($value as $item) {
-                if (! self::safeNestedEvidence($item, $depth + 1)) {
+            foreach ($value as $key => $item) {
+                if (! self::safeNestedKey($key) || ! self::safeNestedEvidence($item, $depth + 1)) {
                     return false;
                 }
                 if (self::meaningful($item, $depth + 1)) {
@@ -135,13 +135,24 @@ final class FutureSecurityAssurance
             if ($value === [] || count($value) > 100) {
                 return false;
             }
-            foreach ($value as $item) {
-                if (! self::safeNestedEvidence($item, $depth + 1)) {
+            foreach ($value as $key => $item) {
+                if (! self::safeNestedKey($key) || ! self::safeNestedEvidence($item, $depth + 1)) {
                     return false;
                 }
             }
         }
         return is_scalar($value) || is_array($value);
+    }
+
+    private static function safeNestedKey(int|string $key): bool
+    {
+        if (is_int($key)) {
+            return $key >= 0;
+        }
+        if ($key === '' || strlen($key) > 80 || preg_match('/^[A-Za-z0-9_.:-]+$/D', $key) !== 1) {
+            return false;
+        }
+        return preg_match('/(?:password|passwd|api[_-]?key|private[_-]?key|access[_-]?token|refresh[_-]?token|authorization|bearer|secret)/i', $key) !== 1;
     }
 
     private static function fresh(string $reviewedAt, mixed $maxAgeDays): bool
