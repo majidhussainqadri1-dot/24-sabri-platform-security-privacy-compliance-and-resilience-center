@@ -77,11 +77,13 @@ final class FutureSecurityCapabilityCatalog
             if (
                 preg_match('/^F24-FUT-0(?:0[1-9]|1[0-9]|2[0-5])$/', $id) !== 1
                 || ! in_array($item['priority'] ?? '', ['P0', 'P1', 'P2'], true)
-                || empty($item['title'])
-                || empty($item['family'])
+                || ! is_string($item['title'] ?? null) || trim((string) $item['title']) === ''
+                || ! is_string($item['family'] ?? null) || trim((string) $item['family']) === ''
+                || ! is_bool($item['external_evidence'] ?? null)
                 || ($item['owner'] ?? '') !== 'File 24 assurance'
-                || empty($item['native_enforcement_preserved'])
-                || empty($item['security_single_point_of_failure_forbidden'])
+                || ! (($item['native_enforcement_preserved'] ?? null) === true)
+                || ! (($item['security_single_point_of_failure_forbidden'] ?? null) === true)
+                || ! (($item['public_safe_evidence_only'] ?? null) === true)
             ) {
                 return false;
             }

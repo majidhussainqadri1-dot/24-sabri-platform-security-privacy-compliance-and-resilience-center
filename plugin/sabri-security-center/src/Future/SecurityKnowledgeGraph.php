@@ -19,9 +19,24 @@ final class SecurityKnowledgeGraph
      */
     public function build(array $nodes, array $edges): array
     {
+        if (count($nodes) > 2000 || count($edges) > 10000) {
+            return [
+                'nodes' => [],
+                'edges' => [],
+                'node_count' => 0,
+                'edge_count' => 0,
+                'ambiguous_node_count' => 0,
+                'input_complete' => false,
+                'errors' => ['graph_scope_overflow'],
+            ];
+        }
+
         $safeNodes = [];
         $ambiguousNodeIds = [];
-        foreach (array_slice($nodes, 0, 2000) as $node) {
+        foreach ($nodes as $node) {
+            if (! is_array($node)) {
+                continue;
+            }
             $id = Sanitizer::key($node['id'] ?? '', 120);
             $type = Sanitizer::key($node['type'] ?? '', 40);
             $label = Sanitizer::text($node['label'] ?? '', 160);
@@ -43,7 +58,10 @@ final class SecurityKnowledgeGraph
 
         $safeEdges = [];
         $seen = [];
-        foreach (array_slice($edges, 0, 10000) as $edge) {
+        foreach ($edges as $edge) {
+            if (! is_array($edge)) {
+                continue;
+            }
             $from = Sanitizer::key($edge['from'] ?? '', 120);
             $to = Sanitizer::key($edge['to'] ?? '', 120);
             $relation = Sanitizer::key($edge['relation'] ?? '', 60);
@@ -64,6 +82,8 @@ final class SecurityKnowledgeGraph
             'node_count' => count($safeNodes),
             'edge_count' => count($safeEdges),
             'ambiguous_node_count' => count($ambiguousNodeIds),
+            'input_complete' => true,
+            'errors' => [],
         ];
     }
 
@@ -75,7 +95,7 @@ final class SecurityKnowledgeGraph
         $from = Sanitizer::key($from, 120);
         $to = Sanitizer::key($to, 120);
         $maxDepth = max(1, min(12, $maxDepth));
-        if ($from === '' || $to === '') {
+        if ($from === '' || $to === '' || ($graph['input_complete'] ?? true) !== true) {
             return ['reachable' => false, 'path' => [], 'depth' => 0];
         }
 

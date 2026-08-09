@@ -21,13 +21,14 @@ final class AutomatedRemediationPolicy
         $previewed = Sanitizer::boolean($request['previewed'] ?? false);
         $rollback = Sanitizer::opaqueReference($request['rollback_reference'] ?? '');
         $reportedApprovals = Sanitizer::strictInteger($request['human_approvals'] ?? 0, 0, 10);
-        $approvalRefs = $this->approvalReferences($request['human_approval_refs'] ?? []);
+        [$approvalRefs, $approvalEvidenceValid] = $this->approvalReferences($request['human_approval_refs'] ?? []);
         $approvals = count($approvalRefs);
         $stepUp = Sanitizer::boolean($request['step_up_verified'] ?? false);
         $reasons = [];
 
         if ($action === '' || ! in_array($risk, ['low','medium','high','critical'], true)) $reasons[] = 'invalid_action_or_risk';
         if (! $reversible || ! $previewed || $rollback === '') $reasons[] = 'reversibility_evidence_missing';
+        if (! $approvalEvidenceValid) $reasons[] = 'approval_evidence_invalid';
         if ($reportedApprovals === null) $reasons[] = 'approval_count_invalid';
         elseif ($reportedApprovals !== $approvals) $reasons[] = 'approval_evidence_mismatch';
 
@@ -47,20 +48,24 @@ final class AutomatedRemediationPolicy
         return $this->result('block', 'none', array_values(array_unique($reasons)), $rollback, $approvals);
     }
 
-    /** @return string[] */
+    /** @return array{0:string[],1:bool} */
     private function approvalReferences(mixed $value): array
     {
-        if (! is_array($value)) {
-            return [];
+        if (! is_array($value) || count($value) > 10) {
+            return [[], false];
+        }
+        if ($value !== [] && array_keys($value) !== range(0, count($value) - 1)) {
+            return [[], false];
         }
         $refs = [];
-        foreach (array_slice($value, 0, 10) as $candidate) {
+        foreach ($value as $candidate) {
             $ref = Sanitizer::opaqueReference($candidate, 180);
-            if ($ref !== '') {
-                $refs[$ref] = true;
+            if ($ref === '' || isset($refs[$ref])) {
+                return [array_keys($refs), false];
             }
+            $refs[$ref] = true;
         }
-        return array_keys($refs);
+        return [array_keys($refs), true];
     }
 
     /** @param string[] $reasons
