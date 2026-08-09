@@ -15,8 +15,10 @@ final class PrivacyEgressGuard
      */
     public function evaluate(array $request): array
     {
-        $classes = array_values(array_unique(array_map('strtoupper', Sanitizer::textList($request['data_classes'] ?? [], 10, 10))));
-        $categories = array_values(array_unique(array_map('strtolower', Sanitizer::textList($request['detected_categories'] ?? [], 20, 40))));
+        [$classValues, $classesValid] = $this->strictTextList($request['data_classes'] ?? [], 10, 10);
+        [$categoryValues, $categoriesValid] = $this->strictTextList($request['detected_categories'] ?? [], 20, 40);
+        $classes = array_values(array_unique(array_map('strtoupper', $classValues)));
+        $categories = array_values(array_unique(array_map('strtolower', $categoryValues)));
         $destination = Sanitizer::key($request['destination_class'] ?? '', 40);
         $purpose = Sanitizer::key($request['purpose'] ?? '', 80);
         $consent = Sanitizer::boolean($request['consent_or_lawful_basis'] ?? false);
@@ -27,8 +29,10 @@ final class PrivacyEgressGuard
         $sensitive = array_intersect($classes, ['C3','C4','C5']) !== [] || array_intersect($categories, ['secret','identity','clinical','payment','credential']) !== [];
 
         $reasons = [];
+        if (! $classesValid) $reasons[] = 'data_classification_invalid';
         if ($classes === []) $reasons[] = 'data_classification_missing';
         if ($unknownClasses !== []) $reasons[] = 'unknown_data_class';
+        if (! $categoriesValid) $reasons[] = 'detected_categories_invalid';
         if ($destination === '' || ! in_array($destination, $approvedDestinations, true)) $reasons[] = 'destination_not_approved';
         if ($purpose === '') $reasons[] = 'purpose_missing';
         if (! $consent) $reasons[] = 'lawful_basis_missing';
@@ -42,5 +46,18 @@ final class PrivacyEgressGuard
             'unknown_data_classes' => $unknownClasses,
             'native_enforcement_required' => true,
         ];
+    }
+
+    /** @return array{0:string[],1:bool} */
+    private function strictTextList(mixed $value, int $maxItems, int $maxLength): array
+    {
+        if (! is_array($value) || $value === [] || count($value) > $maxItems || array_keys($value) !== range(0, count($value) - 1)) {
+            return [[], false];
+        }
+        $clean = Sanitizer::textList($value, $maxItems, $maxLength);
+        if (count($clean) !== count($value)) {
+            return [$clean, false];
+        }
+        return [$clean, true];
     }
 }
