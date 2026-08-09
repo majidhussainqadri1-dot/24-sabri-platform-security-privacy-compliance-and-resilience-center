@@ -16,7 +16,8 @@ final class PolicyAsCodeEngine
     {
         $version = Sanitizer::text($policy['version'] ?? '', 40);
         $effect = Sanitizer::key($policy['effect'] ?? 'deny', 30);
-        $rules = is_array($policy['rules'] ?? null) ? array_slice($policy['rules'], 0, 100) : [];
+        $rawRules = $policy['rules'] ?? null;
+        $rules = is_array($rawRules) && count($rawRules) <= 100 ? $rawRules : [];
         if ($version === '' || ! in_array($effect, ['allow', 'deny', 'require_approval'], true) || $rules === []) {
             return ['matched' => false, 'decision' => 'deny', 'reason' => 'invalid_policy', 'version' => $version];
         }
@@ -45,7 +46,7 @@ final class PolicyAsCodeEngine
         return match ($operator) {
             'equals' => $this->strictScalarEquals($actual, $expected),
             'present' => $actual !== null && $actual !== '' && $actual !== [],
-            'in' => is_array($expected) && in_array($actual, $expected, true),
+            'in' => is_array($expected) && count($expected) <= 100 && in_array($actual, $expected, true),
             'gte' => $this->finiteNumber($actual) !== null
                 && $this->finiteNumber($expected) !== null
                 && $this->finiteNumber($actual) >= $this->finiteNumber($expected),
