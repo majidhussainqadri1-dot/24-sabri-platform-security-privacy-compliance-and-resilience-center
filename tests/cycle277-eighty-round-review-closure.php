@@ -25,8 +25,9 @@ c277(FutureSecurityCapabilityCatalog::count() === 25, 'Future catalogue must rem
 c277(FutureSecurityCapabilityCatalog::repositoryCodingComplete(), 'Future catalogue invariants must remain complete.');
 
 $catalogSource = (string) file_get_contents(dirname(__DIR__) . '/plugin/sabri-security-center/src/Future/FutureSecurityCapabilityCatalog.php');
-c277(str_contains($catalogSource, "public_safe_evidence_only'] ?? null) !== true"), 'Repository-complete gate must enforce public-safe evidence invariant.');
+c277(str_contains($catalogSource, "public_safe_evidence_only'] ?? null) === true"), 'Repository-complete gate must enforce public-safe evidence invariant.');
 c277(str_contains($catalogSource, "is_bool(\$item['external_evidence'] ?? null)"), 'External-evidence metadata must retain strict boolean type integrity.');
+c277(preg_match('/(?:^|[^A-Za-z0-9_])true\s*\|/m', $catalogSource) !== 1, 'Catalogue invariant syntax must remain compatible with declared PHP 8.0 support.');
 
 $evidence = [
     'algorithm_registry' => ['password' => 'redacted'],
@@ -117,7 +118,7 @@ c277(in_array('graph_scope_overflow', $graphResult['errors'] ?? [], true), 'Grap
 
 $register = (string) file_get_contents(dirname(__DIR__) . '/docs/EIGHTY-ROUND-REVIEW-AND-CORRECTION-CYCLES-198-277.md');
 c277(str_contains($register, 'Requested review rounds | **80**'), 'Review register must record all 80 requested rounds.');
-c277(str_contains($register, '198, 199, 200, 201, 202, 203, 204, 205'), 'Review register must identify every defect-bearing requested round.');
+c277(str_contains($register, '198, 199, 200, 201, 202, 203, 204, 205'), 'Review register must identify defect-bearing requested rounds.');
 c277(str_contains($register, 'Known unresolved repository-correctable defects after fixes/retests | **0**'), 'Closure register must retain zero known unresolved repository-correctable defects.');
 
 preg_match_all('/^\| (?:19[8-9]|2[0-7][0-9]) \|/m', $register, $matches);
