@@ -143,7 +143,7 @@ final class ConditionalIntegrationCatalog
         $required = (array) $record['required_controls'];
         $missing = array_values(array_diff($required, $controls));
         $contractVersion = Sanitizer::text($evidence['contract_version'] ?? '', 40);
-        $contractCompatible = $contractVersion !== ''
+        $contractCompatible = preg_match('/^\d+\.\d+(?:\.\d+)?$/', $contractVersion) === 1
             && version_compare($contractVersion, (string) $record['contract_version'], '>=');
         $evidenceRef = Sanitizer::opaqueReference($evidence['evidence_ref'] ?? '');
         $reviewedAt = Sanitizer::isoTime($evidence['reviewed_at'] ?? '');
