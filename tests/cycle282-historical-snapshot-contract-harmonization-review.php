@@ -26,13 +26,13 @@ c282(str_contains($c197, "preg_match('/for cycle in \\$\\(seq 116 ([0-9]+)\\); d
 c282(str_contains($ci, 'file24-source-snapshot-exact-head.zip'), 'Current CI must retain exact-head ZIP naming.');
 c282(str_contains($ci, 'file-24-sanitized-source-snapshot-exact-head'), 'Current CI must retain exact-head artifact naming.');
 c282(preg_match('/for cycle in \\$\\(seq 116 ([0-9]+)\\); do/', $ci, $range) === 1 && (int) ($range[1] ?? 0) >= 197, 'Current CI explicit historical review gate must remain through Cycle 197 or later.');
-c282(str_contains($ci, 'test "$count" -ge 296'), 'CI PHP source/test floor must advance through Cycle 282.');
-c282(str_contains($ci, 'test "$count" -ge 208'), 'CI independent test floor must advance through Cycle 282.');
+c282(preg_match('/test "\\$count" -ge ([0-9]+)/', $ci, $lintFloor) === 1 && (int) ($lintFloor[1] ?? 0) >= 296, 'CI PHP source/test floor must retain or advance beyond Cycle 282.');
+c282(preg_match_all('/test "\\$count" -ge ([0-9]+)/', $ci, $floors) >= 2 && min(array_map('intval', $floors[1] ?? [])) >= 208, 'CI independent test floor must retain or advance beyond Cycle 282.');
 c282(str_contains($ci, 'cycle282-historical-snapshot-contract-harmonization-review.php'), 'CI must explicitly bind Cycle 282.');
 
 $source = json_decode((string) file_get_contents($root . '/docs/SOURCE-MANIFEST-0.99.0.json'), true, 512, JSON_THROW_ON_ERROR);
 c282(($source['verification']['php_files_minimum'] ?? 0) >= 296, 'Source manifest PHP floor must advance through Cycle 282.');
 c282(($source['verification']['test_programs_minimum'] ?? 0) >= 208, 'Source manifest test floor must advance through Cycle 282.');
-c282(($source['verification']['latest_review_cycle'] ?? 0) === 282, 'Source manifest latest review cycle must be 282.');
+c282(($source['verification']['latest_review_cycle'] ?? 0) >= 282, 'Source manifest must retain Cycle 282 or later review evidence.');
 
 echo "PASS: Cycle 282 historical snapshot/range contracts harmonized for exact-head CI\n";
