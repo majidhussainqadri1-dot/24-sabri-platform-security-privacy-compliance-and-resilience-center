@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Sabri\Platform\Security\Integration;
 
+use Sabri\Platform\Security\Registry\ModuleRegistry;
 use Sabri\Platform\Security\Support\Sanitizer;
 
 /**
@@ -56,29 +57,59 @@ final class File02Adapter
 
     public function contractState(string $current, array $definition = []): string
     {
-        return $this->available() ? 'compatible' : 'missing';
+        if (! $this->available()) {
+            return 'missing';
+        }
+
+        $validated = (new ModuleRegistry())->validate($this->manifestDefinition());
+        if (is_wp_error($validated) || empty($validated['manifest_complete'])) {
+            return 'blocked';
+        }
+
+        return 'compatible';
     }
 
     /** @param mixed $manifests @return array<int,array<string,mixed>> */
     public function manifest(mixed $manifests): array
     {
         $manifests = is_array($manifests) ? $manifests : [];
-        $manifests[] = [
+        if (! $this->available()) {
+            return $manifests;
+        }
+
+        $manifests[] = $this->manifestDefinition();
+        return $manifests;
+    }
+
+    /** @return array<string,mixed> */
+    private function manifestDefinition(): array
+    {
+        return [
             'module_key' => 'file-02-authentication',
             'name' => 'Authentication and Accounts',
-            'version' => defined('SAUTH_VERSION') ? (string) SAUTH_VERSION : '',
-            'owner' => 'file-02',
-            'data_classes' => ['C2', 'C3', 'C5'],
-            'routes' => [],
+            'version' => defined('SAUTH_VERSION') ? (string) SAUTH_VERSION : '1.0.0',
+            'owner' => 'File 02',
+            'posture' => 'foundation',
+            'data_classes' => ['C2 Personal', 'C3 Sensitive Personal', 'C5 Credential Evidence'],
+            'public_routes' => [],
+            'private_routes' => [],
             'capabilities' => [],
-            'vendors' => [],
-            'secrets' => ['credential-provider-secrets'],
-            'privacy_handlers' => [],
-            'emergency_callbacks' => [],
-            'security_tested_at' => '',
-            'posture' => $this->available() ? 'assessed' : 'unassessed',
-            'evidence_ref' => '',
+            'external_vendors' => [],
+            'privacy_operations' => [],
+            'tables' => ['file02-authentication-state'],
+            'files' => ['file02-authentication-package'],
+            'secrets' => ['credential-provider-secret-references'],
+            'exporters' => [],
+            'erasers' => [],
+            'emergency_callbacks' => ['authentication-assurance-status'],
+            'asvs_level_target' => 'ASVS-L3',
+            'last_security_test' => '',
+            'contract_version' => '1.0.0',
+            'canonical_data_owner' => 'File 02',
+            'canonical_action_owner' => 'File 02',
+            'evidence_source' => 'module:file-02-authentication',
+            'degraded_behavior' => 'Privileged authentication-dependent writes fail closed when File 02 assurance is unavailable.',
+            'release_gate' => 'Credential, recovery, session and provider staging acceptance',
         ];
-        return $manifests;
     }
 }
