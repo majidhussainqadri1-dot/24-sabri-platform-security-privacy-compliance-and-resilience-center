@@ -33,7 +33,7 @@ jobs:
             php -l "$source_file"
             count=$((count + 1))
           done < <(find plugin tests -type f -name '*.php' -print0 | sort -z)
-          test "$count" -ge 276
+          test "$count" -ge 294
           echo "Linted $count PHP files."
 
       - name: Run the complete historical and code-complete suites
@@ -45,7 +45,7 @@ jobs:
             php "$test_file"
             count=$((count + 1))
           done < <(find tests -maxdepth 1 -type f -name '*.php' ! -name 'bootstrap.php' -print0 | sort -z)
-          test "$count" -ge 189
+          test "$count" -ge 206
           echo "Executed $count independent PHP test programs."
 
       - name: Reject secrets, private operations material and unsafe PHP
@@ -173,7 +173,7 @@ jobs:
           for class in FutureSecurityCapabilityCatalog FutureSecurityAssurance SecurityKnowledgeGraph AttackPathEngine PolicyAsCodeEngine PrivacyEgressGuard PrivacyAnalyticsGuard ArtifactProvenanceVerifier AgenticAiSecurity AutomatedRemediationPolicy; do
             test -f "plugin/sabri-security-center/src/Future/${class}.php"
           done
-          for cycle in $(seq 116 184); do
+          for cycle in $(seq 116 197); do
             find tests -maxdepth 1 -type f -name "cycle${cycle}-*.php" | grep -q .
           done
           test -f docs/FUTURE-SECURITY-PRIVACY-SUPERSET-0.99.0.md
@@ -184,6 +184,16 @@ jobs:
           test -f docs/REVIEW-AND-CORRECTION-FUTURE-SECURITY-CYCLES-156-165.md
           test -f docs/REVIEW-AND-CORRECTION-FUTURE-SECURITY-CYCLES-168-177.md
           test -f plugin/sabri-security-center/docs/FUTURE-SECURITY-PRIVACY-SUPERSET.md
+          test -f docs/EIGHTY-ROUND-REVIEW-AND-CORRECTION-CYCLES-198-277.md
+          test -f docs/EIGHTY-ROUND-REVIEW-FINAL-ERRATUM-198-277.md
+          test -f docs/CONDITIONAL-INTEGRATION-CONTRACTS-0.99.0.md
+          test -f plugin/sabri-security-center/docs/CONDITIONAL-INTEGRATION-CONTRACTS.md
+          test -f tests/cycle277-eighty-round-review-closure.php
+          test -f tests/cycle278-manifest-integration-completeness-review.php
+          test -f tests/cycle279-conditional-cross-plan-assurance-review.php
+          test -f tests/cycle280-release-evidence-parity-review.php
+          grep -Fq 'Defect-bearing requested rounds | **9**' docs/EIGHTY-ROUND-REVIEW-AND-CORRECTION-CYCLES-198-277.md
+          grep -Fq '198, 199, 200, 201, 202, 203, 204, 205, 206' docs/EIGHTY-ROUND-REVIEW-AND-CORRECTION-CYCLES-198-277.md
           grep -q 'F24-FUT-025' docs/FUTURE-SECURITY-PRIVACY-SUPERSET-0.99.0.md
           grep -q 'Defect-bearing rounds' docs/REVIEW-AND-CORRECTION-FUTURE-SECURITY-CYCLES-116-125.md
           grep -q 'Defect-bearing cycles' docs/REVIEW-AND-CORRECTION-FUTURE-SECURITY-CYCLES-126-135.md
@@ -236,7 +246,7 @@ jobs:
             SOURCE-MANIFEST-0.99.0.json THREE-PLAN-HARMONIZATION-0.99.0.md \
             CHAT-DIRECTIVES-TRACEABILITY-0.99.0.md FILES-00-26-INTEGRATION-MATRIX-0.99.0.md \
             REVIEW-AND-CORRECTION-ALL-CHATS-ROUND-1.md REVIEW-AND-CORRECTION-ALL-CHATS-ROUND-2.md \
-            FUTURE-SECURITY-PRIVACY-SUPERSET-0.99.0.md REVIEW-AND-CORRECTION-FUTURE-SECURITY-CYCLES-116-125.md REVIEW-AND-CORRECTION-FUTURE-SECURITY-CYCLES-126-135.md REVIEW-AND-CORRECTION-FUTURE-SECURITY-CYCLES-136-145.md REVIEW-AND-CORRECTION-FUTURE-SECURITY-CYCLES-146-155.md REVIEW-AND-CORRECTION-FUTURE-SECURITY-CYCLES-156-165.md REVIEW-AND-CORRECTION-FUTURE-SECURITY-CYCLES-168-177.md; do
+            FUTURE-SECURITY-PRIVACY-SUPERSET-0.99.0.md CONDITIONAL-INTEGRATION-CONTRACTS-0.99.0.md EIGHTY-ROUND-REVIEW-AND-CORRECTION-CYCLES-198-277.md EIGHTY-ROUND-REVIEW-FINAL-ERRATUM-198-277.md REVIEW-AND-CORRECTION-FUTURE-SECURITY-CYCLES-116-125.md REVIEW-AND-CORRECTION-FUTURE-SECURITY-CYCLES-126-135.md REVIEW-AND-CORRECTION-FUTURE-SECURITY-CYCLES-136-145.md REVIEW-AND-CORRECTION-FUTURE-SECURITY-CYCLES-146-155.md REVIEW-AND-CORRECTION-FUTURE-SECURITY-CYCLES-156-165.md REVIEW-AND-CORRECTION-FUTURE-SECURITY-CYCLES-168-177.md; do
             test -f "docs/$doc"
           done
           for manual in \
@@ -246,7 +256,7 @@ jobs:
             INCIDENT-RESPONSE-PLAN.md DISASTER-RECOVERY-PLAN.md BACKUP-RESTORE-GUIDE.md KEY-GOVERNANCE-GUIDE.md \
             LOGICAL-DATA-MODEL.md THREAT-MODEL.md INTEGRATION-MATRIX.md RETENTION-MATRIX.md MIGRATION-ROLLBACK.md \
             KNOWN-LIMITATIONS.md SCHEMA-MANIFEST.json SOURCE-MANIFEST.json THREE-PLAN-HARMONIZATION.md \
-            CHAT-DIRECTIVES-TRACEABILITY.md FUTURE-SECURITY-PRIVACY-SUPERSET.md; do
+            CHAT-DIRECTIVES-TRACEABILITY.md FUTURE-SECURITY-PRIVACY-SUPERSET.md CONDITIONAL-INTEGRATION-CONTRACTS.md; do
             test -f "plugin/sabri-security-center/docs/$manual"
           done
 
@@ -267,7 +277,7 @@ jobs:
         run: |
           set -euo pipefail
           git ls-files -z | sort -z | xargs -0 sha256sum > /tmp/file24-source-checksums.sha256
-          test "$(wc -l < /tmp/file24-source-checksums.sha256)" -ge 446
+          test "$(wc -l < /tmp/file24-source-checksums.sha256)" -ge 534
           sha256sum -c /tmp/file24-source-checksums.sha256
           echo "path=/tmp/file24-source-checksums.sha256" >> "$GITHUB_OUTPUT"
 
@@ -311,15 +321,15 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          rm -rf /tmp/file24-source /tmp/file24-source-snapshot-cycle184.zip
+          rm -rf /tmp/file24-source /tmp/file24-source-snapshot-exact-head.zip
           mkdir -p /tmp/file24-source
           rsync -a --exclude='.git' --exclude='build' ./ /tmp/file24-source/
-          (cd /tmp && zip -X -q -r file24-source-snapshot-cycle184.zip file24-source)
+          (cd /tmp && zip -X -q -r file24-source-snapshot-exact-head.zip file24-source)
 
       - name: Upload sanitized code-complete source snapshot
         if: matrix.php == '8.3'
         uses: actions/upload-artifact@v4
         with:
-          name: file-24-sanitized-source-snapshot-cycle184
-          path: /tmp/file24-source-snapshot-cycle184.zip
+          name: file-24-sanitized-source-snapshot-exact-head
+          path: /tmp/file24-source-snapshot-exact-head.zip
           if-no-files-found: error
