@@ -12,12 +12,12 @@
 - Conditional cross-plan assurance contracts: `3/3`
 - Future Security & Privacy Superset: `25/25`
 - Repository status: code-complete candidate, subject to exact-head CI
-- PHP source/test files in the corrected verification tree: at least `294`
-- Independent top-level PHP test programs: at least `206`
+- PHP source/test files in the corrected verification tree: at least `295`
+- Independent top-level PHP test programs: at least `207`
 - Files 00–26 integration rows: `27`
 - Governed logical domains: `28`
 - Release phases: `24A–24L`
-- Latest broad review lineage: Cycles `198–277`; completeness/cross-plan corrections: `278–280`
+- Latest broad review lineage: Cycles `198–277`; completeness/cross-plan corrections: `278–281`
 - Truthful boundary: not staging-accepted, not independently assured, not live-deployed and not operational
 
 ## Corrected release-evidence truth
