@@ -152,9 +152,9 @@ final class ModuleRegistry
         if ($lastSecurityTest !== '' && strtotime($lastSecurityTest) > time() + 300) {
             return new \WP_Error('spcrc_manifest_security_test_future', 'Manifest security-test evidence cannot be dated in the future.');
         }
-        $contractVersion = Sanitizer::text($manifest['contract_version'] ?? '1.0.0', 40);
-        if (preg_match('/^\d+\.\d+(?:\.\d+)?$/', $contractVersion) !== 1) {
-            return new \WP_Error('spcrc_manifest_contract_version_invalid', 'Manifest contract version must be explicit and numeric.');
+        $contractVersion = Sanitizer::text($manifest['contract_version'] ?? '', 40);
+        if ($contractVersion !== '' && preg_match('/^\d+\.\d+(?:\.\d+)?$/', $contractVersion) !== 1) {
+            return new \WP_Error('spcrc_manifest_contract_version_invalid', 'Manifest contract version must be explicit and numeric when supplied.');
         }
         $canonicalDataOwner = Sanitizer::text($manifest['canonical_data_owner'] ?? $owner, 120);
         $canonicalActionOwner = Sanitizer::text($manifest['canonical_action_owner'] ?? $owner, 160);
@@ -168,15 +168,45 @@ final class ModuleRegistry
         $capabilities = $this->safeList($manifest['capabilities'] ?? [], 100, 120, 'capabilities');
         $externalVendors = $this->safeList($manifest['external_vendors'] ?? [], 50, 160, 'external_vendors');
         $privacyOperations = $this->safeList($manifest['privacy_operations'] ?? [], 20, 60, 'privacy_operations');
-        foreach ([$dataClasses, $capabilities, $externalVendors, $privacyOperations] as $list) {
+        $tables = $this->safeList($manifest['tables'] ?? [], 100, 160, 'tables');
+        $files = $this->safeList($manifest['files'] ?? [], 100, 180, 'files');
+        $secrets = $this->safeList($manifest['secrets'] ?? [], 50, 120, 'secrets');
+        $exporters = $this->safeList($manifest['exporters'] ?? [], 50, 120, 'exporters');
+        $erasers = $this->safeList($manifest['erasers'] ?? [], 50, 120, 'erasers');
+        $emergencyCallbacks = $this->safeList($manifest['emergency_callbacks'] ?? [], 50, 160, 'emergency_callbacks');
+        foreach ([$dataClasses, $capabilities, $externalVendors, $privacyOperations, $tables, $files, $secrets, $exporters, $erasers, $emergencyCallbacks] as $list) {
             if (is_wp_error($list)) {
                 return $list;
             }
         }
-        $degradedBehavior = Sanitizer::text($manifest['degraded_behavior'] ?? 'Unknown/unavailable; no permissive fallback.', 300);
-        $releaseGate = Sanitizer::text($manifest['release_gate'] ?? 'Evidence not supplied.', 300);
+        $asvsLevelTarget = strtoupper(Sanitizer::text($manifest['asvs_level_target'] ?? '', 20));
+        if ($asvsLevelTarget !== '' && ! in_array($asvsLevelTarget, ['ASVS-L2', 'ASVS-L3'], true)) {
+            return new \WP_Error('spcrc_manifest_asvs_level_invalid', 'Manifest ASVS target must be ASVS-L2 or ASVS-L3 when supplied.');
+        }
+        $degradedBehavior = Sanitizer::text($manifest['degraded_behavior'] ?? '', 300);
+        $releaseGate = Sanitizer::text($manifest['release_gate'] ?? '', 300);
         if (Sanitizer::containsSensitiveMaterial($degradedBehavior) || Sanitizer::containsSensitiveMaterial($releaseGate)) {
             return new \WP_Error('spcrc_manifest_sensitive_operational_text', 'Manifest operational text must not contain URLs, contact data, credentials or storage paths.');
+        }
+
+        // Historical manifests remain parseable for backward compatibility, but
+        // they are never promoted above unassessed unless the full File-24
+        // security-manifest contract is explicit. Missing evidence is not
+        // silently fabricated through defaults.
+        $completenessIssues = [];
+        foreach (['tables','files','secrets','exporters','erasers','emergency_callbacks'] as $field) {
+            if (! array_key_exists($field, $manifest)) {
+                $completenessIssues[] = 'missing_' . $field;
+            }
+        }
+        if ($contractVersion === '') $completenessIssues[] = 'missing_contract_version';
+        if ($evidenceSource === '') $completenessIssues[] = 'missing_evidence_source';
+        if ($asvsLevelTarget === '') $completenessIssues[] = 'missing_asvs_level_target';
+        if ($degradedBehavior === '') $completenessIssues[] = 'missing_degraded_behavior';
+        if ($releaseGate === '') $completenessIssues[] = 'missing_release_gate';
+        $manifestComplete = $completenessIssues === [];
+        if (! $manifestComplete) {
+            $posture = 'unassessed';
         }
 
         return [
@@ -191,6 +221,13 @@ final class ModuleRegistry
             'capabilities' => $capabilities,
             'external_vendors' => $externalVendors,
             'privacy_operations' => $privacyOperations,
+            'tables' => $tables,
+            'files' => $files,
+            'secrets' => $secrets,
+            'exporters' => $exporters,
+            'erasers' => $erasers,
+            'emergency_callbacks' => $emergencyCallbacks,
+            'asvs_level_target' => $asvsLevelTarget,
             'last_security_test' => $lastSecurityTest,
             'contract_version' => $contractVersion,
             'canonical_data_owner' => $canonicalDataOwner,
@@ -198,6 +235,8 @@ final class ModuleRegistry
             'evidence_source' => $evidenceSource,
             'degraded_behavior' => $degradedBehavior,
             'release_gate' => $releaseGate,
+            'manifest_complete' => $manifestComplete,
+            'completeness_issues' => $completenessIssues,
         ];
     }
 
@@ -472,6 +511,13 @@ final class ModuleRegistry
             'capabilities' => Capabilities::all(),
             'external_vendors' => [],
             'privacy_operations' => [],
+            'tables' => ['spcrc-owned-tables'],
+            'files' => ['plugin/sabri-security-center'],
+            'secrets' => ['external-secret-references-only'],
+            'exporters' => [],
+            'erasers' => [],
+            'emergency_callbacks' => ['spcrc/boot_blocked', 'spcrc/system_checks'],
+            'asvs_level_target' => 'ASVS-L3',
             'last_security_test' => '',
             'contract_version' => '1.0.0',
             'canonical_data_owner' => 'File 24',
