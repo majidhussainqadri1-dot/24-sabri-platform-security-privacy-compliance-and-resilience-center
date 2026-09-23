@@ -10,15 +10,17 @@ File 24 is the cross-platform security-governance and assurance plane for the Sa
 - Base requirements: **F24-R001–F24-R100 repository-implemented**
 - Recovered directives: **18/18 CHAT-* repository-implemented**
 - Later central-plan delta: **CV-262–CV-285 = 24/24** plus **F24-CEN-01 = 1/1 repository-implemented**
+- Conditional cross-plan assurance: **Traffic Analytics + Disease Intelligence + CF-04 = 3/3 repository-encoded, activation still separately gated**
 - Future Security & Privacy Superset: **F24-FUT-001–F24-FUT-025 = 25/25 repository-implemented**
-- Current-plan/Future-Superset repository reviews: **Cycles 112–135**
-- Latest ten-round re-audit: **Cycles 185–194; defects found and corrected in all 10 requested rounds; post-request QA defect corrected in Cycle 195; final clean closure Cycles 196–197; zero known unresolved repository-correctable defects after correction/retest**
+- Current-plan/Future-Superset repository reviews: **Cycles 112–197**
+- Broad fresh review: **Cycles 198–277; authoritative final result 9 defect-bearing requested rounds (198–206), 71 clean requested rounds (207–277)**
+- Completeness/cross-plan correction regressions: **Cycles 278–283**
 
 This status means the approved repository-coding scope, including the later Continuous Value / Top-20 File-24 delta and the Future Security & Privacy Superset, is implemented, traceable, reviewed, testable and packageable. It does **not** mean Hostinger staging acceptance, independent certification, penetration-test acceptance, restore-drill acceptance, live deployment or operational acceptance.
 
 ## Implemented repository scope
 
-- module manifests, security states and Files 00–26 integration contracts;
+- full module-security manifests with explicit contract/evidence metadata, security states and Files 00–26 integration contracts with machine-readable fail-safe fields;
 - control, risk, finding, vulnerability, incident, governance and assurance registries;
 - versioned policy hierarchy, exceptions and release gates;
 - File 00 membership and File 02 credential-authentication assurance without alternate identity ownership;
@@ -30,6 +32,7 @@ This status means the approved repository-coding scope, including the later Cont
 - Islamic governance, anti-surveillance, ranking fairness, AI assurance and verified-transfer/download assurance from the recovered directives;
 - `CV-262..CV-285` explicit traceability for zero trust, encryption, secrets, audit, privacy, cookies, secure SDLC, vulnerability management, compliance, backup/DR, incidents, SLOs, performance, observability, graceful degradation, RPO/RTO, release rings, support, capacity, migrations, vendor resilience and runbooks;
 - `F24-CEN-01` Assurance Center contract: controls/evidence/exceptions/incidents/disaster-recovery assurance with native authorization/encryption/rate-limiting/validation preserved;
+- conditional assurance contracts for Traffic Analytics, Disease Intelligence and CF-04 Central Media without activation or native-owner takeover;
 - `F24-FUT-001..F24-FUT-025` Future Security & Privacy Superset covering post-quantum readiness, crypto agility/inventory, security graph/attack paths, attack-surface/control monitoring, policy-as-code, DSPM/DLP, differential privacy/clean rooms, workload/JIT identity, cyber recovery/chaos/BAS/deception, exploitability/VEX/SLSA, agentic AI/AIBOM, assurance cases and bounded remediation;
 - hardening for nested evidence safety, graph identity integrity, finite/deterministic attack scoring, type-safe policy evaluation, fail-closed data classification, finite privacy budgets, bounded Agentic AI data scope, distinct-human remediation approval evidence, release-scope parity, evidence freshness, vulnerability lifecycle integrity, scanner-to-file binding and one-time-delivery concurrency;
 - capability-protected wp-admin fallback, private REST APIs, security headers and truthful seven-status reporting;
@@ -54,11 +57,12 @@ find plugin tests -type f -name '*.php' -print0 | xargs -0 -n1 php -l
 while IFS= read -r -d '' test_file; do
   php "$test_file"
 done < <(find tests -maxdepth 1 -type f -name '*.php' ! -name 'bootstrap.php' -print0 | sort -z)
-sha256sum -c CHECKSUMS.sha256
+git ls-files -z | sort -z | xargs -0 sha256sum > /tmp/file24-source-checksums.sha256
+sha256sum -c /tmp/file24-source-checksums.sha256
 ./tools/build-release.sh
 ```
 
-The build creates an installable ZIP and SHA-256 receipt under `build/`. CI requires every top-level regression, explicitly requires cycles `116`–`135`, verifies the current/Future requirement catalogues and includes the packaged `FUTURE-SECURITY-PRIVACY-SUPERSET.md` operator document.
+The build creates an installable ZIP and SHA-256 receipt under `build/`. CI requires every top-level regression, explicitly requires the current review lineage through Cycle 280, verifies base/current/Future/conditional catalogues, and includes the packaged Future-Security and conditional-integration operator documents.
 
 ## External gates deliberately deferred
 
@@ -68,4 +72,4 @@ Real Hostinger WordPress/MySQL activation and upgrade, live companion contracts,
 
 After the Cycle-125 merge, the repository was reopened for ten more fresh reviews. **All 10 rounds found a repository-correctable defect and each defect was corrected in the same round with a permanent regression**: 126 release-scope parity; 127 boundary-evidence freshness; 128 vulnerability lifecycle; 129 annual governance-review expiry; 130 AI Teacher launch/evidence timing; 131 performance finite/unit integrity; 132 transfer/download evidence freshness; 133 upload scan hash/freshness binding; 134 private-delivery consume concurrency; 135 exact same-origin port semantics. The detailed register is `docs/REVIEW-AND-CORRECTION-FUTURE-SECURITY-CYCLES-126-135.md`.
 
-The corrected source has a local full-suite result of **227 PHP source/test files lint-clean** and **140 independent top-level PHP test programs passing** on the available review runtime. Exact-head PHP 8.0/8.3 GitHub Actions is the merge gate. Staging/live/operational claims remain separate.
+The corrected tree contains at least **297 PHP source/test files** and **209 independent top-level PHP test programs** under the exact-head CI gate. PHP 8.0/8.3 GitHub Actions remains the merge gate. Staging/live/operational claims remain separate.

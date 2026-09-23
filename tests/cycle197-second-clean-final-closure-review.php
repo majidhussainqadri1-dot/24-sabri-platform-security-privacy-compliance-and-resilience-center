@@ -17,7 +17,7 @@ $ci = (string) file_get_contents($root . '/.github/workflows/ci.yml');
 $register = (string) file_get_contents($root . '/docs/REVIEW-AND-CORRECTION-FUTURE-SECURITY-CYCLES-185-194.md');
 
 c197(str_contains($ci, "find plugin tests -type f -name '*.php'") && str_contains($ci, "find tests -maxdepth 1 -type f -name '*.php' ! -name 'bootstrap.php'"), 'CI must dynamically lint all PHP source/tests and execute every top-level regression rather than rely only on a frozen cycle range.');
-c197(str_contains($ci, "for cycle in $(seq 116 184); do"), 'Historical explicit cycle gate must remain at least through the prior merged closure while dynamic discovery executes later regressions.');
+c197(preg_match('/for cycle in \\$\\(seq 116 ([0-9]+)\\); do/', $ci, $range) === 1 && (int) ($range[1] ?? 0) >= 184, 'Historical explicit cycle gate must remain at least through the prior merged closure while later regressions may advance it.');
 c197(str_contains($ci, "! grep -RInE --include='*.php' ':[[:space:]]*never\\b' plugin tests"), 'CI must preserve the PHP 8.0 compatibility guard that exposed Cycle 195.');
 foreach (range(185, 197) as $cycle) {
     c197((glob($root . '/tests/cycle' . $cycle . '-*.php') ?: []) !== [], 'Every Cycle 185-197 permanent regression must exist in the repository.');

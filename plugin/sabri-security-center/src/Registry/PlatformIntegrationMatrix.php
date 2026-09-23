@@ -43,20 +43,24 @@ final class PlatformIntegrationMatrix
     /** @return array<int,array<string,mixed>> */
     public static function all(): array
     {
-        return self::FILES;
+        $out = [];
+        foreach (self::FILES as $file => $definition) {
+            $out[$file] = self::withFailSafeContract($definition);
+        }
+        return $out;
     }
 
     /** @return array<string,mixed>|null */
     public static function get(int $file): ?array
     {
-        return self::FILES[$file] ?? null;
+        return isset(self::FILES[$file]) ? self::withFailSafeContract(self::FILES[$file]) : null;
     }
 
     /** @return array<int,array<string,mixed>> */
     public static function evaluate(): array
     {
         $results = [];
-        foreach (self::FILES as $file => $definition) {
+        foreach (self::all() as $file => $definition) {
             $default = $file === 24 ? 'compatible' : 'unassessed';
             $state = Sanitizer::key(apply_filters((string) $definition['contract_filter'], $default, $definition), 30);
             if (! in_array($state, ['compatible', 'unassessed', 'degraded', 'blocked', 'missing'], true)) {
@@ -94,6 +98,45 @@ final class PlatformIntegrationMatrix
 
     public static function complete(): bool
     {
-        return count(self::FILES) === 27 && array_keys(self::FILES) === range(0, 26);
+        if (count(self::FILES) !== 27 || array_keys(self::FILES) !== range(0, 26)) {
+            return false;
+        }
+
+        $required = [
+            'file', 'name', 'native_owner', 'assurance', 'contract_filter', 'criticality',
+            'degraded_behavior', 'contract_version', 'failure_mode', 'user_message',
+            'alert_owner', 'recovery_owner', 'exit_criteria',
+        ];
+        foreach (self::all() as $file => $definition) {
+            if (($definition['file'] ?? -1) !== $file) {
+                return false;
+            }
+            foreach ($required as $field) {
+                if (! isset($definition[$field]) || trim((string) $definition[$field]) === '') {
+                    return false;
+                }
+            }
+            if (preg_match('/^\d+\.\d+(?:\.\d+)?$/', (string) $definition['contract_version']) !== 1) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** @param array<string,mixed> $definition @return array<string,mixed> */
+    private static function withFailSafeContract(array $definition): array
+    {
+        $name = (string) ($definition['name'] ?? 'native module');
+        $degraded = (string) ($definition['degraded_behavior'] ?? 'assurance unavailable');
+
+        return array_merge($definition, [
+            'contract_version' => '1.0.0',
+            'failure_mode' => 'Missing, incompatible, stale or blocked assurance contract',
+            'user_message' => $name . ' assurance is unavailable or degraded; unsafe governed actions remain restricted.',
+            'alert_owner' => 'File 24 assurance operations and native module owner',
+            'recovery_owner' => 'Native module owner with File 24 assurance verification',
+            'exit_criteria' => 'Compatible versioned contract, current bounded evidence and successful native-owner recheck',
+            'degraded_behavior' => $degraded,
+        ]);
     }
 }

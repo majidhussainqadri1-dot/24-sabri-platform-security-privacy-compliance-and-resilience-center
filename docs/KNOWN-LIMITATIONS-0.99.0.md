@@ -5,7 +5,7 @@ Repository coding is complete for the approved File 24 scope, but the following 
 1. Hostinger WordPress/MySQL staging acceptance;
 2. production key/secret custody and recovery drill;
 3. real WAF, DNS, SMTP, SMS, TURN/SFU, AI, storage, logging and backup-provider behavior;
-4. exact-head cross-file integration acceptance for Files 00, 02, 17, 20 and all other native owners;
+4. exact-head cross-file integration acceptance for Files 00, 02, 17, 20, all other native owners, and any separately activated Traffic Analytics, Disease Intelligence or CF-04 conditional integration;
 5. real backup restore, rollback rehearsal and deletion-ledger replay;
 6. independent penetration testing and vulnerability retest;
 7. qualified legal/privacy applicability decisions for Pakistan and target jurisdictions;

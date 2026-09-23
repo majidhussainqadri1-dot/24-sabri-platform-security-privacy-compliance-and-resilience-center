@@ -10,9 +10,9 @@ Every defect discovered in a requested round was corrected immediately before th
 |---|---:|
 | Requested review rounds | **80** |
 | Requested cycles | **198–277** |
-| Defect-bearing requested rounds | **8** |
-| Defect-bearing requested cycles | **198, 199, 200, 201, 202, 203, 204, 205** |
-| Clean requested rounds after those fixes | **72** |
+| Defect-bearing requested rounds | **9** |
+| Defect-bearing requested cycles | **198, 199, 200, 201, 202, 203, 204, 205, 206** |
+| Clean requested rounds after those fixes | **71** |
 | Known unresolved repository-correctable defects after fixes/retests | **0** |
 
 ## Individual review register
@@ -27,7 +27,7 @@ Every defect discovered in a requested round was corrected immediately before th
 | 203 | Automated remediation human-approval evidence | **Defect found and corrected.** Approval refs beyond ten, malformed refs or duplicates could be truncated/dropped; the entire approval evidence set is now strict and fail-closed. |
 | 204 | Artifact provenance type integrity | **Defect found and corrected.** Untrusted provenance identifiers were directly string-cast; non-scalar values could cause unsafe coercion/runtime failure. Bounded scalar hex parsing now blocks them safely. |
 | 205 | Security Knowledge Graph snapshot completeness | **Defect found and corrected.** Oversized node/edge sets were silently sliced, which could hide attack relationships; overflow now yields an explicit incomplete/blocked graph state. |
-| 206 | Attack-path source/target normalization and duplicate suppression | **No new defect found.** Existing deterministic pair de-duplication and bounded scoring preserved. |
+| 206 | Full-suite PHP 8.0/static compatibility after the 198–205 hardening batch | **Defect found and corrected.** Strict-boolean source expressions triggered the repository compatibility scanner, and two newly strict empty-list cases were corrected without reopening truncation vulnerabilities. |
 | 207 | Attack-path finite numeric scoring | **No new defect found.** NaN/Infinity and malformed numeric dimensions remain bounded/fail-safe. |
 | 208 | Knowledge-graph duplicate node ambiguity | **No new defect found.** Conflicting duplicate IDs remain removed as ambiguous. |
 | 209 | Knowledge-graph phantom-edge rejection | **No new defect found.** Edges to absent nodes remain excluded. |
@@ -102,4 +102,4 @@ Every defect discovered in a requested round was corrected immediately before th
 
 ## Closure rule
 
-The permanent `tests/cycle277-eighty-round-review-closure.php` regression binds the defect corrections and confirms that this register contains exactly eighty individual requested rows. The complete repository suite must remain green on supported PHP versions before merge, and the merged `main` commit must be re-tested. Any later failing evidence reopens the relevant scope.
+The permanent `tests/cycle277-eighty-round-review-closure.php` regression binds the nine defect-bearing requested-round corrections and confirms that this register contains exactly eighty individual requested rows. The complete repository suite must remain green on supported PHP versions before merge, and the merged `main` commit must be re-tested. Any later failing evidence reopens the relevant scope.

@@ -11,7 +11,7 @@ This release implements the repository-coding scope of **File 24 — Sabri Platf
 The repository now contains executable implementations and contracts for:
 
 - governance charter, versioned policy hierarchy, exceptions and release gates;
-- Files 00–26 ownership/assurance matrix and versioned module manifests;
+- Files 00–26 ownership/assurance matrix with machine-readable fail-safe fields and full versioned module-security manifests;
 - membership and credential-authentication assurance without alternate identity ownership;
 - security-state recommendations, controls, risks, findings, vulnerabilities, incidents and audit evidence;
 - privacy requests, verification, recovery, data inventory, processing activities, consent, legal holds, international-transfer metadata and deletion replay;
@@ -21,6 +21,7 @@ The repository now contains executable implementations and contracts for:
 - Islamic governance, anti-surveillance, ranking fairness, AI assurance and one-GiB verified-transfer/download assurance;
 - explicit Continuous Value traceability and fail-closed evidence gates for `CV-262..CV-285`;
 - `F24-CEN-01` Assurance Center contract preserving native authorization, encryption, rate limiting and validation;
+- three conditional cross-plan assurance contracts for Traffic Analytics, Disease Intelligence and CF-04 Central Media, without activation or native-owner transfer;
 - Future Security & Privacy Superset `F24-FUT-001..F24-FUT-025`;
 - post-quantum readiness, crypto agility and cryptographic asset inventory evidence contracts;
 - privacy-safe Security Knowledge Graph and bounded attack-path intelligence;
@@ -32,13 +33,14 @@ The repository now contains executable implementations and contracts for:
 
 ## Requirement closure
 
-The repository now has five explicit requirement layers without rewriting historical identifiers:
+The repository now has six explicit requirement layers without rewriting historical identifiers:
 
 1. `F24-R001..F24-R100` — **100/100 repository implemented**.
 2. Recovered File-24-relevant `CHAT-*` directives — **18/18 repository implemented**.
 3. Later Continuous Value requirements `CV-262..CV-285` — **24/24 repository implemented and explicitly traceable**.
 4. File-specific `F24-CEN-01` — **1/1 repository implemented**.
-5. Future Security & Privacy Superset `F24-FUT-001..F24-FUT-025` — **25/25 repository implemented and explicitly traceable**.
+5. Conditional cross-plan assurance contracts — **3/3 repository encoded** (Traffic Analytics, Disease Intelligence, CF-04 Central Media; activation remains a separate gate).
+6. Future Security & Privacy Superset `F24-FUT-001..F24-FUT-025` — **25/25 repository implemented and explicitly traceable**.
 
 `ContinuousValueRequirementCatalog` enforces the 25-record later-plan closure. `ContinuousValueAssurance` requires explicit evidence shapes and fails closed for missing controls, invalid timestamps or unsafe evidence references. `AssuranceCenterContract` rejects native-control takeover, a File-24 security single point of failure and public exposure of private operations material.
 
@@ -75,17 +77,18 @@ The following remain deliberately outside repository coding and are separate evi
 
 The invariant gates now include:
 
-- PHP source/test files: **at least 227**, all lint-clean on PHP 8.0 and PHP 8.3;
-- independent top-level PHP test programs: **at least 140**, all executed;
+- PHP source/test files: **at least 297**, all required to lint clean on PHP 8.0 and PHP 8.3;
+- independent top-level PHP test programs: **at least 209**, all executed;
 - base requirement catalogue: **100/100**;
 - recovered directive catalogue: **18/18**;
 - Continuous Value / final-plan catalogue: **25/25** (`CV-262..CV-285` + `F24-CEN-01`);
+- conditional cross-plan assurance catalogue: **3/3**;
 - Future Security & Privacy Superset catalogue: **25/25** (`F24-FUT-001..F24-FUT-025`);
 - Files 00–26 integration rows: **27/27**;
 - governed logical domains: **28**;
 - release phases encoded: **24A–24L (12/12)**;
-- current-plan and future-superset review evidence: **Cycles 112–135**, with permanent regression tests;
-- explicit CI existence/parity gates for all ten Future Security implementation classes, the Future Superset root/package docs, and cycles `116..135`;
+- current-plan/future-superset review evidence: **Cycles 112–197**; broad review **198–277**; correction regressions **278–283**;
+- explicit CI existence/parity gates for Future Security classes, conditional-plan contracts, exact review records and correction regressions through Cycle 280;
 - deterministic package build, SHA-256 receipt and package/source integrity gates remain mandatory.
 
-**Repository coding result:** 100% of the identified current governing File-24 coding scope plus the approved Future Security & Privacy Superset is represented and gated, with zero known unresolved repository-correctable defect after the latest ten fresh review/correction rounds (185–194), the post-request Cycle 195 QA correction, and two clean closure reviews (196–197). Later staging/live/operational statuses remain unclaimed until independently evidenced.
+**Repository coding result:** 100% of the identified current governing File-24 coding scope plus the approved Future Security & Privacy Superset is represented and gated, with the Cycles 198–277 register reconciled to 9 defect-bearing requested rounds (198–206), 71 clean requested rounds (207–277), and the manifest/integration/cross-plan release-evidence corrections bound by Cycles 278–283. Later staging/live/operational statuses remain unclaimed until independently evidenced.
