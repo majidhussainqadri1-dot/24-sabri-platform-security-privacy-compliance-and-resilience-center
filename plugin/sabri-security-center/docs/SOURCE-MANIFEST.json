@@ -38,7 +38,6 @@
   ],
   "installable_root": "sabri-security-center",
   "build_tool": "tools/build-release.sh",
-  "checksum_ledger": "CHECKSUMS.sha256",
   "public_safe_only": true,
   "private_operations_material_bundled": false,
   "external_gates_deferred": [
@@ -54,5 +53,6 @@
       "disease-intelligence",
       "cf-04-central-media"
     ]
-  }
+  },
+  "source_checksum_artifact": "file24-source-checksums.sha256 (generated from exact checked-out commit in CI)"
 }
