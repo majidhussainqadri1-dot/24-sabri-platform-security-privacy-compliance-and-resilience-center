@@ -27,7 +27,7 @@ foreach ([$source, $packagedSource] as $manifest) {
     c280(($manifest['conditional_integration_contracts']['count'] ?? 0) === 3, 'Source manifest must record three conditional integration contracts.');
     c280(($manifest['verification']['php_files_minimum'] ?? 0) >= 294, 'Source manifest must carry the corrected PHP verification floor.');
     c280(($manifest['verification']['test_programs_minimum'] ?? 0) >= 206, 'Source manifest must carry the corrected test-program floor.');
-    c280(($manifest['verification']['latest_review_cycle'] ?? 0) === 280, 'Source manifest must identify Cycle 280 as the latest correction review.');
+    c280(($manifest['verification']['latest_review_cycle'] ?? 0) >= 280, 'Source manifest review lineage must retain Cycle 280 or advance beyond it.');
     c280(str_contains((string) ($manifest['source_checksum_artifact'] ?? ''), 'file24-source-checksums.sha256'), 'Source checksum evidence must refer to the exact-head CI artifact.');
     c280(! array_key_exists('checksum_ledger', $manifest), 'Source manifest must not claim a non-existent repository checksum ledger.');
 }
@@ -35,15 +35,15 @@ foreach ([$source, $packagedSource] as $manifest) {
 $receipt = (string) file_get_contents($root . '/docs/RELEASE-RECEIPT-0.99.0.md');
 c280(str_contains($receipt, 'Files 00–26 integration rows: `27`'), 'Release receipt must record Files 00–26 / 27 rows.');
 c280(str_contains($receipt, 'Conditional cross-plan assurance contracts: `3/3`'), 'Release receipt must record 3/3 conditional integrations.');
-c280(str_contains($receipt, 'Cycles `198–277`') && str_contains($receipt, '`278–280`'), 'Release receipt must preserve the current review lineage.');
+c280(str_contains($receipt, 'Cycles `198–277`') && preg_match('/`278–([0-9]+)`/', $receipt, $receiptRange) === 1 && (int) ($receiptRange[1] ?? 0) >= 280, 'Release receipt must preserve Cycle 280 while allowing later corrective reviews.');
 
 $register = (string) file_get_contents($root . '/docs/EIGHTY-ROUND-REVIEW-AND-CORRECTION-CYCLES-198-277.md');
 c280(str_contains($register, 'Defect-bearing requested rounds | **9**'), 'Eighty-round register must use the corrected nine-defect count.');
 c280(str_contains($register, '198, 199, 200, 201, 202, 203, 204, 205, 206'), 'Eighty-round register must include Cycle 206 as defect-bearing.');
 
 $ci = (string) file_get_contents($root . '/.github/workflows/ci.yml');
-c280(str_contains($ci, 'test "$count" -ge 294'), 'CI must enforce the corrected PHP source/test floor.');
-c280(str_contains($ci, 'test "$count" -ge 206'), 'CI must enforce the corrected independent test-program floor.');
+c280(preg_match('/test "\\$count" -ge ([0-9]+)/', $ci, $lintFloor) === 1 && (int) ($lintFloor[1] ?? 0) >= 294, 'CI must retain or advance the corrected PHP source/test floor.');
+c280(preg_match_all('/test "\\$count" -ge ([0-9]+)/', $ci, $floors) >= 2 && min(array_map('intval', $floors[1] ?? [])) >= 206, 'CI must retain or advance the corrected independent test-program floor.');
 c280(str_contains($ci, 'seq 116 197'), 'CI must retain explicit historical regression existence through Cycle 197.');
 c280(str_contains($ci, 'cycle277-eighty-round-review-closure.php'), 'CI must explicitly bind Cycle 277 closure.');
 c280(str_contains($ci, 'cycle278-manifest-integration-completeness-review.php'), 'CI must explicitly bind Cycle 278.');
