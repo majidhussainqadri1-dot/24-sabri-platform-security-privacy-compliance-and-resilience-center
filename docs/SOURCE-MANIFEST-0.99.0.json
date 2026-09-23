@@ -21,9 +21,9 @@
     "count": 12
   },
   "verification": {
-    "php_files_minimum": 296,
-    "test_programs_minimum": 208,
-    "latest_review_cycle": 282,
+    "php_files_minimum": 297,
+    "test_programs_minimum": 209,
+    "latest_review_cycle": 283,
     "php_versions": [
       "8.0",
       "8.3"
