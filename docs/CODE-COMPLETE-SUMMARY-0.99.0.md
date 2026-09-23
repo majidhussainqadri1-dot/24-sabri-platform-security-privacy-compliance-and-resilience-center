@@ -77,8 +77,8 @@ The following remain deliberately outside repository coding and are separate evi
 
 The invariant gates now include:
 
-- PHP source/test files: **at least 295**, all required to lint clean on PHP 8.0 and PHP 8.3;
-- independent top-level PHP test programs: **at least 207**, all executed;
+- PHP source/test files: **at least 296**, all required to lint clean on PHP 8.0 and PHP 8.3;
+- independent top-level PHP test programs: **at least 208**, all executed;
 - base requirement catalogue: **100/100**;
 - recovered directive catalogue: **18/18**;
 - Continuous Value / final-plan catalogue: **25/25** (`CV-262..CV-285` + `F24-CEN-01`);
@@ -87,8 +87,8 @@ The invariant gates now include:
 - Files 00–26 integration rows: **27/27**;
 - governed logical domains: **28**;
 - release phases encoded: **24A–24L (12/12)**;
-- current-plan/future-superset review evidence: **Cycles 112–197**; broad review **198–277**; correction regressions **278–281**;
+- current-plan/future-superset review evidence: **Cycles 112–197**; broad review **198–277**; correction regressions **278–282**;
 - explicit CI existence/parity gates for Future Security classes, conditional-plan contracts, exact review records and correction regressions through Cycle 280;
 - deterministic package build, SHA-256 receipt and package/source integrity gates remain mandatory.
 
-**Repository coding result:** 100% of the identified current governing File-24 coding scope plus the approved Future Security & Privacy Superset is represented and gated, with the Cycles 198–277 register reconciled to 9 defect-bearing requested rounds (198–206), 71 clean requested rounds (207–277), and the manifest/integration/cross-plan release-evidence corrections bound by Cycles 278–281. Later staging/live/operational statuses remain unclaimed until independently evidenced.
+**Repository coding result:** 100% of the identified current governing File-24 coding scope plus the approved Future Security & Privacy Superset is represented and gated, with the Cycles 198–277 register reconciled to 9 defect-bearing requested rounds (198–206), 71 clean requested rounds (207–277), and the manifest/integration/cross-plan release-evidence corrections bound by Cycles 278–282. Later staging/live/operational statuses remain unclaimed until independently evidenced.
