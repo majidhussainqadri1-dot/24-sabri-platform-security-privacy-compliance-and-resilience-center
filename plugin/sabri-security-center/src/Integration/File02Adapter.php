@@ -87,7 +87,7 @@ final class File02Adapter
         return [
             'module_key' => 'file-02-authentication',
             'name' => 'Authentication and Accounts',
-            'version' => defined('SAUTH_VERSION') ? (string) SAUTH_VERSION : '1.0.0',
+            'version' => defined('SAUTH_VERSION') ? (string) SAUTH_VERSION : '',
             'owner' => 'File 02',
             'posture' => 'foundation',
             'data_classes' => ['C2 Personal', 'C3 Sensitive Personal', 'C5 Credential Evidence'],
