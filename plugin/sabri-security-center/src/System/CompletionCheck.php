@@ -10,6 +10,7 @@ use Sabri\Platform\Security\Future\FutureSecurityCapabilityCatalog;
 use Sabri\Platform\Security\Incident\IncidentCoordinator;
 use Sabri\Platform\Security\Policy\BoundaryPolicyCatalog;
 use Sabri\Platform\Security\Registry\ChatDirectiveCatalog;
+use Sabri\Platform\Security\Registry\ConditionalIntegrationCatalog;
 use Sabri\Platform\Security\Registry\ContinuousValueRequirementCatalog;
 use Sabri\Platform\Security\Registry\GovernedArtifactRegistry;
 use Sabri\Platform\Security\Registry\PlatformIntegrationMatrix;
@@ -54,6 +55,13 @@ final class CompletionCheck
             'CV-262–CV-285 plus F24-CEN-01 repository traceability complete',
             ($continuous['repository_coding_complete'] ?? false) === true,
             (int) ($continuous['total'] ?? 0) . '/25 current-plan requirements mapped'
+        );
+        $conditional = ConditionalIntegrationCatalog::all();
+        $checks[] = $this->check(
+            'conditional_integration_traceability',
+            'Traffic Analytics, Disease Intelligence and CF-04 conditional assurance contracts encoded',
+            ConditionalIntegrationCatalog::repositoryCodingComplete() && count($conditional) === 3,
+            count($conditional) . '/3 conditional integrations mapped; activation remains separately gated'
         );
         $future = FutureSecurityCapabilityCatalog::all();
         $futureComplete = FutureSecurityCapabilityCatalog::repositoryCodingComplete()
