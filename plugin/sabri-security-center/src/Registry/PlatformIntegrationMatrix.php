@@ -44,7 +44,7 @@ final class PlatformIntegrationMatrix
     public static function all(): array
     {
         $out = [];
-        foreach (self::all() as $file => $definition) {
+        foreach (self::FILES as $file => $definition) {
             $out[$file] = self::withFailSafeContract($definition);
         }
         return $out;
@@ -60,7 +60,7 @@ final class PlatformIntegrationMatrix
     public static function evaluate(): array
     {
         $results = [];
-        foreach (self::FILES as $file => $definition) {
+        foreach (self::all() as $file => $definition) {
             $default = $file === 24 ? 'compatible' : 'unassessed';
             $state = Sanitizer::key(apply_filters((string) $definition['contract_filter'], $default, $definition), 30);
             if (! in_array($state, ['compatible', 'unassessed', 'degraded', 'blocked', 'missing'], true)) {
