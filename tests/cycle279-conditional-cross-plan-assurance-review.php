@@ -41,6 +41,16 @@ foreach (ConditionalIntegrationCatalog::all() as $key => $record) {
     c279(($blocked['state'] ?? '') === 'blocked' && empty($blocked['write_allowed']), $key . ' must fail closed when a required control is missing.');
 }
 
+$malformedVersion = ConditionalIntegrationCatalog::evaluate('traffic-analytics', [
+    'controls' => ConditionalIntegrationCatalog::get('traffic-analytics')['required_controls'] ?? [],
+    'contract_version' => 'not-a-version',
+    'evidence_ref' => 'evidence:bad-version',
+    'reviewed_at' => gmdate('c'),
+    'native_owner_preserved' => true,
+    'activation_requested' => true,
+]);
+c279(($malformedVersion['state'] ?? '') === 'blocked' && empty($malformedVersion['contract_compatible']), 'Malformed contract versions must fail closed.');
+
 $unknown = ConditionalIntegrationCatalog::evaluate('unknown-plan', [
     'controls' => [],
     'activation_requested' => true,
