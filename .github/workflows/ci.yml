@@ -73,7 +73,7 @@ jobs:
           grep -q 'GPL-2.0-or-later' plugin/sabri-security-center/LICENSES.md
           php -r '$d=json_decode(file_get_contents("plugin/sabri-security-center/SBOM.spdx.json"), true, 512, JSON_THROW_ON_ERROR); if (($d["spdxVersion"] ?? "") !== "SPDX-2.3" || ($d["packages"][0]["versionInfo"] ?? "") !== "0.99.0") { exit(1); }'
           php -r '$d=json_decode(file_get_contents("docs/SCHEMA-MANIFEST-0.99.0.json"), true, 512, JSON_THROW_ON_ERROR); if (($d["schema_version"] ?? "") !== "0.25.5" || count($d["logical_registry_types"] ?? []) !== 28) { exit(1); }'
-          php -r '$d=json_decode(file_get_contents("docs/SOURCE-MANIFEST-0.99.0.json"), true, 512, JSON_THROW_ON_ERROR); if (($d["runtime_version"] ?? "") !== "0.99.0" || empty($d["public_safe_only"]) || !empty($d["private_operations_material_bundled"])) { exit(1); }'
+          php -r '$d=json_decode(file_get_contents("docs/SOURCE-MANIFEST-0.99.0.json"), true, 512, JSON_THROW_ON_ERROR); if (($d["runtime_version"] ?? "") !== "0.99.0" || empty($d["public_safe_only"]) || !empty($d["private_operations_material_bundled"]) || ($d["integration_files"]["last"] ?? -1) !== 26 || ($d["integration_files"]["count"] ?? 0) !== 27 || ($d["conditional_integration_contracts"]["count"] ?? 0) !== 3 || ($d["verification"]["latest_review_cycle"] ?? 0) !== 280) { exit(1); }'
 
       - name: Verify F24 and All-Chats repository coding closure
         shell: bash
@@ -82,6 +82,7 @@ jobs:
           php -r 'require "tests/bootstrap.php"; if (Sabri\Platform\Security\Registry\RequirementCatalog::count() !== 100 || !Sabri\Platform\Security\Registry\RequirementCatalog::repositoryCodingComplete()) { exit(1); }'
           php -r 'require "tests/bootstrap.php"; if (Sabri\Platform\Security\Registry\ChatDirectiveCatalog::count() !== 18 || !Sabri\Platform\Security\Registry\ChatDirectiveCatalog::repositoryCodingComplete()) { exit(1); }'
           php -r 'require "tests/bootstrap.php"; if (Sabri\Platform\Security\Registry\ContinuousValueRequirementCatalog::count() !== 25 || !Sabri\Platform\Security\Registry\ContinuousValueRequirementCatalog::repositoryCodingComplete()) { exit(1); }'
+          php -r 'require "tests/bootstrap.php"; if (count(Sabri\Platform\Security\Registry\ConditionalIntegrationCatalog::all()) !== 3 || !Sabri\Platform\Security\Registry\ConditionalIntegrationCatalog::repositoryCodingComplete()) { exit(1); }'
           php -r 'require "tests/bootstrap.php"; $f=Sabri\Platform\Security\Future\FutureSecurityCapabilityCatalog::all(); if (count($f) !== 25 || !Sabri\Platform\Security\Future\FutureSecurityCapabilityCatalog::repositoryCodingComplete() || Sabri\Platform\Security\Future\FutureSecurityAssurance::supportedIds() !== array_keys($f)) { exit(1); }'
           php -r 'require "tests/bootstrap.php"; if (!Sabri\Platform\Security\Release\ReleaseStatus::repositoryCodingComplete()) { exit(1); }'
           php -r 'require "tests/bootstrap.php"; if (count(Sabri\Platform\Security\Registry\PlatformIntegrationMatrix::all()) !== 27 || !Sabri\Platform\Security\Registry\PlatformIntegrationMatrix::complete()) { exit(1); }'
@@ -300,6 +301,7 @@ jobs:
           grep -Fxq 'sabri-security-center/docs/ADMINISTRATOR-MANUAL.md' /tmp/file24-package-entries.txt
           grep -Fxq 'sabri-security-center/docs/THREE-PLAN-HARMONIZATION.md' /tmp/file24-package-entries.txt
           grep -Fxq 'sabri-security-center/docs/FUTURE-SECURITY-PRIVACY-SUPERSET.md' /tmp/file24-package-entries.txt
+          grep -Fxq 'sabri-security-center/docs/CONDITIONAL-INTEGRATION-CONTRACTS.md' /tmp/file24-package-entries.txt
           rm -f /tmp/file24-package-entries.txt
           (cd "$(dirname "$PACKAGE_TWO")" && sha256sum -c "$(basename "$PACKAGE_TWO").sha256")
           echo "path=$PACKAGE_TWO" >> "$GITHUB_OUTPUT"
