@@ -118,7 +118,8 @@ c277(in_array('graph_scope_overflow', $graphResult['errors'] ?? [], true), 'Grap
 
 $register = (string) file_get_contents(dirname(__DIR__) . '/docs/EIGHTY-ROUND-REVIEW-AND-CORRECTION-CYCLES-198-277.md');
 c277(str_contains($register, 'Requested review rounds | **80**'), 'Review register must record all 80 requested rounds.');
-c277(str_contains($register, '198, 199, 200, 201, 202, 203, 204, 205'), 'Review register must identify defect-bearing requested rounds.');
+c277(str_contains($register, '198, 199, 200, 201, 202, 203, 204, 205, 206'), 'Review register must identify all nine defect-bearing requested rounds.');
+c277(str_contains($register, 'Defect-bearing requested rounds | **9**'), 'Review register must record the corrected nine-round defect count.');
 c277(str_contains($register, 'Known unresolved repository-correctable defects after fixes/retests | **0**'), 'Closure register must retain zero known unresolved repository-correctable defects.');
 
 preg_match_all('/^\| (?:19[8-9]|2[0-7][0-9]) \|/m', $register, $matches);
