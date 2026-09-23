@@ -14,7 +14,7 @@ File 24 is the cross-platform security-governance and assurance plane for the Sa
 - Future Security & Privacy Superset: **F24-FUT-001–F24-FUT-025 = 25/25 repository-implemented**
 - Current-plan/Future-Superset repository reviews: **Cycles 112–197**
 - Broad fresh review: **Cycles 198–277; authoritative final result 9 defect-bearing requested rounds (198–206), 71 clean requested rounds (207–277)**
-- Completeness/cross-plan correction regressions: **Cycles 278–282**
+- Completeness/cross-plan correction regressions: **Cycles 278–283**
 
 This status means the approved repository-coding scope, including the later Continuous Value / Top-20 File-24 delta and the Future Security & Privacy Superset, is implemented, traceable, reviewed, testable and packageable. It does **not** mean Hostinger staging acceptance, independent certification, penetration-test acceptance, restore-drill acceptance, live deployment or operational acceptance.
 
@@ -72,4 +72,4 @@ Real Hostinger WordPress/MySQL activation and upgrade, live companion contracts,
 
 After the Cycle-125 merge, the repository was reopened for ten more fresh reviews. **All 10 rounds found a repository-correctable defect and each defect was corrected in the same round with a permanent regression**: 126 release-scope parity; 127 boundary-evidence freshness; 128 vulnerability lifecycle; 129 annual governance-review expiry; 130 AI Teacher launch/evidence timing; 131 performance finite/unit integrity; 132 transfer/download evidence freshness; 133 upload scan hash/freshness binding; 134 private-delivery consume concurrency; 135 exact same-origin port semantics. The detailed register is `docs/REVIEW-AND-CORRECTION-FUTURE-SECURITY-CYCLES-126-135.md`.
 
-The corrected tree contains at least **296 PHP source/test files** and **208 independent top-level PHP test programs** under the exact-head CI gate. PHP 8.0/8.3 GitHub Actions remains the merge gate. Staging/live/operational claims remain separate.
+The corrected tree contains at least **297 PHP source/test files** and **209 independent top-level PHP test programs** under the exact-head CI gate. PHP 8.0/8.3 GitHub Actions remains the merge gate. Staging/live/operational claims remain separate.
