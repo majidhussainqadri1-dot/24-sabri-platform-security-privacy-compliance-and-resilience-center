@@ -33,3 +33,12 @@ File 26 is high-risk. Missing or incompatible contract evidence gates ranking/re
 ## Conditional modules
 
 CF-01 through CF-04 remain conditional planning identifiers, not permanent numbered files. File 24 may record assurance contracts for them without claiming activation or transferring native ownership.
+
+
+## Machine-readable fail-safe contract
+
+Every permanent matrix row now exposes `contract_version`, `failure_mode`, `degraded_behavior`, `user_message`, `alert_owner`, `recovery_owner` and `exit_criteria`. `PlatformIntegrationMatrix::complete()` verifies these fields in addition to exact 00–26 numbering.
+
+## Conditional cross-plan assurance
+
+Traffic Analytics, Disease Intelligence and CF-04 Central Media are encoded separately in `ConditionalIntegrationCatalog`. They do not become numbered files and cannot be activated merely by repository presence.
