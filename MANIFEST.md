@@ -13,7 +13,7 @@ File 24 runtime **0.99.0** is the current repository code-complete candidate for
 - Conditional cross-plan assurance contracts: Traffic Analytics, Disease Intelligence and CF-04 Central Media
 - Future Security & Privacy Superset: `F24-FUT-001..F24-FUT-025`
 - Permanent numbered integration matrix: Files `00..26`
-- Latest broad review lineage: Cycles 198–277, followed by manifest/cross-plan/release-evidence correction regressions 278–282
+- Latest broad review lineage: Cycles 198–277, followed by manifest/cross-plan/release-evidence correction regressions 278–283
 - Requirements traceability: `docs/REQUIREMENTS-TRACEABILITY-0.99.0.md`
 - External evidence gates: `docs/KNOWN-LIMITATIONS-0.99.0.md`
 - Release receipt: `docs/RELEASE-RECEIPT-0.99.0.md`
