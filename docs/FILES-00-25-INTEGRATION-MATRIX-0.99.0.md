@@ -1,4 +1,6 @@
-# File 24 0.99.0 — Files 00–25 Integration Matrix
+# Historical Files 00–25 Integration Matrix — Superseded Baseline
+
+> This document is retained as historical evidence only. Current repository truth is `FILES-00-26-INTEGRATION-MATRIX-0.99.0.md` and `PlatformIntegrationMatrix`, which contain Files 00–26 and the corrected File 13/20/25 ownership model.
 
 File 24 is the canonical assurance owner, not a duplicate native backend. Each integration must provide a versioned manifest, evidence source and degraded behavior.
 
