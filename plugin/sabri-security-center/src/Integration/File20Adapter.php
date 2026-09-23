@@ -56,7 +56,20 @@ final class File20Adapter
             'capabilities' => ['manage_options'],
             'external_vendors' => [],
             'privacy_operations' => [],
+            'tables' => ['file20-shell-settings'],
+            'files' => ['file20-shell-assets'],
+            'secrets' => [],
+            'exporters' => [],
+            'erasers' => [],
+            'emergency_callbacks' => ['safe-mode-observation'],
+            'asvs_level_target' => 'ASVS-L2',
             'last_security_test' => '',
+            'contract_version' => '1.0.0',
+            'canonical_data_owner' => 'File 20',
+            'canonical_action_owner' => 'File 20',
+            'evidence_source' => 'module:file-20-unified-shell',
+            'degraded_behavior' => 'Native shell remains available; File 24 falls back to wp-admin and never blocks the site.',
+            'release_gate' => 'Versioned File 20 security-state contract and staging acceptance',
         ];
 
         return $manifests;
