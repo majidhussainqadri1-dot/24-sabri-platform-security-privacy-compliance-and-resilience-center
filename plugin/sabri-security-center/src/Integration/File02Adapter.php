@@ -57,6 +57,9 @@ final class File02Adapter
 
     public function contractState(string $current, array $definition = []): string
     {
+        if ($current === 'blocked') {
+            return 'blocked';
+        }
         if (! $this->available()) {
             return 'missing';
         }
