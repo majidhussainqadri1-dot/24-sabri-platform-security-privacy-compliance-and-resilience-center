@@ -31,7 +31,7 @@ final class LaunchBlockerContract
         int $ownerUserId,
         string $evidenceRef,
         array $payload
-    ): true|\WP_Error {
+    ): bool|\WP_Error {
         if ($ownerUserId < 1) {
             return new \WP_Error('spcrc_launch_blocker_owner_required', 'Launch-critical blockers require an accountable owner.');
         }
