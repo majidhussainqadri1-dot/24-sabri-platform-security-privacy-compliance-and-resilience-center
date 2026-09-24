@@ -116,13 +116,20 @@ final class ModuleRegistry
      */
     public function validate(array $manifest): array|\WP_Error
     {
-        $required = [
-            'module_key', 'name', 'version', 'owner', 'data_classes', 'public_routes', 'private_routes',
+        $required = ['module_key', 'name', 'version', 'owner', 'data_classes', 'public_routes', 'private_routes'];
+        $completeContractFields = [
             'tables', 'files', 'capabilities', 'external_vendors', 'secret_classes', 'privacy_operations',
             'exporters', 'erasers', 'emergency_callbacks', 'last_security_test', 'verification_level',
             'contract_version', 'canonical_data_owner', 'canonical_action_owner', 'evidence_source',
             'degraded_behavior', 'release_gate',
         ];
+        $contractGaps = [];
+        foreach ($completeContractFields as $field) {
+            if (! array_key_exists($field, $manifest)) {
+                $contractGaps[] = $field;
+            }
+        }
+        $contractComplete = $contractGaps === [];
         foreach ($required as $field) {
             if (! array_key_exists($field, $manifest)) {
                 return new \WP_Error('spcrc_manifest_missing_field', sprintf('Missing manifest field: %s', $field));
@@ -144,6 +151,9 @@ final class ModuleRegistry
         if (! in_array($posture, self::ALLOWED_POSTURES, true)) {
             $posture = 'unassessed';
         }
+        if (! $contractComplete) {
+            $posture = 'unassessed';
+        }
         foreach ([$name, $version, $owner] as $identityValue) {
             if (Sanitizer::containsSensitiveMaterial($identityValue)) {
                 return new \WP_Error('spcrc_manifest_sensitive_identity', 'Manifest identity fields must not contain URLs, contact data, credentials or storage paths.');
@@ -158,19 +168,16 @@ final class ModuleRegistry
         if ($lastSecurityTest !== '' && strtotime($lastSecurityTest) > time() + 300) {
             return new \WP_Error('spcrc_manifest_security_test_future', 'Manifest security-test evidence cannot be dated in the future.');
         }
-        $contractVersion = Sanitizer::text($manifest['contract_version'], 40);
-        if (preg_match('/^\d+\.\d+(?:\.\d+)?$/', $contractVersion) !== 1) {
-            return new \WP_Error('spcrc_manifest_contract_version_invalid', 'Manifest contract version must be explicitly supplied and numeric.');
+        $contractVersion = Sanitizer::text($manifest['contract_version'] ?? '', 40);
+        if ($contractVersion !== '' && preg_match('/^\d+\.\d+(?:\.\d+)?$/', $contractVersion) !== 1) {
+            return new \WP_Error('spcrc_manifest_contract_version_invalid', 'Manifest contract version must be explicitly numeric when supplied.');
         }
-        $canonicalDataOwner = Sanitizer::text($manifest['canonical_data_owner'], 120);
-        $canonicalActionOwner = Sanitizer::text($manifest['canonical_action_owner'], 160);
-        $evidenceSource = Sanitizer::opaqueReference($manifest['evidence_source']);
-        if ($evidenceSource === '') {
-            return new \WP_Error('spcrc_manifest_evidence_source_missing', 'Manifest evidence source must be an explicit opaque reference.');
-        }
-        $verificationLevel = Sanitizer::key($manifest['verification_level'], 40);
-        if (! in_array($verificationLevel, ['asvs-l1', 'asvs-l2', 'asvs-l3', 'not-applicable'], true)) {
-            return new \WP_Error('spcrc_manifest_verification_level_invalid', 'Manifest verification level must explicitly declare an approved ASVS-aligned target.');
+        $canonicalDataOwner = Sanitizer::text($manifest['canonical_data_owner'] ?? $owner, 120);
+        $canonicalActionOwner = Sanitizer::text($manifest['canonical_action_owner'] ?? $owner, 160);
+        $evidenceSource = Sanitizer::opaqueReference($manifest['evidence_source'] ?? '');
+        $verificationLevel = Sanitizer::key($manifest['verification_level'] ?? '', 40);
+        if ($verificationLevel !== '' && ! in_array($verificationLevel, ['asvs-l1', 'asvs-l2', 'asvs-l3', 'not-applicable'], true)) {
+            return new \WP_Error('spcrc_manifest_verification_level_invalid', 'Manifest verification level must declare an approved ASVS-aligned target.');
         }
         foreach ([$canonicalDataOwner, $canonicalActionOwner] as $canonicalOwner) {
             if ($canonicalOwner === '' || Sanitizer::containsSensitiveMaterial($canonicalOwner)) {
@@ -178,25 +185,22 @@ final class ModuleRegistry
             }
         }
         $dataClasses = $this->safeList($manifest['data_classes'], 20, 120, 'data_classes');
-        $tables = $this->safeList($manifest['tables'], 100, 120, 'tables');
-        $files = $this->safeList($manifest['files'], 100, 160, 'files');
-        $capabilities = $this->safeList($manifest['capabilities'], 100, 120, 'capabilities');
-        $externalVendors = $this->safeList($manifest['external_vendors'], 50, 160, 'external_vendors');
-        $secretClasses = $this->safeList($manifest['secret_classes'], 50, 120, 'secret_classes');
-        $privacyOperations = $this->safeList($manifest['privacy_operations'], 20, 60, 'privacy_operations');
-        $exporters = $this->safeList($manifest['exporters'], 50, 120, 'exporters');
-        $erasers = $this->safeList($manifest['erasers'], 50, 120, 'erasers');
-        $emergencyCallbacks = $this->safeList($manifest['emergency_callbacks'], 50, 120, 'emergency_callbacks');
+        $tables = $this->safeList($manifest['tables'] ?? [], 100, 120, 'tables');
+        $files = $this->safeList($manifest['files'] ?? [], 100, 160, 'files');
+        $capabilities = $this->safeList($manifest['capabilities'] ?? [], 100, 120, 'capabilities');
+        $externalVendors = $this->safeList($manifest['external_vendors'] ?? [], 50, 160, 'external_vendors');
+        $secretClasses = $this->safeList($manifest['secret_classes'] ?? [], 50, 120, 'secret_classes');
+        $privacyOperations = $this->safeList($manifest['privacy_operations'] ?? [], 20, 60, 'privacy_operations');
+        $exporters = $this->safeList($manifest['exporters'] ?? [], 50, 120, 'exporters');
+        $erasers = $this->safeList($manifest['erasers'] ?? [], 50, 120, 'erasers');
+        $emergencyCallbacks = $this->safeList($manifest['emergency_callbacks'] ?? [], 50, 120, 'emergency_callbacks');
         foreach ([$dataClasses, $tables, $files, $capabilities, $externalVendors, $secretClasses, $privacyOperations, $exporters, $erasers, $emergencyCallbacks] as $list) {
             if (is_wp_error($list)) {
                 return $list;
             }
         }
-        $degradedBehavior = Sanitizer::text($manifest['degraded_behavior'], 300);
-        $releaseGate = Sanitizer::text($manifest['release_gate'], 300);
-        if ($degradedBehavior === '' || $releaseGate === '') {
-            return new \WP_Error('spcrc_manifest_operational_contract_missing', 'Degraded behavior and release gate must be explicitly declared.');
-        }
+        $degradedBehavior = Sanitizer::text($manifest['degraded_behavior'] ?? 'Unknown/unavailable; no permissive fallback.', 300);
+        $releaseGate = Sanitizer::text($manifest['release_gate'] ?? 'Evidence not supplied.', 300);
         if (Sanitizer::containsSensitiveMaterial($degradedBehavior) || Sanitizer::containsSensitiveMaterial($releaseGate)) {
             return new \WP_Error('spcrc_manifest_sensitive_operational_text', 'Manifest operational text must not contain URLs, contact data, credentials or storage paths.');
         }
@@ -227,6 +231,8 @@ final class ModuleRegistry
             'evidence_source' => $evidenceSource,
             'degraded_behavior' => $degradedBehavior,
             'release_gate' => $releaseGate,
+            'contract_complete' => $contractComplete,
+            'contract_gaps' => $contractGaps,
         ];
     }
 
