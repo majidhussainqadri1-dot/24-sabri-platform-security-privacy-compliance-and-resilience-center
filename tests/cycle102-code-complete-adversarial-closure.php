@@ -28,7 +28,7 @@ c102(str_contains($incidents, 'spcrc_incident_declaration_partial') && str_conta
 c102(str_contains($remote, 'persistence_failed') && str_contains($remote, 'remote_evidence_persistence_failed'), 'Remote evidence delivery counts must reflect durable persistence truth.');
 c102(RequirementCatalog::count() === 100 && RequirementCatalog::repositoryCodingComplete(), 'All F24-R001–F24-R100 repository requirements must remain mapped as implemented.');
 c102(count(PlatformIntegrationMatrix::all()) === 27 && PlatformIntegrationMatrix::complete(), 'All permanent Files 00–26 must retain explicit, contiguous integration boundaries.');
-c102(count(GovernedArtifactRegistry::types()) === 28, 'All governed logical domains must remain implemented.');
+c102(count(GovernedArtifactRegistry::types()) === 29, 'All governed logical domains must remain implemented.');
 $status = ReleaseStatus::summary();
 c102(($status['version'] ?? '') === '0.99.0' && ! empty($status['repository_coding_complete']), 'Repository code-complete identity must remain 0.99.0.');
 c102(empty($status['production_ready']) && in_array('staging_accepted', $status['pending_external_gates'] ?? [], true), 'Code completion must not conceal the later staging and production gates.');
