@@ -116,7 +116,13 @@ final class ModuleRegistry
      */
     public function validate(array $manifest): array|\WP_Error
     {
-        $required = ['module_key', 'name', 'version', 'owner', 'data_classes', 'public_routes', 'private_routes'];
+        $required = [
+            'module_key', 'name', 'version', 'owner', 'data_classes', 'public_routes', 'private_routes',
+            'tables', 'files', 'capabilities', 'external_vendors', 'secret_classes', 'privacy_operations',
+            'exporters', 'erasers', 'emergency_callbacks', 'last_security_test', 'verification_level',
+            'contract_version', 'canonical_data_owner', 'canonical_action_owner', 'evidence_source',
+            'degraded_behavior', 'release_gate',
+        ];
         foreach ($required as $field) {
             if (! array_key_exists($field, $manifest)) {
                 return new \WP_Error('spcrc_manifest_missing_field', sprintf('Missing manifest field: %s', $field));
@@ -152,29 +158,45 @@ final class ModuleRegistry
         if ($lastSecurityTest !== '' && strtotime($lastSecurityTest) > time() + 300) {
             return new \WP_Error('spcrc_manifest_security_test_future', 'Manifest security-test evidence cannot be dated in the future.');
         }
-        $contractVersion = Sanitizer::text($manifest['contract_version'] ?? '1.0.0', 40);
+        $contractVersion = Sanitizer::text($manifest['contract_version'], 40);
         if (preg_match('/^\d+\.\d+(?:\.\d+)?$/', $contractVersion) !== 1) {
-            return new \WP_Error('spcrc_manifest_contract_version_invalid', 'Manifest contract version must be explicit and numeric.');
+            return new \WP_Error('spcrc_manifest_contract_version_invalid', 'Manifest contract version must be explicitly supplied and numeric.');
         }
-        $canonicalDataOwner = Sanitizer::text($manifest['canonical_data_owner'] ?? $owner, 120);
-        $canonicalActionOwner = Sanitizer::text($manifest['canonical_action_owner'] ?? $owner, 160);
-        $evidenceSource = Sanitizer::opaqueReference($manifest['evidence_source'] ?? '');
+        $canonicalDataOwner = Sanitizer::text($manifest['canonical_data_owner'], 120);
+        $canonicalActionOwner = Sanitizer::text($manifest['canonical_action_owner'], 160);
+        $evidenceSource = Sanitizer::opaqueReference($manifest['evidence_source']);
+        if ($evidenceSource === '') {
+            return new \WP_Error('spcrc_manifest_evidence_source_missing', 'Manifest evidence source must be an explicit opaque reference.');
+        }
+        $verificationLevel = Sanitizer::key($manifest['verification_level'], 40);
+        if (! in_array($verificationLevel, ['asvs-l1', 'asvs-l2', 'asvs-l3', 'not-applicable'], true)) {
+            return new \WP_Error('spcrc_manifest_verification_level_invalid', 'Manifest verification level must explicitly declare an approved ASVS-aligned target.');
+        }
         foreach ([$canonicalDataOwner, $canonicalActionOwner] as $canonicalOwner) {
             if ($canonicalOwner === '' || Sanitizer::containsSensitiveMaterial($canonicalOwner)) {
                 return new \WP_Error('spcrc_manifest_canonical_owner_invalid', 'Canonical ownership statements must be bounded and non-sensitive.');
             }
         }
         $dataClasses = $this->safeList($manifest['data_classes'], 20, 120, 'data_classes');
-        $capabilities = $this->safeList($manifest['capabilities'] ?? [], 100, 120, 'capabilities');
-        $externalVendors = $this->safeList($manifest['external_vendors'] ?? [], 50, 160, 'external_vendors');
-        $privacyOperations = $this->safeList($manifest['privacy_operations'] ?? [], 20, 60, 'privacy_operations');
-        foreach ([$dataClasses, $capabilities, $externalVendors, $privacyOperations] as $list) {
+        $tables = $this->safeList($manifest['tables'], 100, 120, 'tables');
+        $files = $this->safeList($manifest['files'], 100, 160, 'files');
+        $capabilities = $this->safeList($manifest['capabilities'], 100, 120, 'capabilities');
+        $externalVendors = $this->safeList($manifest['external_vendors'], 50, 160, 'external_vendors');
+        $secretClasses = $this->safeList($manifest['secret_classes'], 50, 120, 'secret_classes');
+        $privacyOperations = $this->safeList($manifest['privacy_operations'], 20, 60, 'privacy_operations');
+        $exporters = $this->safeList($manifest['exporters'], 50, 120, 'exporters');
+        $erasers = $this->safeList($manifest['erasers'], 50, 120, 'erasers');
+        $emergencyCallbacks = $this->safeList($manifest['emergency_callbacks'], 50, 120, 'emergency_callbacks');
+        foreach ([$dataClasses, $tables, $files, $capabilities, $externalVendors, $secretClasses, $privacyOperations, $exporters, $erasers, $emergencyCallbacks] as $list) {
             if (is_wp_error($list)) {
                 return $list;
             }
         }
-        $degradedBehavior = Sanitizer::text($manifest['degraded_behavior'] ?? 'Unknown/unavailable; no permissive fallback.', 300);
-        $releaseGate = Sanitizer::text($manifest['release_gate'] ?? 'Evidence not supplied.', 300);
+        $degradedBehavior = Sanitizer::text($manifest['degraded_behavior'], 300);
+        $releaseGate = Sanitizer::text($manifest['release_gate'], 300);
+        if ($degradedBehavior === '' || $releaseGate === '') {
+            return new \WP_Error('spcrc_manifest_operational_contract_missing', 'Degraded behavior and release gate must be explicitly declared.');
+        }
         if (Sanitizer::containsSensitiveMaterial($degradedBehavior) || Sanitizer::containsSensitiveMaterial($releaseGate)) {
             return new \WP_Error('spcrc_manifest_sensitive_operational_text', 'Manifest operational text must not contain URLs, contact data, credentials or storage paths.');
         }
@@ -188,10 +210,17 @@ final class ModuleRegistry
             'data_classes' => $dataClasses,
             'public_routes' => $publicRoutes,
             'private_routes' => $privateRoutes,
+            'tables' => $tables,
+            'files' => $files,
             'capabilities' => $capabilities,
             'external_vendors' => $externalVendors,
+            'secret_classes' => $secretClasses,
             'privacy_operations' => $privacyOperations,
+            'exporters' => $exporters,
+            'erasers' => $erasers,
+            'emergency_callbacks' => $emergencyCallbacks,
             'last_security_test' => $lastSecurityTest,
+            'verification_level' => $verificationLevel,
             'contract_version' => $contractVersion,
             'canonical_data_owner' => $canonicalDataOwner,
             'canonical_action_owner' => $canonicalActionOwner,
@@ -469,11 +498,18 @@ final class ModuleRegistry
                 '/wp-admin/admin.php?page=sabri-security-governance',
                 '/wp-json/sabri-security/v1/status',
             ],
+            'tables' => ['spcrc-governance-domain'],
+            'files' => ['security-center-public-safe-artifacts'],
             'capabilities' => Capabilities::all(),
             'external_vendors' => [],
+            'secret_classes' => ['security-key-metadata-only'],
             'privacy_operations' => [],
+            'exporters' => [],
+            'erasers' => [],
+            'emergency_callbacks' => ['incident-command', 'security-state-recommendation'],
             'last_security_test' => '',
-            'contract_version' => '1.0.0',
+            'verification_level' => 'asvs-l3',
+            'contract_version' => '1.1.0',
             'canonical_data_owner' => 'File 24',
             'canonical_action_owner' => 'Native owners; File 24 assurance only',
             'evidence_source' => 'release:file-24-0.99.0',
