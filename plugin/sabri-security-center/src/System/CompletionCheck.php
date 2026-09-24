@@ -9,12 +9,16 @@ use Sabri\Platform\Security\Future\FutureSecurityAssurance;
 use Sabri\Platform\Security\Future\FutureSecurityCapabilityCatalog;
 use Sabri\Platform\Security\Incident\IncidentCoordinator;
 use Sabri\Platform\Security\Integration\ConditionalIntegrationCatalog;
+use Sabri\Platform\Security\Integration\ContractCompatibilityPolicy;
+use Sabri\Platform\Security\Monitoring\PerformanceObjectiveContract;
 use Sabri\Platform\Security\Policy\BoundaryPolicyCatalog;
 use Sabri\Platform\Security\Registry\ChatDirectiveCatalog;
 use Sabri\Platform\Security\Registry\ContinuousValueRequirementCatalog;
 use Sabri\Platform\Security\Registry\GovernedArtifactRegistry;
+use Sabri\Platform\Security\Registry\ModuleRegistry;
 use Sabri\Platform\Security\Registry\PlatformIntegrationMatrix;
 use Sabri\Platform\Security\Registry\RequirementCatalog;
+use Sabri\Platform\Security\Release\LaunchBlockerContract;
 use Sabri\Platform\Security\Release\ReleaseGateManager;
 use Sabri\Platform\Security\Release\ReleaseStatus;
 use Sabri\Platform\Security\Support\Sanitizer;
@@ -80,8 +84,26 @@ final class CompletionCheck
         $checks[] = $this->check(
             'governed_domains',
             'Required governance and assurance domains implemented',
-            count(GovernedArtifactRegistry::types()) >= 28,
+            count(GovernedArtifactRegistry::types()) >= 29,
             count(GovernedArtifactRegistry::types()) . ' logical domains'
+        );
+        $checks[] = $this->check(
+            'manifest_contract_semantics',
+            'Module manifest compatibility/security-test contract is executable',
+            ModuleRegistry::repositoryContractSchemaComplete() && ContractCompatibilityPolicy::repositoryCodingComplete(),
+            'Explicit contract compatibility/deprecation plus required last-security-test evidence'
+        );
+        $checks[] = $this->check(
+            'performance_contract',
+            'F24-R092 measurable performance contract is executable',
+            PerformanceObjectiveContract::repositoryCodingComplete(),
+            count(PerformanceObjectiveContract::metricKeys()) . '/8 governed performance metrics'
+        );
+        $checks[] = $this->check(
+            'launch_blocker_contract',
+            'F24-R096 launch-critical blocker register contract is executable',
+            LaunchBlockerContract::repositoryCodingComplete(),
+            'owner, due date, evidence, affected feature and fail-closed feature state required'
         );
         $checks[] = $this->check(
             'boundary_policies',
