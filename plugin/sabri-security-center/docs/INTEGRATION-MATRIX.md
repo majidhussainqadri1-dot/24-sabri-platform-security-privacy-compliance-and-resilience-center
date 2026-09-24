@@ -1,4 +1,4 @@
-# File 24 0.99.0 — Files 00–25 Integration Matrix
+# File 24 0.99.0 — Files 00–26 Integration Matrix
 
 File 24 is the canonical assurance owner, not a duplicate native backend. Each integration must provide a versioned manifest, evidence source and degraded behavior.
 
@@ -17,7 +17,7 @@ File 24 is the canonical assurance owner, not a duplicate native backend. Each i
 | 10 — Video Wall and Live Broadcasting | recorded/live media, stream keys and replay | upload, rights, live-key and provider assurance | live/high-risk actions gated |
 | 11 — Reels | reel entity, discovery and watch history | duration, abuse and patient privacy assurance | reels assurance unavailable |
 | 12 — PDF Library | restricted PDF objects and reader access | private delivery, entitlement and purge assurance | restricted delivery gated |
-| 13 — Welcome Intro | session-aware accessible intro | privacy, accessibility and route-suppression assurance | intro assurance unavailable |
+| 13 — Welcome Intro Historical Compatibility | legacy compatibility only; File 20 owns invocation/frequency and File 25 presentation | duplicate-owner detection and migration assurance | legacy intro remains disabled |
 | 14 — Global Clinic USP | approved clinic value proposition | claim substantiation and privacy-safe analytics | claim status unknown |
 | 15 — Radar and Trends | research rubric, saved studies and trends | no-diagnosis, provenance and private study assurance | private/clinical-like actions gated |
 | 16 — Sabri Classical Homeopathy AI | source-linked educational AI | corpus ACL, citation, prompt-injection and provider assurance | AI actions gated |
@@ -30,3 +30,13 @@ File 24 is the canonical assurance owner, not a duplicate native backend. Each i
 | 23 — Publishing Dashboard | private publishing operations | role, delegation, adapter and export assurance | write actions gated |
 | 24 — Security, Privacy, Compliance and Resilience Center | governance and assurance | canonical assurance owner | native controls continue |
 | 25 — Public UI, Profile Timeline and Visual Experience | public profiles, timelines and visual presentation | public leakage, cache, trust and accessibility assurance | public presentation uses safe fallback |
+
+| 26 — Search, Discovery, Recommendations, Knowledge Graph and Classification | federated search, derivative indexes, ranking, recommendations, taxonomy and owner-sourced graph projections | private-state leakage, deletion reconciliation, ranking fairness, recommendation consent and experiment rollback assurance | high-risk discovery/ranking writes gated |
+
+## Machine-readable fail-safe contract
+
+Every permanent File 00–26 row carries: failure mode, default behavior, user message, alert owner, recovery owner, exit criteria and degraded behavior. `PlatformIntegrationMatrix::complete()` rejects a matrix that is not exactly 27 rows, has malformed/duplicate contract filters, or omits any of these fields.
+
+## Conditional integrations
+
+CF-04 Media, Traffic Analytics and Disease Intelligence are not permanent numbered files. Their File 24 assurance contracts are encoded in `ConditionalIntegrationCatalog`, remain OFF by default and preserve their native ownership until separate activation, migration/rollback and staging evidence exists.
