@@ -6,6 +6,7 @@ namespace Sabri\Platform\Security\Release;
 
 use Sabri\Platform\Security\Future\FutureSecurityAssurance;
 use Sabri\Platform\Security\Future\FutureSecurityCapabilityCatalog;
+use Sabri\Platform\Security\Integration\ConditionalIntegrationCatalog;
 use Sabri\Platform\Security\Policy\BoundaryPolicyCatalog;
 use Sabri\Platform\Security\Registry\ChatDirectiveCatalog;
 use Sabri\Platform\Security\Registry\ContinuousValueRequirementCatalog;
@@ -28,13 +29,16 @@ final class ReleaseStatus
             && ContinuousValueRequirementCatalog::count() === 25
             && FutureSecurityCapabilityCatalog::count() === 25
             && $futureParity
-            && PlatformIntegrationMatrix::complete();
+            && PlatformIntegrationMatrix::complete()
+            && ConditionalIntegrationCatalog::count() === 3
+            && ConditionalIntegrationCatalog::repositoryCodingComplete();
         $coded = RequirementCatalog::repositoryCodingComplete()
             && ChatDirectiveCatalog::repositoryCodingComplete()
             && ContinuousValueRequirementCatalog::repositoryCodingComplete()
             && FutureSecurityCapabilityCatalog::repositoryCodingComplete()
             && $futureParity
             && PlatformIntegrationMatrix::complete()
+            && ConditionalIntegrationCatalog::repositoryCodingComplete()
             && count(BoundaryPolicyCatalog::all()) === 11
             && defined('SPCRC_VERSION')
             && version_compare((string) SPCRC_VERSION, self::CODE_COMPLETE_VERSION, '>=');
@@ -47,7 +51,7 @@ final class ReleaseStatus
         $operational = $live && Sanitizer::boolean(apply_filters('spcrc/release_evidence_operational', false, $version));
 
         return [
-            'specified' => ['complete' => $specified, 'evidence' => $specified ? 'F24-R001–R100 + 18 CHAT + 25 CV/CEN + 25 Future requirements catalogued with File 00–26 integration' : 'Current governing requirement catalogue incomplete'],
+            'specified' => ['complete' => $specified, 'evidence' => $specified ? 'F24-R001–R100 + 18 CHAT + 25 CV/CEN + 25 Future requirements catalogued with File 00–26 integration and 3 conditional cross-file assurance contracts' : 'Current governing requirement catalogue incomplete'],
             'coded' => ['complete' => $coded, 'evidence' => $coded ? 'Current governing repository scope code-complete candidate ' . $version : 'Repository coding incomplete'],
             'packaged' => ['complete' => $packaged, 'evidence' => $packaged ? 'Exact package evidence supplied' : 'Runtime package evidence not asserted'],
             'automated_qa_green' => ['complete' => $automatedQa, 'evidence' => $automatedQa ? 'Exact-head automated QA evidence supplied' : 'Runtime CI evidence not asserted'],
