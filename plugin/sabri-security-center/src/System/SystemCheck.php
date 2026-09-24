@@ -141,8 +141,27 @@ final class SystemCheck
     /** @return array<string,mixed> */
     private function checkModuleRegistry(): array
     {
-        $count = count($this->modules->all());
-        return $this->result('module_registry', 'At least one module manifest registered', $count > 0, (string) $count);
+        $manifests = $this->modules->all();
+        $count = count($manifests);
+        $incomplete = [];
+        foreach ($manifests as $key => $manifest) {
+            if (! is_array($manifest) || empty($manifest['contract_complete'])) {
+                $incomplete[] = Sanitizer::key((string) $key, 120);
+            }
+        }
+        $passed = $count > 0 && $incomplete === [];
+        $detail = $count === 0
+            ? 'No module manifests are registered'
+            : ($incomplete === []
+                ? $count . ' registered manifests satisfy the current tested/versioned contract'
+                : 'Incomplete/unassessed manifest contracts: ' . implode(', ', array_filter($incomplete)));
+        return $this->result(
+            'module_registry',
+            'Registered module manifests satisfy the tested versioned contract',
+            $passed,
+            $detail,
+            'warning'
+        );
     }
 
     /** @return array<string,mixed> */
