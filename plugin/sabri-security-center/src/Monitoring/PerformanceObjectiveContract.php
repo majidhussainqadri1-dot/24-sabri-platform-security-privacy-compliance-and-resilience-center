@@ -52,7 +52,7 @@ final class PerformanceObjectiveContract
     }
 
     /** @param array<string,mixed> $payload @return true|\WP_Error */
-    public static function validateArtifact(array $payload): true|\WP_Error
+    public static function validateArtifact(array $payload): bool|\WP_Error
     {
         $metric = Sanitizer::key($payload['metric'] ?? '', 80);
         if (! isset(self::METRICS[$metric])) {
