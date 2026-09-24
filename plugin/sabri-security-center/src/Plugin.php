@@ -169,6 +169,28 @@ final class Plugin
         add_filter('spcrc/trust_center_service', static fn (): TrustCenterService => $trust);
         add_filter('spcrc/chat_directive_catalog', static fn (): array => ChatDirectiveCatalog::all());
         add_filter('spcrc/conditional_integration_catalog', static fn (): array => ConditionalIntegrationCatalog::all());
+        /* File 19 consumes this File 24-owned containment signal. The decision is
+         * derived only from current canonical security-state requests; File 19
+         * cannot fabricate or clear assurance containment locally. */
+        add_filter('sun_file24_notification_containment_active', static function (mixed $current = false): bool {
+            unset($current);
+            $requests = apply_filters('spcrc/security_state_requests', []);
+            if (! is_array($requests)) {
+                return true;
+            }
+            foreach ($requests as $request) {
+                if (! is_array($request) || 'open' !== (string) ($request['status'] ?? '')) {
+                    continue;
+                }
+                $state = (string) ($request['state'] ?? '');
+                $module = (string) ($request['module_key'] ?? '');
+                if (in_array($state, ['incident-containment', 'platform-read-only'], true)
+                    && in_array($module, ['file-19', 'file-24', 'platform', 'global'], true)) {
+                    return true;
+                }
+            }
+            return false;
+        }, 10, 1);
         add_filter('spcrc/evaluate_conditional_integration', static fn (array $current, string $key, array $evidence): array => ConditionalIntegrationCatalog::evaluate($key, $evidence), 10, 3);
         add_filter('spcrc/evaluate_islamic_governance', static fn (array $evidence): array => IslamicGovernanceCharter::evaluate($evidence));
         add_filter('spcrc/evaluate_anti_surveillance', static fn (array $evidence): array => AntiSurveillancePolicy::evaluate($evidence));
