@@ -142,7 +142,8 @@ c278(str_contains($review, 'Clean requested rounds after those fixes | **71**'),
 $ci = (string) file_get_contents(dirname(__DIR__) . '/.github/workflows/ci.yml');
 c278(str_contains($ci, 'cycle278-cross-file-completion.php'), 'CI must explicitly retain the Cycle 278 cross-file completion regression.');
 c278(str_contains($ci, 'ConditionalIntegrationCatalog::repositoryCodingComplete()'), 'CI must gate conditional integration completion.');
-c278(str_contains($ci, 'file24-source-snapshot-cycle278.zip'), 'CI snapshot naming must reflect the current correction cycle.');
+c278(str_contains($ci, 'file24-source-snapshot-cycle278.zip'), 'CI snapshot path naming must reflect the current correction cycle.');
+c278(str_contains($ci, 'file-24-sanitized-source-snapshot-cycle278'), 'CI uploaded artifact name must reflect the current correction cycle.');
 
 c278(ReleaseStatus::repositoryCodingComplete(), 'Repository coding status must include the corrected manifest, matrix and conditional-integration gates.');
 c278(! ReleaseStatus::productionReady(), 'Repository correction must not assert staging/live/operational acceptance.');
