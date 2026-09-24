@@ -7,11 +7,19 @@ namespace Sabri\Platform\Security\Release;
 use Sabri\Platform\Security\Future\FutureSecurityAssurance;
 use Sabri\Platform\Security\Future\FutureSecurityCapabilityCatalog;
 use Sabri\Platform\Security\Integration\ConditionalIntegrationCatalog;
+use Sabri\Platform\Security\Integration\ContractCompatibilityPolicy;
+use Sabri\Platform\Security\Integration\File00Adapter;
+use Sabri\Platform\Security\Integration\File02Adapter;
+use Sabri\Platform\Security\Integration\File20Adapter;
+use Sabri\Platform\Security\Monitoring\PerformanceObjectiveContract;
 use Sabri\Platform\Security\Policy\BoundaryPolicyCatalog;
 use Sabri\Platform\Security\Registry\ChatDirectiveCatalog;
 use Sabri\Platform\Security\Registry\ContinuousValueRequirementCatalog;
+use Sabri\Platform\Security\Registry\GovernedArtifactRegistry;
+use Sabri\Platform\Security\Registry\ModuleRegistry;
 use Sabri\Platform\Security\Registry\PlatformIntegrationMatrix;
 use Sabri\Platform\Security\Registry\RequirementCatalog;
+use Sabri\Platform\Security\Release\LaunchBlockerContract;
 use Sabri\Platform\Security\Support\Sanitizer;
 
 /** Truthful seven-status release model. */
@@ -40,6 +48,14 @@ final class ReleaseStatus
             && PlatformIntegrationMatrix::complete()
             && ConditionalIntegrationCatalog::repositoryCodingComplete()
             && count(BoundaryPolicyCatalog::all()) === 11
+            && count(GovernedArtifactRegistry::types()) === 29
+            && ModuleRegistry::repositoryContractSchemaComplete()
+            && ContractCompatibilityPolicy::repositoryCodingComplete()
+            && PerformanceObjectiveContract::repositoryCodingComplete()
+            && LaunchBlockerContract::repositoryCodingComplete()
+            && method_exists(File00Adapter::class, 'contractState')
+            && method_exists(File02Adapter::class, 'contractState')
+            && method_exists(File20Adapter::class, 'contractState')
             && defined('SPCRC_VERSION')
             && version_compare((string) SPCRC_VERSION, self::CODE_COMPLETE_VERSION, '>=');
 

@@ -11,7 +11,7 @@ A release-assessable manifest declares:
 - operational scope: `capabilities`, `external_vendors`, safe `secret_classes` metadata;
 - privacy lifecycle: `privacy_operations`, `exporters`, `erasers`;
 - emergency integration: `emergency_callbacks`;
-- assurance evidence: `last_security_test`, ASVS-aligned `verification_level`, explicit `contract_version`, opaque `evidence_source`;
+- assurance evidence: a **non-blank, valid, non-future** `last_security_test`, ASVS-aligned `verification_level`, an explicitly supported `contract_version`, and opaque `evidence_source`;
 - ownership: `canonical_data_owner`, `canonical_action_owner`;
 - failure and release truth: `degraded_behavior`, `release_gate`.
 
@@ -19,7 +19,7 @@ Secret **values** must never be placed in the manifest. Only bounded public-safe
 
 ## Compatibility and fail-safe behavior
 
-Older/incomplete manifests may still be parsed so older modules do not crash the platform. They are, however, forced to `posture=unassessed`, return `contract_complete=false`, and expose `contract_gaps`. Missing fields are never silently converted into a release-ready contract.
+Older/incomplete manifests may still be parsed so older modules do not crash the platform. They are, however, forced to `posture=unassessed`, return `contract_complete=false`, and expose `contract_gaps`. Missing fields are never silently converted into a release-ready contract. `ContractCompatibilityPolicy` defines the supported manifest range: below-minimum versions are `deprecated`, and an unreviewed next major version is `blocked` until a reviewed adapter explicitly supports it.
 
 High-risk/critical actions remain gated by the corresponding versioned integration state and native authorization.
 

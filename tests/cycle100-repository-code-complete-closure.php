@@ -30,7 +30,7 @@ c100(Schema::VERSION === '0.25.5' && ($schema['schema_version'] ?? '') === '0.25
 c100(RequirementCatalog::count() === 100 && RequirementCatalog::repositoryCodingComplete(), 'F24-R001–F24-R100 must be repository complete.');
 c100(ChatDirectiveCatalog::count() === 18 && ChatDirectiveCatalog::repositoryCodingComplete(), 'All-Chats v2.1 File 24 directives must be repository complete.');
 c100(count(PlatformIntegrationMatrix::all()) === 27 && PlatformIntegrationMatrix::complete(), 'File 00–26 matrix must be complete.');
-c100(count(GovernedArtifactRegistry::types()) === 28, 'Logical governed domains must be complete.');
+c100(count(GovernedArtifactRegistry::types()) === 29, 'Logical governed domains must be complete.');
 c100(count(BoundaryPolicyCatalog::all()) === 11, 'High-risk boundary policy catalogue must include the All-Chats domains.');
 c100(count(ReleaseGateManager::phases()) === 12, 'Phases 24A–24L must be implemented.');
 c100(count(Capabilities::all()) >= 27, 'Least-privilege operational capabilities must be declared.');

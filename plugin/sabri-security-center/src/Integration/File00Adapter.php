@@ -11,6 +11,7 @@ final class File00Adapter
     public function registerHooks(): void
     {
         add_filter('spcrc/identity_authority_available', [$this, 'identityAvailable']);
+        add_filter('spcrc/file00_contract_state', [$this, 'contractState'], 10, 2);
         add_filter('spcrc/is_founder_user', [$this, 'isFounder'], 10, 2);
         add_filter('spcrc/module_manifests', [$this, 'manifest']);
         add_filter('spcrc/public_browsing_compatible', [$this, 'publicBrowsingCompatible']);
@@ -24,6 +25,19 @@ final class File00Adapter
         return defined('SMC_VERSION')
             && function_exists('smc_user_status')
             && function_exists('smc_is_founder');
+    }
+
+    public function contractState(string $current, array $definition = []): string
+    {
+        if (! $this->available()) {
+            return 'missing';
+        }
+        if (! defined('SMC_CONTRACT_VERSION')) {
+            return 'degraded';
+        }
+
+        $state = ContractCompatibilityPolicy::evaluate((string) SMC_CONTRACT_VERSION, '1.2.0', '2.0.0');
+        return $state === 'compatible' ? 'compatible' : ($state === 'deprecated' ? 'degraded' : 'blocked');
     }
 
     public function identityAvailable(bool $current): bool
@@ -137,7 +151,7 @@ final class File00Adapter
             'exporters' => ['wp-privacy-exporter'],
             'erasers' => ['wp-privacy-eraser'],
             'emergency_callbacks' => ['identity-suspension', 'step-up-assurance'],
-            'last_security_test' => '',
+            'last_security_test' => Sanitizer::isoTime(apply_filters('spcrc/file00_last_security_test', '')),
             'verification_level' => 'asvs-l3',
             'contract_version' => '1.2.0',
             'canonical_data_owner' => 'File 00',

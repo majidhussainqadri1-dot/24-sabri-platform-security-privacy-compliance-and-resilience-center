@@ -1,4 +1,4 @@
-# Foundation Integration Contracts — 0.27.0
+# File 24 Integration Contracts — 0.99.0
 
 ## Contract law
 
@@ -8,11 +8,15 @@ File 24 is the governance and assurance plane. Every integration is versioned, b
 
 Modules may return manifests through `spcrc/module_manifests` or call `spcrc/register_module_manifest`.
 
-Required fields: `module_key`, `name`, `version`, `owner`, `data_classes`, `public_routes`, `private_routes`.
+Identity fields are required: `module_key`, `name`, `version`, `owner`, `data_classes`, `public_routes`, `private_routes`.
 
-Bounded optional fields include `capabilities`, `external_vendors`, `posture`, `last_security_test`, `privacy_operations`, `contract_version`, `canonical_owners`, `evidence_source`, `degraded_behavior` and `release_gate`.
+A **complete current assurance contract** additionally requires: `tables`, `files`, `capabilities`, `external_vendors`, `secret_classes`, `privacy_operations`, `exporters`, `erasers`, `emergency_callbacks`, `last_security_test`, `verification_level`, `contract_version`, `canonical_data_owner`, `canonical_action_owner`, `evidence_source`, `degraded_behavior` and `release_gate`.
+
+`last_security_test` may not be blank for a complete manifest and must be a valid non-future timestamp. `contract_version` must be inside the explicit File 24 supported range. Versions below the minimum are `deprecated`; an unreviewed next major version is `blocked`. A parseable but incomplete/deprecated manifest remains registered only as `unassessed` and must not be presented as operational.
 
 A persisted `module_key` is permanently bound to its sanitized module name and owner unless an approved migration transfers ownership. Unknown fields are discarded. Persistence uses guarded insert/update and concurrent-write detection; destructive replacement is prohibited.
+
+`ContractCompatibilityPolicy` is the executable deprecation/compatibility authority for the File 24 manifest contract. File 00, File 02 and File 20 adapters also publish explicit `spcrc/file00_contract_state`, `spcrc/file02_contract_state` and `spcrc/file20_contract_state` results from the native contract surfaces they actually detect.
 
 ## File 00 identity and step-up authority
 
@@ -103,6 +107,13 @@ Unknown upstream fields are discarded. `verified` backup posture requires succes
 
 Public Trust Center output is allowlisted after filters. Arbitrary private fields are discarded, and the public program status remains `Foundation candidate; production assurance pending` until independent release gates are evidenced.
 
-## Foundation 0.27.0 contract additions
+## Current 0.99.0 contract additions
 
 Privacy module callbacks default to deny and require an opaque native authority reference through `spcrc/authorize_privacy_module_callback`. Deletion retries require File 00 step-up through `spcrc/verify_step_up_assurance` with purpose `privacy:deletion-retry`. Manifest routes are same-origin path-only contracts.
+
+
+## Measurable performance and launch blockers
+
+F24-R092 is enforced by `PerformanceObjectiveContract`: all eight governed metrics (ingestion, burst, dashboard p95, backlog, retry recovery, data-loss tolerance, export time and storage growth) require a metric-specific unit/direction, finite threshold, environment, effective version and measurement window. Actual thresholds and measurements remain staging/operational evidence.
+
+F24-R096 uses the governed `launch-blocker` artifact domain plus `LaunchBlockerContract`. Every critical blocker requires an accountable owner, due date, affected feature and fail-closed feature state while unresolved; closure requires opaque verification evidence, and accepted risk requires a governed decision reference.

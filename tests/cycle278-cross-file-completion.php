@@ -50,7 +50,7 @@ $complete = array_merge($legacy, [
     'exporters' => [],
     'erasers' => [],
     'emergency_callbacks' => ['safe-shutdown'],
-    'last_security_test' => '',
+    'last_security_test' => gmdate('c', time() - 60),
     'verification_level' => 'asvs-l2',
     'contract_version' => '1.2.0',
     'canonical_data_owner' => 'Legacy owner',
@@ -65,8 +65,12 @@ c278(is_array($completeResult) && ($completeResult['contract_complete'] ?? false
 c278(($completeResult['contract_gaps'] ?? ['x']) === [], 'Complete manifest must have zero contract gaps.');
 
 if (! defined('SAUTH_VERSION')) {
-    define('SAUTH_VERSION', '1.0.0');
+    define('SAUTH_VERSION', '1.3.4');
 }
+if (! defined('SAUTH_ACCOUNT_CONTRACT_VERSION')) {
+    define('SAUTH_ACCOUNT_CONTRACT_VERSION', '1.1.0');
+}
+add_filter('spcrc/file02_last_security_test', static fn (string $current): string => gmdate('c', time() - 60));
 $file02 = new File02Adapter();
 $file02Manifest = $file02->manifest([]);
 c278(isset($file02Manifest[0]) && is_array($file02Manifest[0]), 'File 02 adapter must publish a manifest.');
@@ -142,8 +146,8 @@ c278(str_contains($review, 'Clean requested rounds after those fixes | **71**'),
 $ci = (string) file_get_contents(dirname(__DIR__) . '/.github/workflows/ci.yml');
 c278(str_contains($ci, 'cycle278-cross-file-completion.php'), 'CI must explicitly retain the Cycle 278 cross-file completion regression.');
 c278(str_contains($ci, 'ConditionalIntegrationCatalog::repositoryCodingComplete()'), 'CI must gate conditional integration completion.');
-c278(str_contains($ci, 'file24-source-snapshot-cycle278.zip'), 'CI snapshot path naming must reflect the current correction cycle.');
-c278(str_contains($ci, 'file-24-sanitized-source-snapshot-cycle278'), 'CI uploaded artifact name must reflect the current correction cycle.');
+c278(str_contains($ci, 'file24-source-snapshot-cycle279.zip'), 'CI snapshot path naming must reflect the current correction cycle.');
+c278(str_contains($ci, 'file-24-sanitized-source-snapshot-cycle279'), 'CI uploaded artifact name must reflect the current correction cycle.');
 
 c278(ReleaseStatus::repositoryCodingComplete(), 'Repository coding status must include the corrected manifest, matrix and conditional-integration gates.');
 c278(! ReleaseStatus::productionReady(), 'Repository correction must not assert staging/live/operational acceptance.');

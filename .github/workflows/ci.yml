@@ -33,7 +33,7 @@ jobs:
             php -l "$source_file"
             count=$((count + 1))
           done < <(find plugin tests -type f -name '*.php' -print0 | sort -z)
-          test "$count" -ge 292
+          test "$count" -ge 296
           echo "Linted $count PHP files."
 
       - name: Run the complete historical and code-complete suites
@@ -45,7 +45,7 @@ jobs:
             php "$test_file"
             count=$((count + 1))
           done < <(find tests -maxdepth 1 -type f -name '*.php' ! -name 'bootstrap.php' -print0 | sort -z)
-          test "$count" -ge 204
+          test "$count" -ge 205
           echo "Executed $count independent PHP test programs."
 
       - name: Reject secrets, private operations material and unsafe PHP
@@ -72,7 +72,7 @@ jobs:
           grep -q 'License Inventory — 0.99.0' plugin/sabri-security-center/LICENSES.md
           grep -q 'GPL-2.0-or-later' plugin/sabri-security-center/LICENSES.md
           php -r '$d=json_decode(file_get_contents("plugin/sabri-security-center/SBOM.spdx.json"), true, 512, JSON_THROW_ON_ERROR); if (($d["spdxVersion"] ?? "") !== "SPDX-2.3" || ($d["packages"][0]["versionInfo"] ?? "") !== "0.99.0") { exit(1); }'
-          php -r '$d=json_decode(file_get_contents("docs/SCHEMA-MANIFEST-0.99.0.json"), true, 512, JSON_THROW_ON_ERROR); if (($d["schema_version"] ?? "") !== "0.25.5" || count($d["logical_registry_types"] ?? []) !== 28) { exit(1); }'
+          php -r '$d=json_decode(file_get_contents("docs/SCHEMA-MANIFEST-0.99.0.json"), true, 512, JSON_THROW_ON_ERROR); if (($d["schema_version"] ?? "") !== "0.25.5" || count($d["logical_registry_types"] ?? []) !== 29) { exit(1); }'
           php -r '$d=json_decode(file_get_contents("docs/SOURCE-MANIFEST-0.99.0.json"), true, 512, JSON_THROW_ON_ERROR); if (($d["runtime_version"] ?? "") !== "0.99.0" || empty($d["public_safe_only"]) || !empty($d["private_operations_material_bundled"])) { exit(1); }'
 
       - name: Verify F24 and All-Chats repository coding closure
@@ -86,7 +86,7 @@ jobs:
           php -r 'require "tests/bootstrap.php"; if (!Sabri\Platform\Security\Release\ReleaseStatus::repositoryCodingComplete()) { exit(1); }'
           php -r 'require "tests/bootstrap.php"; if (count(Sabri\Platform\Security\Registry\PlatformIntegrationMatrix::all()) !== 27 || !Sabri\Platform\Security\Registry\PlatformIntegrationMatrix::complete()) { exit(1); }'
           php -r 'require "tests/bootstrap.php"; if (Sabri\Platform\Security\Integration\ConditionalIntegrationCatalog::count() !== 3 || !Sabri\Platform\Security\Integration\ConditionalIntegrationCatalog::repositoryCodingComplete()) { exit(1); }'
-          php -r 'require "tests/bootstrap.php"; if (count(Sabri\Platform\Security\Registry\GovernedArtifactRegistry::types()) !== 28) { exit(1); }'
+          php -r 'require "tests/bootstrap.php"; if (count(Sabri\Platform\Security\Registry\GovernedArtifactRegistry::types()) !== 29) { exit(1); }'
           php -r 'require "tests/bootstrap.php"; if (count(Sabri\Platform\Security\Policy\BoundaryPolicyCatalog::all()) !== 11) { exit(1); }'
           php -r 'require "tests/bootstrap.php"; if (count(Sabri\Platform\Security\Release\ReleaseGateManager::phases()) !== 12) { exit(1); }'
           php -r 'require "tests/bootstrap.php"; if (count(Sabri\Platform\Security\Capabilities::all()) < 27) { exit(1); }'
@@ -220,11 +220,12 @@ jobs:
           grep -q 'ambiguous_node_count' plugin/sabri-security-center/src/Future/SecurityKnowledgeGraph.php
           grep -q 'unknown_data_classes' plugin/sabri-security-center/src/Future/PrivacyEgressGuard.php
 
-      - name: Verify Cycle 278 cross-file completion
+      - name: Verify Cycles 278–279 cross-file and semantic completion
         shell: bash
         run: |
           set -euo pipefail
           php tests/cycle278-cross-file-completion.php
+          php tests/cycle279-semantic-completion.php
           test -f plugin/sabri-security-center/src/Integration/ConditionalIntegrationCatalog.php
           test -f docs/CROSS-FILE-COMPLETION-CYCLE-278.md
           grep -Fq 'Defect-bearing requested rounds | **9**' docs/EIGHTY-ROUND-REVIEW-AND-CORRECTION-CYCLES-198-277.md
@@ -325,15 +326,15 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          rm -rf /tmp/file24-source /tmp/file24-source-snapshot-cycle278.zip
+          rm -rf /tmp/file24-source /tmp/file24-source-snapshot-cycle279.zip
           mkdir -p /tmp/file24-source
           rsync -a --exclude='.git' --exclude='build' ./ /tmp/file24-source/
-          (cd /tmp && zip -X -q -r file24-source-snapshot-cycle278.zip file24-source)
+          (cd /tmp && zip -X -q -r file24-source-snapshot-cycle279.zip file24-source)
 
       - name: Upload sanitized code-complete source snapshot
         if: matrix.php == '8.3'
         uses: actions/upload-artifact@v4
         with:
-          name: file-24-sanitized-source-snapshot-cycle278
-          path: /tmp/file24-source-snapshot-cycle278.zip
+          name: file-24-sanitized-source-snapshot-cycle279
+          path: /tmp/file24-source-snapshot-cycle279.zip
           if-no-files-found: error
