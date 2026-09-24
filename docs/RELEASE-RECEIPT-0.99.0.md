@@ -8,8 +8,8 @@
 - Governing sources: Definitive Master Plan v3.0 and File 24 Harmonized Draft 2 (document version 1.1)
 - Governing requirements: `F24-R001–F24-R100`
 - Repository status: code-complete candidate
-- PHP files in final verification tree: at least `278`
-- Independent PHP test programs: at least `190`
+- PHP files in final verification tree: at least `292`
+- Independent PHP test programs: at least `204`
 - Dedicated Cycles 97–102 assertions: `146`
 - Files 00–26 integration rows: `27`
 - Governed logical domains: `28`
