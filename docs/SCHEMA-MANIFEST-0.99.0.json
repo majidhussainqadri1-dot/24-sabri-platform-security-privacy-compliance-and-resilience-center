@@ -33,6 +33,7 @@
     "trust-claim",
     "performance-objective",
     "release-gate",
+    "launch-blocker",
     "training",
     "integration",
     "security-test",
