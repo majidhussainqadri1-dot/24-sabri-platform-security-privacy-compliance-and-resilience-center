@@ -9,6 +9,7 @@ final class File20Adapter
     public function registerHooks(): void
     {
         add_filter('spcrc/file20_adapter_available', [$this, 'adapterAvailable']);
+        add_filter('spcrc/file20_contract_state', [$this, 'contractState'], 10, 2);
         add_filter('spcrc/module_manifests', [$this, 'manifest']);
         add_filter('spcrc/file20_safe_mode_active', [$this, 'safeModeActive']);
         add_action('spcrc/security_state_requested', [$this, 'observeStateRequest']);
@@ -18,6 +19,19 @@ final class File20Adapter
     {
         return defined('SABRI_SHELL_VERSION')
             && class_exists('Sabri\\UnifiedShell\\SafeMode');
+    }
+
+    public function contractState(string $current, array $definition = []): string
+    {
+        if (! $this->available()) {
+            return 'missing';
+        }
+        $contractClass = 'Sabri\\UnifiedShell\\CentralPlanContract';
+        if (! class_exists($contractClass) || ! defined($contractClass . '::CONTRACT_VERSION')) {
+            return 'degraded';
+        }
+        $state = ContractCompatibilityPolicy::evaluate((string) constant($contractClass . '::CONTRACT_VERSION'), '1.0.0', '2.0.0');
+        return $state === 'compatible' ? 'compatible' : ($state === 'deprecated' ? 'degraded' : 'blocked');
     }
 
     public function adapterAvailable(bool $current): bool
@@ -62,7 +76,7 @@ final class File20Adapter
             'exporters' => [],
             'erasers' => [],
             'emergency_callbacks' => ['safe-mode-rendering', 'maintenance-state-rendering'],
-            'last_security_test' => '',
+            'last_security_test' => \Sabri\Platform\Security\Support\Sanitizer::isoTime(apply_filters('spcrc/file20_last_security_test', '')),
             'verification_level' => 'asvs-l2',
             'contract_version' => '1.2.0',
             'canonical_data_owner' => 'File 20',
