@@ -22,8 +22,8 @@
     "count": 12
   },
   "verification": {
-    "php_files_minimum": 276,
-    "test_programs_minimum": 190,
+    "php_files_minimum": 292,
+    "test_programs_minimum": 204,
     "code_complete_assertions": 146,
     "php_versions": [
       "8.0",
