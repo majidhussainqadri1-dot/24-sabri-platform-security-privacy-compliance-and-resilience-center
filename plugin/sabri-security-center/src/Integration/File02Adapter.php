@@ -56,7 +56,14 @@ final class File02Adapter
 
     public function contractState(string $current, array $definition = []): string
     {
-        return $this->available() ? 'compatible' : 'missing';
+        if (! $this->available()) {
+            return 'missing';
+        }
+        $version = defined('SAUTH_VERSION') ? (string) SAUTH_VERSION : '';
+        if ($version === '' || preg_match('/^\d+(?:\.\d+){0,3}(?:-[0-9A-Za-z.-]+)?$/', $version) !== 1) {
+            return 'blocked';
+        }
+        return 'compatible';
     }
 
     /** @param mixed $manifests @return array<int,array<string,mixed>> */
@@ -66,18 +73,29 @@ final class File02Adapter
         $manifests[] = [
             'module_key' => 'file-02-authentication',
             'name' => 'Authentication and Accounts',
-            'version' => defined('SAUTH_VERSION') ? (string) SAUTH_VERSION : '',
-            'owner' => 'file-02',
-            'data_classes' => ['C2', 'C3', 'C5'],
-            'routes' => [],
+            'version' => defined('SAUTH_VERSION') ? (string) SAUTH_VERSION : '0.0.0-unavailable',
+            'owner' => 'File 02',
+            'posture' => $this->available() ? 'foundation' : 'unassessed',
+            'data_classes' => ['C2 Personal', 'C3 Sensitive Personal', 'C5 Credential Secret Metadata'],
+            'public_routes' => [],
+            'private_routes' => [],
+            'tables' => ['authentication-session-domain'],
+            'files' => ['authentication-evidence-domain'],
             'capabilities' => [],
-            'vendors' => [],
-            'secrets' => ['credential-provider-secrets'],
-            'privacy_handlers' => [],
-            'emergency_callbacks' => [],
-            'security_tested_at' => '',
-            'posture' => $this->available() ? 'assessed' : 'unassessed',
-            'evidence_ref' => '',
+            'external_vendors' => [],
+            'secret_classes' => ['credential-provider-secrets', 'recovery-secrets', 'session-secrets'],
+            'privacy_operations' => [],
+            'exporters' => [],
+            'erasers' => [],
+            'emergency_callbacks' => ['session-revocation', 'authentication-lockdown'],
+            'last_security_test' => '',
+            'verification_level' => 'asvs-l3',
+            'contract_version' => '1.2.0',
+            'canonical_data_owner' => 'File 02',
+            'canonical_action_owner' => 'File 02',
+            'evidence_source' => 'module:file-02-authentication',
+            'degraded_behavior' => 'Privileged authentication-dependent writes fail closed when File 02 assurance is unavailable.',
+            'release_gate' => 'Exact-head File 02 contract tests, staging authentication/recovery tests and rollback acceptance',
         ];
         return $manifests;
     }
