@@ -2,6 +2,8 @@
 
 ## Governing basis
 
+**Final erratum incorporated:** this register now carries the authoritative corrected result of 9 defect-bearing requested cycles (198–206) and 71 clean requested cycles (207–277).
+
 These eighty fresh repository reviews reopen merged `main` after Cycle 197 and compare File 24 against the current consolidated governing plan, the File 24 Future Security & Privacy Superset / Ten-Round-Reviewed Final addendum, native-owner/no-security-single-point-of-failure boundaries, public-safe evidence law, status truth, and the complete historical/current automated suite.
 
 Every defect discovered in a requested round was corrected immediately before the next round, given a permanent regression, and then re-reviewed. This register is repository coding / automated-QA evidence only. Hostinger staging, real external providers, independent penetration testing, qualified legal/privacy review, real restore/load/rollback/browser/accessibility rehearsals, live deployment, Founder production acceptance, and measured operational SLO evidence remain separate gates.
@@ -10,9 +12,9 @@ Every defect discovered in a requested round was corrected immediately before th
 |---|---:|
 | Requested review rounds | **80** |
 | Requested cycles | **198–277** |
-| Defect-bearing requested rounds | **8** |
-| Defect-bearing requested cycles | **198, 199, 200, 201, 202, 203, 204, 205** |
-| Clean requested rounds after those fixes | **72** |
+| Defect-bearing requested rounds | **9** |
+| Defect-bearing requested cycles | **198, 199, 200, 201, 202, 203, 204, 205, 206** |
+| Clean requested rounds after those fixes | **71** |
 | Known unresolved repository-correctable defects after fixes/retests | **0** |
 
 ## Individual review register
@@ -27,7 +29,7 @@ Every defect discovered in a requested round was corrected immediately before th
 | 203 | Automated remediation human-approval evidence | **Defect found and corrected.** Approval refs beyond ten, malformed refs or duplicates could be truncated/dropped; the entire approval evidence set is now strict and fail-closed. |
 | 204 | Artifact provenance type integrity | **Defect found and corrected.** Untrusted provenance identifiers were directly string-cast; non-scalar values could cause unsafe coercion/runtime failure. Bounded scalar hex parsing now blocks them safely. |
 | 205 | Security Knowledge Graph snapshot completeness | **Defect found and corrected.** Oversized node/edge sets were silently sliced, which could hide attack relationships; overflow now yields an explicit incomplete/blocked graph state. |
-| 206 | Attack-path source/target normalization and duplicate suppression | **No new defect found.** Existing deterministic pair de-duplication and bounded scoring preserved. |
+| 206 | Full-suite PHP 8.0 compatibility and newly hardened empty-list semantics | **Defect found and corrected.** The post-198–205 full-suite retest exposed a PHP-8.0 static-compatibility scanner conflict plus valid-empty-list handling regressions in the new hardening; the strict invariants were rewritten compatibly and empty lists remain allowed only where the contract permits them. |
 | 207 | Attack-path finite numeric scoring | **No new defect found.** NaN/Infinity and malformed numeric dimensions remain bounded/fail-safe. |
 | 208 | Knowledge-graph duplicate node ambiguity | **No new defect found.** Conflicting duplicate IDs remain removed as ambiguous. |
 | 209 | Knowledge-graph phantom-edge rejection | **No new defect found.** Edges to absent nodes remain excluded. |

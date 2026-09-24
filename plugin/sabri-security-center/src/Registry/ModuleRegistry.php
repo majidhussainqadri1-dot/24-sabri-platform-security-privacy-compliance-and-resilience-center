@@ -117,6 +117,19 @@ final class ModuleRegistry
     public function validate(array $manifest): array|\WP_Error
     {
         $required = ['module_key', 'name', 'version', 'owner', 'data_classes', 'public_routes', 'private_routes'];
+        $completeContractFields = [
+            'tables', 'files', 'capabilities', 'external_vendors', 'secret_classes', 'privacy_operations',
+            'exporters', 'erasers', 'emergency_callbacks', 'last_security_test', 'verification_level',
+            'contract_version', 'canonical_data_owner', 'canonical_action_owner', 'evidence_source',
+            'degraded_behavior', 'release_gate',
+        ];
+        $contractGaps = [];
+        foreach ($completeContractFields as $field) {
+            if (! array_key_exists($field, $manifest)) {
+                $contractGaps[] = $field;
+            }
+        }
+        $contractComplete = $contractGaps === [];
         foreach ($required as $field) {
             if (! array_key_exists($field, $manifest)) {
                 return new \WP_Error('spcrc_manifest_missing_field', sprintf('Missing manifest field: %s', $field));
@@ -138,6 +151,9 @@ final class ModuleRegistry
         if (! in_array($posture, self::ALLOWED_POSTURES, true)) {
             $posture = 'unassessed';
         }
+        if (! $contractComplete) {
+            $posture = 'unassessed';
+        }
         foreach ([$name, $version, $owner] as $identityValue) {
             if (Sanitizer::containsSensitiveMaterial($identityValue)) {
                 return new \WP_Error('spcrc_manifest_sensitive_identity', 'Manifest identity fields must not contain URLs, contact data, credentials or storage paths.');
@@ -152,23 +168,33 @@ final class ModuleRegistry
         if ($lastSecurityTest !== '' && strtotime($lastSecurityTest) > time() + 300) {
             return new \WP_Error('spcrc_manifest_security_test_future', 'Manifest security-test evidence cannot be dated in the future.');
         }
-        $contractVersion = Sanitizer::text($manifest['contract_version'] ?? '1.0.0', 40);
-        if (preg_match('/^\d+\.\d+(?:\.\d+)?$/', $contractVersion) !== 1) {
-            return new \WP_Error('spcrc_manifest_contract_version_invalid', 'Manifest contract version must be explicit and numeric.');
+        $contractVersion = Sanitizer::text($manifest['contract_version'] ?? '', 40);
+        if ($contractVersion !== '' && preg_match('/^\d+\.\d+(?:\.\d+)?$/', $contractVersion) !== 1) {
+            return new \WP_Error('spcrc_manifest_contract_version_invalid', 'Manifest contract version must be explicitly numeric when supplied.');
         }
         $canonicalDataOwner = Sanitizer::text($manifest['canonical_data_owner'] ?? $owner, 120);
         $canonicalActionOwner = Sanitizer::text($manifest['canonical_action_owner'] ?? $owner, 160);
         $evidenceSource = Sanitizer::opaqueReference($manifest['evidence_source'] ?? '');
+        $verificationLevel = Sanitizer::key($manifest['verification_level'] ?? '', 40);
+        if ($verificationLevel !== '' && ! in_array($verificationLevel, ['asvs-l1', 'asvs-l2', 'asvs-l3', 'not-applicable'], true)) {
+            return new \WP_Error('spcrc_manifest_verification_level_invalid', 'Manifest verification level must declare an approved ASVS-aligned target.');
+        }
         foreach ([$canonicalDataOwner, $canonicalActionOwner] as $canonicalOwner) {
             if ($canonicalOwner === '' || Sanitizer::containsSensitiveMaterial($canonicalOwner)) {
                 return new \WP_Error('spcrc_manifest_canonical_owner_invalid', 'Canonical ownership statements must be bounded and non-sensitive.');
             }
         }
         $dataClasses = $this->safeList($manifest['data_classes'], 20, 120, 'data_classes');
+        $tables = $this->safeList($manifest['tables'] ?? [], 100, 120, 'tables');
+        $files = $this->safeList($manifest['files'] ?? [], 100, 160, 'files');
         $capabilities = $this->safeList($manifest['capabilities'] ?? [], 100, 120, 'capabilities');
         $externalVendors = $this->safeList($manifest['external_vendors'] ?? [], 50, 160, 'external_vendors');
+        $secretClasses = $this->safeList($manifest['secret_classes'] ?? [], 50, 120, 'secret_classes');
         $privacyOperations = $this->safeList($manifest['privacy_operations'] ?? [], 20, 60, 'privacy_operations');
-        foreach ([$dataClasses, $capabilities, $externalVendors, $privacyOperations] as $list) {
+        $exporters = $this->safeList($manifest['exporters'] ?? [], 50, 120, 'exporters');
+        $erasers = $this->safeList($manifest['erasers'] ?? [], 50, 120, 'erasers');
+        $emergencyCallbacks = $this->safeList($manifest['emergency_callbacks'] ?? [], 50, 120, 'emergency_callbacks');
+        foreach ([$dataClasses, $tables, $files, $capabilities, $externalVendors, $secretClasses, $privacyOperations, $exporters, $erasers, $emergencyCallbacks] as $list) {
             if (is_wp_error($list)) {
                 return $list;
             }
@@ -177,6 +203,24 @@ final class ModuleRegistry
         $releaseGate = Sanitizer::text($manifest['release_gate'] ?? 'Evidence not supplied.', 300);
         if (Sanitizer::containsSensitiveMaterial($degradedBehavior) || Sanitizer::containsSensitiveMaterial($releaseGate)) {
             return new \WP_Error('spcrc_manifest_sensitive_operational_text', 'Manifest operational text must not contain URLs, contact data, credentials or storage paths.');
+        }
+
+        $semanticRequirements = [
+            'contract_version' => $contractVersion,
+            'verification_level' => $verificationLevel,
+            'evidence_source' => $evidenceSource,
+            'degraded_behavior' => $degradedBehavior,
+            'release_gate' => $releaseGate,
+        ];
+        foreach ($semanticRequirements as $field => $value) {
+            if ($value === '') {
+                $contractGaps[] = $field;
+                $contractComplete = false;
+            }
+        }
+        $contractGaps = array_values(array_unique($contractGaps));
+        if (! $contractComplete) {
+            $posture = 'unassessed';
         }
 
         return [
@@ -188,16 +232,25 @@ final class ModuleRegistry
             'data_classes' => $dataClasses,
             'public_routes' => $publicRoutes,
             'private_routes' => $privateRoutes,
+            'tables' => $tables,
+            'files' => $files,
             'capabilities' => $capabilities,
             'external_vendors' => $externalVendors,
+            'secret_classes' => $secretClasses,
             'privacy_operations' => $privacyOperations,
+            'exporters' => $exporters,
+            'erasers' => $erasers,
+            'emergency_callbacks' => $emergencyCallbacks,
             'last_security_test' => $lastSecurityTest,
+            'verification_level' => $verificationLevel,
             'contract_version' => $contractVersion,
             'canonical_data_owner' => $canonicalDataOwner,
             'canonical_action_owner' => $canonicalActionOwner,
             'evidence_source' => $evidenceSource,
             'degraded_behavior' => $degradedBehavior,
             'release_gate' => $releaseGate,
+            'contract_complete' => $contractComplete,
+            'contract_gaps' => $contractGaps,
         ];
     }
 
@@ -469,11 +522,18 @@ final class ModuleRegistry
                 '/wp-admin/admin.php?page=sabri-security-governance',
                 '/wp-json/sabri-security/v1/status',
             ],
+            'tables' => ['spcrc-governance-domain'],
+            'files' => ['security-center-public-safe-artifacts'],
             'capabilities' => Capabilities::all(),
             'external_vendors' => [],
+            'secret_classes' => ['security-key-metadata-only'],
             'privacy_operations' => [],
+            'exporters' => [],
+            'erasers' => [],
+            'emergency_callbacks' => ['incident-command', 'security-state-recommendation'],
             'last_security_test' => '',
-            'contract_version' => '1.0.0',
+            'verification_level' => 'asvs-l3',
+            'contract_version' => '1.1.0',
             'canonical_data_owner' => 'File 24',
             'canonical_action_owner' => 'Native owners; File 24 assurance only',
             'evidence_source' => 'release:file-24-0.99.0',

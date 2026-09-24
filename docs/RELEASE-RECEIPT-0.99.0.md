@@ -8,11 +8,12 @@
 - Governing sources: Definitive Master Plan v3.0 and File 24 Harmonized Draft 2 (document version 1.1)
 - Governing requirements: `F24-R001–F24-R100`
 - Repository status: code-complete candidate
-- PHP files in final verification tree: at least `176`
-- Independent PHP test programs: at least `108`
+- PHP files in final verification tree: at least `292`
+- Independent PHP test programs: at least `204`
 - Dedicated Cycles 97–102 assertions: `146`
-- Files 00–25 integration rows: `26`
+- Files 00–26 integration rows: `27`
 - Governed logical domains: `28`
+- Conditional cross-file assurance contracts: `3` (`CF-04`, Traffic Analytics, Disease Intelligence)
 - Release phases: `24A–24L`
 - Truthful boundary: not staging-accepted, not independently assured, not live-deployed and not operational
 
@@ -23,3 +24,8 @@ The exact reviewed head, pull request, CI run, merge commit, source-integrity ma
 ## Reproducible package and source integrity
 
 GitHub Actions builds the package twice and byte-compares the results. The build also verifies the adjacent package checksum receipt. A complete SHA-256 manifest for all tracked source files is generated from the immutable checked-out commit and uploaded with the release artifacts. No workflow is permitted to mutate or push back into the reviewed source branch.
+
+
+## September 2026 cross-file completion correction
+
+The repository-level completion gate now requires the full File 00–26 fail-safe contract shape, strict explicit module-manifest contracts, and the three conditional assurance contracts for CF-04, Traffic Analytics and Disease Intelligence. Runtime/staging/live evidence remains separate and is not asserted by this receipt.

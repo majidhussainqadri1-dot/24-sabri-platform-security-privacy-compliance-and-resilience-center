@@ -22,6 +22,7 @@ use Sabri\Platform\Security\Future\PrivacyAnalyticsGuard;
 use Sabri\Platform\Security\Future\PrivacyEgressGuard;
 use Sabri\Platform\Security\Future\SecurityKnowledgeGraph;
 use Sabri\Platform\Security\Incident\IncidentCoordinator;
+use Sabri\Platform\Security\Integration\ConditionalIntegrationCatalog;
 use Sabri\Platform\Security\Integration\File00Adapter;
 use Sabri\Platform\Security\Integration\File02Adapter;
 use Sabri\Platform\Security\Integration\File20Adapter;
@@ -167,6 +168,8 @@ final class Plugin
         add_filter('spcrc/performance_monitor', static fn (): PerformanceMonitor => $performance);
         add_filter('spcrc/trust_center_service', static fn (): TrustCenterService => $trust);
         add_filter('spcrc/chat_directive_catalog', static fn (): array => ChatDirectiveCatalog::all());
+        add_filter('spcrc/conditional_integration_catalog', static fn (): array => ConditionalIntegrationCatalog::all());
+        add_filter('spcrc/evaluate_conditional_integration', static fn (array $current, string $key, array $evidence): array => ConditionalIntegrationCatalog::evaluate($key, $evidence), 10, 3);
         add_filter('spcrc/evaluate_islamic_governance', static fn (array $evidence): array => IslamicGovernanceCharter::evaluate($evidence));
         add_filter('spcrc/evaluate_anti_surveillance', static fn (array $evidence): array => AntiSurveillancePolicy::evaluate($evidence));
         add_filter('spcrc/evaluate_ranking_fairness', static fn (array $evidence): array => RankingFairnessPolicy::evaluate($evidence));
