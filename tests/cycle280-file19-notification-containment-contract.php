@@ -14,6 +14,10 @@ foreach ([
         exit(1);
     }
 }
+if (strpos($plugin, "in_array($module") !== false || strpos($plugin, "['file-19', 'file-24', 'platform', 'global']") !== false) {
+    fwrite(STDERR, "Platform-wide containment must not be narrowed to selected module keys.\n");
+    exit(1);
+}
 if (strpos($matrix, "'contract_filter' => 'spcrc/file19_contract_state'") === false) {
     fwrite(STDERR, "File 19 assurance matrix contract is missing.\n");
     exit(1);
