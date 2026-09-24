@@ -12,13 +12,15 @@ File 24 is the cross-platform security-governance and assurance plane for the Sa
 - Later central-plan delta: **CV-262–CV-285 = 24/24** plus **F24-CEN-01 = 1/1 repository-implemented**
 - Future Security & Privacy Superset: **F24-FUT-001–F24-FUT-025 = 25/25 repository-implemented**
 - Current-plan/Future-Superset repository reviews: **Cycles 112–135**
-- Latest ten-round re-audit: **Cycles 185–194; defects found and corrected in all 10 requested rounds; post-request QA defect corrected in Cycle 195; final clean closure Cycles 196–197; zero known unresolved repository-correctable defects after correction/retest**
+- Latest historical eighty-round re-audit: **Cycles 198–277; authoritative corrected result = 9 defect-bearing requested cycles (198–206), 71 clean requested cycles (207–277), zero known unresolved defects within that reviewed scope after correction/retest. Cycle 278 adds the later cross-file completeness correction and permanent regression.**
 
 This status means the approved repository-coding scope, including the later Continuous Value / Top-20 File-24 delta and the Future Security & Privacy Superset, is implemented, traceable, reviewed, testable and packageable. It does **not** mean Hostinger staging acceptance, independent certification, penetration-test acceptance, restore-drill acceptance, live deployment or operational acceptance.
 
 ## Implemented repository scope
 
 - module manifests, security states and Files 00–26 integration contracts;
+- strict manifest-completeness evidence with legacy manifests forced to unassessed rather than silently release-ready;
+- conditional assurance contracts for CF-04 Media, Traffic Analytics and Disease Intelligence through `ConditionalIntegrationCatalog`;
 - control, risk, finding, vulnerability, incident, governance and assurance registries;
 - versioned policy hierarchy, exceptions and release gates;
 - File 00 membership and File 02 credential-authentication assurance without alternate identity ownership;
@@ -68,4 +70,4 @@ Real Hostinger WordPress/MySQL activation and upgrade, live companion contracts,
 
 After the Cycle-125 merge, the repository was reopened for ten more fresh reviews. **All 10 rounds found a repository-correctable defect and each defect was corrected in the same round with a permanent regression**: 126 release-scope parity; 127 boundary-evidence freshness; 128 vulnerability lifecycle; 129 annual governance-review expiry; 130 AI Teacher launch/evidence timing; 131 performance finite/unit integrity; 132 transfer/download evidence freshness; 133 upload scan hash/freshness binding; 134 private-delivery consume concurrency; 135 exact same-origin port semantics. The detailed register is `docs/REVIEW-AND-CORRECTION-FUTURE-SECURITY-CYCLES-126-135.md`.
 
-The corrected source has a local full-suite result of **227 PHP source/test files lint-clean** and **140 independent top-level PHP test programs passing** on the available review runtime. Exact-head PHP 8.0/8.3 GitHub Actions is the merge gate. Staging/live/operational claims remain separate.
+The current repository inventory contains **292 PHP source/test files** and **204 independent top-level PHP test programs** after Cycle 278. Exact-head PHP 8.0/8.3 GitHub Actions remains the merge gate; these inventory counts do not by themselves assert a passing CI result. Staging/live/operational claims remain separate.
