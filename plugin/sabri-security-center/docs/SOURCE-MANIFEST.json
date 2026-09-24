@@ -11,18 +11,19 @@
   },
   "integration_files": {
     "first": 0,
-    "last": 25,
-    "count": 26
+    "last": 26,
+    "count": 27
   },
   "governed_logical_domains": 28,
+  "conditional_integrations": ["cf-04-media", "traffic-analytics", "disease-intelligence"],
   "release_phases": {
     "first": "24A",
     "last": "24L",
     "count": 12
   },
   "verification": {
-    "php_files_minimum": 176,
-    "test_programs_minimum": 108,
+    "php_files_minimum": 276,
+    "test_programs_minimum": 190,
     "code_complete_assertions": 146,
     "php_versions": [
       "8.0",
