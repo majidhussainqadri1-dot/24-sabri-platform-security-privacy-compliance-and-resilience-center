@@ -8,6 +8,7 @@ use Sabri\Platform\Security\Capabilities;
 use Sabri\Platform\Security\Future\FutureSecurityAssurance;
 use Sabri\Platform\Security\Future\FutureSecurityCapabilityCatalog;
 use Sabri\Platform\Security\Incident\IncidentCoordinator;
+use Sabri\Platform\Security\Integration\ConditionalIntegrationCatalog;
 use Sabri\Platform\Security\Policy\BoundaryPolicyCatalog;
 use Sabri\Platform\Security\Registry\ChatDirectiveCatalog;
 use Sabri\Platform\Security\Registry\ContinuousValueRequirementCatalog;
@@ -63,6 +64,12 @@ final class CompletionCheck
             'F24-FUT-001–F24-FUT-025 repository traceability complete',
             $futureComplete,
             count($future) . '/25 future-security capabilities mapped with exact assurance parity'
+        );
+        $checks[] = $this->check(
+            'conditional_integrations',
+            'CF-04, Traffic Analytics and Disease Intelligence conditional assurance contracts encoded',
+            ConditionalIntegrationCatalog::repositoryCodingComplete(),
+            ConditionalIntegrationCatalog::count() . '/3 conditional contracts'
         );
         $checks[] = $this->check(
             'integration_matrix',
