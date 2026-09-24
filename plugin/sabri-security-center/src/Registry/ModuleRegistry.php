@@ -205,6 +205,24 @@ final class ModuleRegistry
             return new \WP_Error('spcrc_manifest_sensitive_operational_text', 'Manifest operational text must not contain URLs, contact data, credentials or storage paths.');
         }
 
+        $semanticRequirements = [
+            'contract_version' => $contractVersion,
+            'verification_level' => $verificationLevel,
+            'evidence_source' => $evidenceSource,
+            'degraded_behavior' => $degradedBehavior,
+            'release_gate' => $releaseGate,
+        ];
+        foreach ($semanticRequirements as $field => $value) {
+            if ($value === '') {
+                $contractGaps[] = $field;
+                $contractComplete = false;
+            }
+        }
+        $contractGaps = array_values(array_unique($contractGaps));
+        if (! $contractComplete) {
+            $posture = 'unassessed';
+        }
+
         return [
             'module_key' => $moduleKey,
             'name' => $name,
