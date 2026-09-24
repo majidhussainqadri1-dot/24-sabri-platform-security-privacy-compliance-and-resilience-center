@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Sabri\Platform\Security\Registry;
 
 use Sabri\Platform\Security\Capabilities;
+use Sabri\Platform\Security\Integration\ContractCompatibilityPolicy;
 use Sabri\Platform\Security\Support\Sanitizer;
 
 final class ModuleRegistry
@@ -12,6 +13,12 @@ final class ModuleRegistry
     private const MAX_MANIFESTS = 100;
     private const HEARTBEAT_SECONDS = 3600;
     private const ALLOWED_POSTURES = ['unassessed', 'foundation', 'warning', 'critical', 'accepted', 'operational'];
+    private const COMPLETE_CONTRACT_FIELDS = [
+        'tables', 'files', 'capabilities', 'external_vendors', 'secret_classes', 'privacy_operations',
+        'exporters', 'erasers', 'emergency_callbacks', 'last_security_test', 'verification_level',
+        'contract_version', 'canonical_data_owner', 'canonical_action_owner', 'evidence_source',
+        'degraded_behavior', 'release_gate',
+    ];
 
     /** @var array<string,array<string,mixed>> */
     private array $manifests = [];
@@ -111,20 +118,28 @@ final class ModuleRegistry
         return $this->get($moduleKey) !== null;
     }
 
+    /** @return string[] */
+    public static function completeContractFields(): array
+    {
+        return self::COMPLETE_CONTRACT_FIELDS;
+    }
+
+    public static function repositoryContractSchemaComplete(): bool
+    {
+        return in_array('last_security_test', self::COMPLETE_CONTRACT_FIELDS, true)
+            && in_array('contract_version', self::COMPLETE_CONTRACT_FIELDS, true)
+            && in_array('emergency_callbacks', self::COMPLETE_CONTRACT_FIELDS, true)
+            && ContractCompatibilityPolicy::repositoryCodingComplete();
+    }
+
     /** @param array<string,mixed> $manifest
      *  @return array<string,mixed>|\WP_Error
      */
     public function validate(array $manifest): array|\WP_Error
     {
         $required = ['module_key', 'name', 'version', 'owner', 'data_classes', 'public_routes', 'private_routes'];
-        $completeContractFields = [
-            'tables', 'files', 'capabilities', 'external_vendors', 'secret_classes', 'privacy_operations',
-            'exporters', 'erasers', 'emergency_callbacks', 'last_security_test', 'verification_level',
-            'contract_version', 'canonical_data_owner', 'canonical_action_owner', 'evidence_source',
-            'degraded_behavior', 'release_gate',
-        ];
         $contractGaps = [];
-        foreach ($completeContractFields as $field) {
+        foreach (self::COMPLETE_CONTRACT_FIELDS as $field) {
             if (! array_key_exists($field, $manifest)) {
                 $contractGaps[] = $field;
             }
@@ -164,13 +179,22 @@ final class ModuleRegistry
         if (is_wp_error($publicRoutes) || is_wp_error($privateRoutes)) {
             return is_wp_error($publicRoutes) ? $publicRoutes : $privateRoutes;
         }
-        $lastSecurityTest = Sanitizer::isoTime($manifest['last_security_test'] ?? '');
+        $rawLastSecurityTest = trim((string) ($manifest['last_security_test'] ?? ''));
+        $lastSecurityTest = Sanitizer::isoTime($rawLastSecurityTest);
+        if ($rawLastSecurityTest !== '' && $lastSecurityTest === '') {
+            return new \WP_Error('spcrc_manifest_security_test_invalid', 'Manifest security-test evidence must use a valid timestamp.');
+        }
         if ($lastSecurityTest !== '' && strtotime($lastSecurityTest) > time() + 300) {
             return new \WP_Error('spcrc_manifest_security_test_future', 'Manifest security-test evidence cannot be dated in the future.');
         }
         $contractVersion = Sanitizer::text($manifest['contract_version'] ?? '', 40);
         if ($contractVersion !== '' && preg_match('/^\d+\.\d+(?:\.\d+)?$/', $contractVersion) !== 1) {
             return new \WP_Error('spcrc_manifest_contract_version_invalid', 'Manifest contract version must be explicitly numeric when supplied.');
+        }
+        $contractVersionState = $contractVersion === '' ? 'blocked' : ContractCompatibilityPolicy::manifestState($contractVersion);
+        if ($contractVersion !== '' && $contractVersionState !== 'compatible') {
+            $contractGaps[] = 'contract_version_compatibility';
+            $contractComplete = false;
         }
         $canonicalDataOwner = Sanitizer::text($manifest['canonical_data_owner'] ?? $owner, 120);
         $canonicalActionOwner = Sanitizer::text($manifest['canonical_action_owner'] ?? $owner, 160);
@@ -206,6 +230,7 @@ final class ModuleRegistry
         }
 
         $semanticRequirements = [
+            'last_security_test' => $lastSecurityTest,
             'contract_version' => $contractVersion,
             'verification_level' => $verificationLevel,
             'evidence_source' => $evidenceSource,
@@ -244,6 +269,7 @@ final class ModuleRegistry
             'last_security_test' => $lastSecurityTest,
             'verification_level' => $verificationLevel,
             'contract_version' => $contractVersion,
+            'contract_version_state' => $contractVersionState,
             'canonical_data_owner' => $canonicalDataOwner,
             'canonical_action_owner' => $canonicalActionOwner,
             'evidence_source' => $evidenceSource,
@@ -531,9 +557,9 @@ final class ModuleRegistry
             'exporters' => [],
             'erasers' => [],
             'emergency_callbacks' => ['incident-command', 'security-state-recommendation'],
-            'last_security_test' => '',
+            'last_security_test' => Sanitizer::isoTime(apply_filters('spcrc/file24_last_security_test', '')),
             'verification_level' => 'asvs-l3',
-            'contract_version' => '1.1.0',
+            'contract_version' => ContractCompatibilityPolicy::MANIFEST_CURRENT,
             'canonical_data_owner' => 'File 24',
             'canonical_action_owner' => 'Native owners; File 24 assurance only',
             'evidence_source' => 'release:file-24-0.99.0',
