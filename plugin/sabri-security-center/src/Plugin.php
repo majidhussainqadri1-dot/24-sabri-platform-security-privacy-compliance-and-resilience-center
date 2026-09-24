@@ -183,9 +183,12 @@ final class Plugin
                     continue;
                 }
                 $state = (string) ($request['state'] ?? '');
-                $module = (string) ($request['module_key'] ?? '');
-                if (in_array($state, ['incident-containment', 'platform-read-only'], true)
-                    && in_array($module, ['file-19', 'file-24', 'platform', 'global'], true)) {
+                /* These two registry states are platform-wide by definition.
+                 * The SecurityStateRegistry has already authenticated, bounded
+                 * and validated the owning module, so File 19 must contain
+                 * external delivery regardless of which registered module
+                 * requested the global state. */
+                if (in_array($state, ['incident-containment', 'platform-read-only'], true)) {
                     return true;
                 }
             }
