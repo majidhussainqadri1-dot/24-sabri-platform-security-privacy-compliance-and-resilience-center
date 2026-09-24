@@ -25,7 +25,7 @@ final class LaunchBlockerContract
         return self::requiredPayloadFields() === ['affected_feature', 'due_at', 'severity', 'feature_disabled'];
     }
 
-    /** @param array<string,mixed> $payload @return true|\WP_Error */
+    /** @param array<string,mixed> $payload @return bool|\WP_Error */
     public static function validateArtifact(
         string $status,
         int $ownerUserId,
