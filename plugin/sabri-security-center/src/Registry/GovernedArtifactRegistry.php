@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Sabri\Platform\Security\Registry;
 
 use Sabri\Platform\Security\Storage\AuditGapStore;
+use Sabri\Platform\Security\Monitoring\PerformanceObjectiveContract;
+use Sabri\Platform\Security\Release\LaunchBlockerContract;
 use Sabri\Platform\Security\Storage\AuditLogger;
 use Sabri\Platform\Security\Support\AtomicOptionLock;
 use Sabri\Platform\Security\Support\Sanitizer;
@@ -44,6 +46,7 @@ final class GovernedArtifactRegistry
         'trust-claim' => ['draft', 'verified', 'expired', 'revoked'],
         'performance-objective' => ['provisional', 'measured', 'approved', 'breached', 'retired'],
         'release-gate' => ['pending', 'passed', 'failed', 'waived', 'not-applicable'],
+        'launch-blocker' => ['open', 'mitigating', 'accepted-risk', 'closed'],
         'training' => ['planned', 'available', 'completed', 'expired', 'retired'],
         'integration' => ['unassessed', 'compatible', 'degraded', 'blocked', 'retired'],
         'security-test' => ['planned', 'running', 'passed', 'failed', 'accepted-risk'],
@@ -76,6 +79,7 @@ final class GovernedArtifactRegistry
         'trust-claim' => 'spcrc_manage_trust_center',
         'performance-objective' => 'spcrc_manage_performance',
         'release-gate' => 'spcrc_manage_release_gates',
+        'launch-blocker' => 'spcrc_manage_release_gates',
         'training' => 'spcrc_manage_training',
         'integration' => 'spcrc_manage_integrations',
         'security-test' => 'spcrc_run_security_assessments',
@@ -176,6 +180,19 @@ final class GovernedArtifactRegistry
         if ($ownerUserId === null) {
             return new \WP_Error('spcrc_artifact_owner_invalid', 'Artifact owner must be a non-negative whole user identifier.');
         }
+        if ($type === 'performance-objective') {
+            $performanceGate = PerformanceObjectiveContract::validateArtifact($payload);
+            if (is_wp_error($performanceGate)) {
+                return $performanceGate;
+            }
+        }
+        if ($type === 'launch-blocker') {
+            $blockerGate = LaunchBlockerContract::validateArtifact($status, $ownerUserId, $evidenceRef, $payload);
+            if (is_wp_error($blockerGate)) {
+                return $blockerGate;
+            }
+        }
+
         $moduleKey = Sanitizer::key($data['module_key'] ?? 'file-24-security-center', 120);
         if ($moduleKey === '') {
             $moduleKey = 'file-24-security-center';
@@ -486,6 +503,7 @@ final class GovernedArtifactRegistry
             'trust-claim' => ['verified'],
             'performance-objective' => ['measured', 'approved', 'breached'],
             'release-gate' => ['passed', 'failed', 'waived'],
+            'launch-blocker' => ['accepted-risk', 'closed'],
             'security-test' => ['passed', 'failed', 'accepted-risk'],
             'deletion-ledger' => ['reconciled', 'closed'],
         ];
