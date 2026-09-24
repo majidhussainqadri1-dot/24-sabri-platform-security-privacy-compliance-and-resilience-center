@@ -33,7 +33,7 @@ jobs:
             php -l "$source_file"
             count=$((count + 1))
           done < <(find plugin tests -type f -name '*.php' -print0 | sort -z)
-          test "$count" -ge 278
+          test "$count" -ge 292
           echo "Linted $count PHP files."
 
       - name: Run the complete historical and code-complete suites
@@ -45,7 +45,7 @@ jobs:
             php "$test_file"
             count=$((count + 1))
           done < <(find tests -maxdepth 1 -type f -name '*.php' ! -name 'bootstrap.php' -print0 | sort -z)
-          test "$count" -ge 190
+          test "$count" -ge 204
           echo "Executed $count independent PHP test programs."
 
       - name: Reject secrets, private operations material and unsafe PHP
@@ -281,7 +281,7 @@ jobs:
         run: |
           set -euo pipefail
           git ls-files -z | sort -z | xargs -0 sha256sum > /tmp/file24-source-checksums.sha256
-          test "$(wc -l < /tmp/file24-source-checksums.sha256)" -ge 449
+          test "$(wc -l < /tmp/file24-source-checksums.sha256)" -ge 531
           sha256sum -c /tmp/file24-source-checksums.sha256
           echo "path=/tmp/file24-source-checksums.sha256" >> "$GITHUB_OUTPUT"
 
