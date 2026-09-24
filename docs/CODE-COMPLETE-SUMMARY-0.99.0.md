@@ -11,13 +11,14 @@ This release implements the repository-coding scope of **File 24 — Sabri Platf
 The repository now contains executable implementations and contracts for:
 
 - governance charter, versioned policy hierarchy, exceptions and release gates;
-- Files 00–26 ownership/assurance matrix and versioned module manifests;
+- Files 00–26 ownership/assurance matrix, explicit File 00/02/20 contract-state bridges, executable contract-version deprecation/compatibility, and tested module-manifest semantics;
 - membership and credential-authentication assurance without alternate identity ownership;
 - security-state recommendations, controls, risks, findings, vulnerabilities, incidents and audit evidence;
 - privacy requests, verification, recovery, data inventory, processing activities, consent, legal holds, international-transfer metadata and deletion replay;
 - REST/AJAX/webhook authorization, rate limiting, replay protection, same-origin/SSRF policy, upload quarantine contracts and private-delivery grants;
 - vendor/compliance/backup assurance, BIA, recovery objectives, continuity plans and drill evidence;
-- detection, performance evidence, remote-evidence queues and truthful public Trust Center claims;
+- detection, eight-metric measurable performance objectives/threshold evaluation, remote-evidence queues and truthful public Trust Center claims;
+- formal launch-critical blocker records with owner, due date, affected feature, evidence and fail-closed unresolved state;
 - Islamic governance, anti-surveillance, ranking fairness, AI assurance and one-GiB verified-transfer/download assurance;
 - explicit Continuous Value traceability and fail-closed evidence gates for `CV-262..CV-285`;
 - `F24-CEN-01` Assurance Center contract preserving native authorization, encryption, rate limiting and validation;
@@ -75,17 +76,19 @@ The following remain deliberately outside repository coding and are separate evi
 
 The invariant gates now include:
 
-- PHP source/test files: **at least 227**, all lint-clean on PHP 8.0 and PHP 8.3;
-- independent top-level PHP test programs: **at least 140**, all executed;
+- PHP source/test files: **at least 296**, all lint-clean on PHP 8.0 and PHP 8.3;
+- independent top-level PHP test programs: **at least 205**, all executed;
 - base requirement catalogue: **100/100**;
 - recovered directive catalogue: **18/18**;
 - Continuous Value / final-plan catalogue: **25/25** (`CV-262..CV-285` + `F24-CEN-01`);
 - Future Security & Privacy Superset catalogue: **25/25** (`F24-FUT-001..F24-FUT-025`);
 - Files 00–26 integration rows: **27/27**;
-- governed logical domains: **28**;
+- governed logical domains: **29**;
 - release phases encoded: **24A–24L (12/12)**;
-- current-plan and future-superset review evidence: **Cycles 112–135**, with permanent regression tests;
+- current-plan and future-superset review evidence remains permanent, with **Cycle 279** adding the semantic completion regression for the eight defects found in the fresh 20-round audit;
 - explicit CI existence/parity gates for all ten Future Security implementation classes, the Future Superset root/package docs, and cycles `116..135`;
 - deterministic package build, SHA-256 receipt and package/source integrity gates remain mandatory.
 
-**Repository coding result:** 100% of the identified current governing File-24 coding scope plus the approved Future Security & Privacy Superset is represented and gated, with zero known unresolved repository-correctable defect after the latest ten fresh review/correction rounds (185–194), the post-request Cycle 195 QA correction, and two clean closure reviews (196–197). Later staging/live/operational statuses remain unclaimed until independently evidenced.
+**Cycle 279 semantic correction:** the fresh 20-round audit found eight repository/completion defects: blank last-security-test acceptance, missing executable contract-version/deprecation policy, missing File 00/File 20 contract-state bridges, structural-only code-complete gating, stale F24-R088 00–25 wording, non-executable R092 thresholds, no formal R096 blocker record, and stale current documentation. All eight now have executable code/tests or corrected governing documentation.
+
+**Repository coding result:** the identified current governing File-24 coding scope plus the approved Future Security & Privacy Superset is represented and gated after Cycle 279, with zero known unresolved repository-correctable defect in this correction set. This remains a repository claim only; exact companion staging contracts, real performance thresholds, legal/provider evidence, restore drills, independent penetration testing, live deployment and operational acceptance remain unclaimed.
