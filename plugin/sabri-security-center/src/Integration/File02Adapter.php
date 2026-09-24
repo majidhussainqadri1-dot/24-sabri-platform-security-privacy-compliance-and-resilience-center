@@ -59,11 +59,11 @@ final class File02Adapter
         if (! $this->available()) {
             return 'missing';
         }
-        $version = defined('SAUTH_VERSION') ? (string) SAUTH_VERSION : '';
-        if ($version === '' || preg_match('/^\d+(?:\.\d+){0,3}(?:-[0-9A-Za-z.-]+)?$/', $version) !== 1) {
-            return 'blocked';
+        if (! defined('SAUTH_ACCOUNT_CONTRACT_VERSION')) {
+            return 'degraded';
         }
-        return 'compatible';
+        $state = ContractCompatibilityPolicy::evaluate((string) SAUTH_ACCOUNT_CONTRACT_VERSION, '1.1.0', '2.0.0');
+        return $state === 'compatible' ? 'compatible' : ($state === 'deprecated' ? 'degraded' : 'blocked');
     }
 
     /** @param mixed $manifests @return array<int,array<string,mixed>> */
@@ -88,7 +88,7 @@ final class File02Adapter
             'exporters' => [],
             'erasers' => [],
             'emergency_callbacks' => ['session-revocation', 'authentication-lockdown'],
-            'last_security_test' => '',
+            'last_security_test' => Sanitizer::isoTime(apply_filters('spcrc/file02_last_security_test', '')),
             'verification_level' => 'asvs-l3',
             'contract_version' => '1.2.0',
             'canonical_data_owner' => 'File 02',
