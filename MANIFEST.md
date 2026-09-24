@@ -38,3 +38,8 @@ Repository code-complete status does not assert Hostinger staging acceptance, in
 ## Historical review lineage
 
 Historical review evidence remains preserved. **Cycle 17 post-CI illuminative review** remains part of the immutable compatibility lineage, together with the later corrective cycles and current Cycle 278 correction.
+
+- **Historical Cycle 18–21 evidence** remains preserved.
+- Cycles 3–41 remain part of the immutable review lineage.
+- Cycles 57–96 corrective records remain preserved.
+- The historical forty-round review evidence remains preserved.
