@@ -16,7 +16,7 @@ final class RegistryAdmin
         'consent', 'legal-hold', 'processing-activity', 'vulnerability',
         'secret-metadata', 'key-metadata', 'deletion-ledger', 'alert',
         'remote-evidence', 'incident-action', 'upload-assurance', 'private-delivery',
-        'trust-claim',
+        'trust-claim', 'launch-blocker',
     ];
 
 
