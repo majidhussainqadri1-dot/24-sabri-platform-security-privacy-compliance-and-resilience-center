@@ -34,3 +34,7 @@ This repository contains the public-safe **repository code-complete candidate** 
 No passwords, secret keys, raw identity documents, patient/clinical records, private messages, payment credentials, vendor contracts, backup locations, live vulnerabilities, forensic payloads or private incident playbooks belong in this public repository. Manifests inventory **secret classes/metadata only**, never secret values.
 
 Repository code-complete status does not assert Hostinger staging acceptance, independent penetration testing, qualified legal/privacy approval, real restore/load/rollback rehearsals, live deployment, Founder production acceptance or measured operational SLOs.
+
+## Historical review lineage
+
+Historical review evidence remains preserved. **Cycle 17 post-CI illuminative review** remains part of the immutable compatibility lineage, together with the later corrective cycles and current Cycle 278 correction.
