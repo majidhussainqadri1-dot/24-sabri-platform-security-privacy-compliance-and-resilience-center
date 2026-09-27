@@ -92,7 +92,7 @@ $fixtures = [
     'cf-04-media' => [
         'native_scan_preserved', 'native_authorization_preserved', 'native_encryption_preserved',
         'upload_quarantine', 'provider_region_review', 'provider_security_review', 'provider_exit_plan',
-        'credential_plan', 'rights_aware_delivery', 'short_lived_delivery', 'revocation',
+        'credential_plan', 'key_rotation_recovery', 'rights_aware_delivery', 'short_lived_delivery', 'revocation',
         'deletion_propagation', 'audit',
     ],
     'traffic-analytics' => [
