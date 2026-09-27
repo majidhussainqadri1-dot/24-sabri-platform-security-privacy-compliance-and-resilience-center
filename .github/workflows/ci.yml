@@ -33,7 +33,7 @@ jobs:
             php -l "$source_file"
             count=$((count + 1))
           done < <(find plugin tests -type f -name '*.php' -print0 | sort -z)
-          test "$count" -ge 296
+          test "$count" -ge 297
           echo "Linted $count PHP files."
 
       - name: Run the complete historical and code-complete suites
@@ -45,7 +45,7 @@ jobs:
             php "$test_file"
             count=$((count + 1))
           done < <(find tests -maxdepth 1 -type f -name '*.php' ! -name 'bootstrap.php' -print0 | sort -z)
-          test "$count" -ge 205
+          test "$count" -ge 206
           echo "Executed $count independent PHP test programs."
 
       - name: Reject secrets, private operations material and unsafe PHP
@@ -326,15 +326,15 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          rm -rf /tmp/file24-source /tmp/file24-source-snapshot-cycle279.zip
+          rm -rf /tmp/file24-source /tmp/file24-source-snapshot-cycle280.zip
           mkdir -p /tmp/file24-source
           rsync -a --exclude='.git' --exclude='build' ./ /tmp/file24-source/
-          (cd /tmp && zip -X -q -r file24-source-snapshot-cycle279.zip file24-source)
+          (cd /tmp && zip -X -q -r file24-source-snapshot-cycle280.zip file24-source)
 
       - name: Upload sanitized code-complete source snapshot
         if: matrix.php == '8.3'
         uses: actions/upload-artifact@v4
         with:
-          name: file-24-sanitized-source-snapshot-cycle279
-          path: /tmp/file24-source-snapshot-cycle279.zip
+          name: file-24-sanitized-source-snapshot-cycle280
+          path: /tmp/file24-source-snapshot-cycle280.zip
           if-no-files-found: error
