@@ -20,6 +20,7 @@ final class ConditionalIntegrationCatalog
         'cf-04-media' => [
             'name' => 'CF-04 Central Media Processing and Secure Delivery',
             'canonical_owner' => 'cf-04-when-activated',
+            'contract_version' => '1.0.0',
             'file24_role' => 'upload, provider, key, deletion and secure-delivery assurance',
             'required_controls' => [
                 'native_scan_preserved', 'native_authorization_preserved', 'native_encryption_preserved',
@@ -32,6 +33,7 @@ final class ConditionalIntegrationCatalog
         'traffic-analytics' => [
             'name' => 'Traffic Analytics',
             'canonical_owner' => 'analytics-native-owner-when-approved',
+            'contract_version' => '1.0.0',
             'file24_role' => 'privacy, security, compliance, retention, risk and incident assurance',
             'required_controls' => [
                 'declared_measurement_purpose', 'data_minimization', 'optional_analytics_consent',
@@ -44,6 +46,7 @@ final class ConditionalIntegrationCatalog
         'disease-intelligence' => [
             'name' => 'Disease Intelligence',
             'canonical_owner' => 'file-06-15-26-native-split',
+            'contract_version' => '1.0.0',
             'file24_role' => 'medical-safety, privacy, incident and compliance assurance',
             'required_controls' => [
                 'native_disease_truth_preserved', 'source_provenance', 'medical_review',
@@ -77,6 +80,7 @@ final class ConditionalIntegrationCatalog
                 $key === ''
                 || trim((string) ($record['canonical_owner'] ?? '')) === ''
                 || trim((string) ($record['file24_role'] ?? '')) === ''
+                || preg_match('/^\\d+\\.\\d+\\.\\d+$/', (string) ($record['contract_version'] ?? '')) !== 1
                 || ($record['activation_default'] ?? '') !== 'off'
                 || empty($record['required_controls'])
             ) {
@@ -106,7 +110,10 @@ final class ConditionalIntegrationCatalog
         $now ??= time();
         $tested = $testedAt === '' ? false : strtotime($testedAt);
         $fresh = $tested !== false && $tested <= $now + 300 && $tested >= $now - (90 * DAY_IN_SECONDS);
-        $versionValid = preg_match('/^\d+\.\d+(?:\.\d+)?$/', $contractVersion) === 1;
+        $supportedVersion = (string) ($contract['contract_version'] ?? '');
+        $versionValid = preg_match('/^\\d+\\.\\d+\\.\\d+$/', $contractVersion) === 1
+            && $supportedVersion !== ''
+            && hash_equals($supportedVersion, $contractVersion);
 
         $verified = $missing === []
             && $versionValid
@@ -122,6 +129,7 @@ final class ConditionalIntegrationCatalog
             'file24_role' => $contract['file24_role'],
             'missing_controls' => $missing,
             'contract_version_valid' => $versionValid,
+            'supported_contract_version' => $supportedVersion,
             'evidence_ref' => $evidenceRef,
             'evidence_fresh' => $fresh,
             'native_ownership_preserved' => $nativeOwnershipPreserved,
