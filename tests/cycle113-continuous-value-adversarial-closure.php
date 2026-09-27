@@ -47,6 +47,22 @@ $invalidDate = ContinuousValueAssurance::evaluate('CV-275', [
 ]);
 $assert(($invalidDate['state'] ?? '') === 'blocked', 'Unverifiable review timestamps must block performance evidence.');
 
+$now = strtotime('2026-09-27T12:00:00Z');
+$staleEvidence = ContinuousValueAssurance::evaluate('CV-274', [
+    'controls' => ['availability_slo','latency_slo','freshness_slo','delivery_slo','recovery_slo','error_budget','public_status_evidence'],
+    'evidence_ref' => 'ev:cv274:stale',
+    'reviewed_at' => '2026-01-01T00:00:00Z',
+], $now);
+$assert(($staleEvidence['state'] ?? '') === 'blocked', 'Stale Continuous Value evidence must fail closed.');
+$assert(($staleEvidence['evidence_fresh'] ?? true) === false, 'Stale Continuous Value evidence must be marked not fresh.');
+
+$futureEvidence = ContinuousValueAssurance::evaluate('CV-274', [
+    'controls' => ['availability_slo','latency_slo','freshness_slo','delivery_slo','recovery_slo','error_budget','public_status_evidence'],
+    'evidence_ref' => 'ev:cv274:future',
+    'reviewed_at' => '2026-09-28T12:00:00Z',
+], $now);
+$assert(($futureEvidence['state'] ?? '') === 'blocked', 'Future-dated Continuous Value evidence must fail closed.');
+
 $failOpen = ContinuousValueAssurance::evaluate('CV-277', [
     'controls' => ['core_read_fallback','auth_safe_fallback','downstream_degraded_state'],
     'evidence_ref' => 'ev:cv277:1',
