@@ -44,7 +44,7 @@ final class ContinuousValueAssurance
     public static function supportedIds(): array { return array_keys(self::REQUIRED); }
 
     /** @param array<string,mixed> $evidence @return array<string,mixed> */
-    public static function evaluate(string $id, array $evidence): array
+    public static function evaluate(string $id, array $evidence, ?int $now = null): array
     {
         if (! isset(self::REQUIRED[$id])) {
             return ['state'=>'unknown','write_allowed'=>false,'missing_controls'=>[],'evidence_ref'=>''];
@@ -54,7 +54,13 @@ final class ContinuousValueAssurance
         $missing = array_values(array_diff(self::REQUIRED[$id], $controls));
         $evidenceRef = self::opaqueReference((string) ($evidence['evidence_ref'] ?? ''));
         $reviewedAt = self::isoTime((string) ($evidence['reviewed_at'] ?? ''));
-        $state = $missing === [] && $evidenceRef !== '' && $reviewedAt !== '' ? 'verified' : 'blocked';
+        $now ??= time();
+        $reviewedTimestamp = $reviewedAt === '' ? false : strtotime($reviewedAt);
+        $maxAgeDays = max(1, min(365, (int) apply_filters('spcrc/continuous_value_evidence_max_age_days', 90, $id)));
+        $evidenceFresh = $reviewedTimestamp !== false
+            && $reviewedTimestamp <= $now + 300
+            && $reviewedTimestamp >= $now - ($maxAgeDays * DAY_IN_SECONDS);
+        $state = $missing === [] && $evidenceRef !== '' && $evidenceFresh ? 'verified' : 'blocked';
 
         return [
             'state' => $state,
@@ -62,6 +68,8 @@ final class ContinuousValueAssurance
             'missing_controls' => $missing,
             'evidence_ref' => $evidenceRef,
             'reviewed_at' => $reviewedAt,
+            'evidence_fresh' => $evidenceFresh,
+            'max_evidence_age_days' => $maxAgeDays,
             'external_evidence_required' => true,
         ];
     }
