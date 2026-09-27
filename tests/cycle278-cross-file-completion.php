@@ -102,7 +102,7 @@ $fixtures = [
         'export_authorization', 'sensitive_admin_step_up', 'retention_rule', 'incident_route',
     ],
     'disease-intelligence' => [
-        'native_disease_truth_preserved', 'source_provenance', 'medical_review',
+        'native_disease_truth_preserved', 'source_provenance', 'medical_review', 'critical_harm_claim_escalation',
         'no_autonomous_diagnosis', 'no_autonomous_prescription', 'privacy_minimization',
         'ranking_policy_versioned', 'ranking_explainable', 'ranking_rollback',
         'correction_retraction_propagation', 'bot_interest_anomaly_monitor',
