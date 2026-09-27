@@ -15,6 +15,8 @@ This repository contains the public-safe **repository code-complete candidate** 
 - Future Security & Privacy Superset: `F24-FUT-001–F24-FUT-025`
 - Latest historical eighty-round review: Cycles `198–277`, corrected final result `9` defect-bearing rounds (`198–206`) and `71` clean requested rounds.
 - Cross-file completion correction: Cycle `278`.
+- Semantic completion correction: Cycle `279`.
+- File 19 platform-wide notification-containment correction: Cycle `280`.
 
 ## Repository evidence
 
@@ -37,7 +39,7 @@ Repository code-complete status does not assert Hostinger staging acceptance, in
 
 ## Historical review lineage
 
-Historical review evidence remains preserved. **Cycle 17 post-CI illuminative review** remains part of the immutable compatibility lineage, together with the later corrective cycles and current Cycle 278 correction.
+Historical review evidence remains preserved. **Cycle 17 post-CI illuminative review** remains part of the immutable compatibility lineage, together with the later corrective cycles and the current Cycle 280 correction.
 
 - **Historical Cycle 18–21 evidence** remains preserved.
 - Cycles 3–41 remain part of the immutable review lineage.
