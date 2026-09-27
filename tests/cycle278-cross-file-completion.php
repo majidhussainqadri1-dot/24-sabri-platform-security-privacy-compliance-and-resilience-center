@@ -134,6 +134,17 @@ foreach ($fixtures as $key => $controls) {
 
 c278((ConditionalIntegrationCatalog::evaluate('unknown', [], $now)['activation_allowed'] ?? true) === false, 'Unknown conditional integration must fail closed.');
 
+$unsupportedVersion = ConditionalIntegrationCatalog::evaluate('cf-04-media', [
+    'controls' => $fixtures['cf-04-media'],
+    'contract_version' => '2.0.0',
+    'evidence_ref' => 'evidence:cf-04-media:future',
+    'tested_at' => '2026-09-24T07:30:00Z',
+    'native_ownership_preserved' => true,
+    'feature_flag_off_by_default' => true,
+], $now);
+c278(($unsupportedVersion['activation_allowed'] ?? true) === false, 'Unreviewed conditional integration contract versions must fail closed.');
+c278(($unsupportedVersion['contract_version_valid'] ?? true) === false, 'Unsupported conditional integration version must be reported invalid.');
+
 $sourceManifest = json_decode((string) file_get_contents(dirname(__DIR__) . '/docs/SOURCE-MANIFEST-0.99.0.json'), true, 512, JSON_THROW_ON_ERROR);
 c278(($sourceManifest['integration_files']['last'] ?? null) === 26, 'Source manifest must end at File 26.');
 c278(($sourceManifest['integration_files']['count'] ?? null) === 27, 'Source manifest must record 27 permanent files.');
