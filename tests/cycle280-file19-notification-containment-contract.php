@@ -22,4 +22,10 @@ if (strpos($matrix, "'contract_filter' => 'spcrc/file19_contract_state'") === fa
     fwrite(STDERR, "File 19 assurance matrix contract is missing.\n");
     exit(1);
 }
+foreach (['provider-secret', 'abuse', 'sensitive-preview', 'critical-alert/incident containment', 'provider-retry'] as $assuranceNeedle) {
+    if (strpos($matrix, $assuranceNeedle) === false) {
+        fwrite(STDERR, "File 19 assurance matrix is missing required plan concern: {$assuranceNeedle}\n");
+        exit(1);
+    }
+}
 echo "Cycle 280 File19 notification containment contract PASS\n";
