@@ -49,7 +49,7 @@ final class ConditionalIntegrationCatalog
             'contract_version' => '1.0.0',
             'file24_role' => 'medical-safety, privacy, incident and compliance assurance',
             'required_controls' => [
-                'native_disease_truth_preserved', 'source_provenance', 'medical_review',
+                'native_disease_truth_preserved', 'source_provenance', 'medical_review', 'critical_harm_claim_escalation',
                 'no_autonomous_diagnosis', 'no_autonomous_prescription', 'privacy_minimization',
                 'ranking_policy_versioned', 'ranking_explainable', 'ranking_rollback',
                 'correction_retraction_propagation', 'bot_interest_anomaly_monitor',
