@@ -15,6 +15,9 @@ This repository contains the public-safe **repository code-complete candidate** 
 - Future Security & Privacy Superset: `F24-FUT-001–F24-FUT-025`
 - Latest historical eighty-round review: Cycles `198–277`, corrected final result `9` defect-bearing rounds (`198–206`) and `71` clean requested rounds.
 - Cross-file completion correction: Cycle `278`.
+- Semantic completion correction: Cycle `279`.
+- File 19 platform-wide notification-containment correction: Cycle `280`.
+- Twenty-round cross-plan review: `27 September 2026` (7 defect-bearing review rounds corrected; exact-head CI is the final external repository gate).
 
 ## Repository evidence
 
@@ -28,6 +31,7 @@ This repository contains the public-safe **repository code-complete candidate** 
 - Known external gates: `docs/KNOWN-LIMITATIONS-0.99.0.md`
 - Eighty-round register: `docs/EIGHTY-ROUND-REVIEW-AND-CORRECTION-CYCLES-198-277.md`
 - Cross-file completion evidence: `docs/CROSS-FILE-COMPLETION-CYCLE-278.md`
+- Twenty-round cross-plan review: `docs/TWENTY-ROUND-CROSS-PLAN-REVIEW-2026-09-27.md`
 
 ## Public/private boundary
 
@@ -37,7 +41,7 @@ Repository code-complete status does not assert Hostinger staging acceptance, in
 
 ## Historical review lineage
 
-Historical review evidence remains preserved. **Cycle 17 post-CI illuminative review** remains part of the immutable compatibility lineage, together with the later corrective cycles and current Cycle 278 correction.
+Historical review evidence remains preserved. **Cycle 17 post-CI illuminative review** remains part of the immutable compatibility lineage, together with the later corrective cycles and the current Cycle 280 correction.
 
 - **Historical Cycle 18–21 evidence** remains preserved.
 - Cycles 3–41 remain part of the immutable review lineage.

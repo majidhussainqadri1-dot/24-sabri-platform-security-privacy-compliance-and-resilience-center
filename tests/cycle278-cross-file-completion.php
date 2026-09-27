@@ -92,17 +92,17 @@ $fixtures = [
     'cf-04-media' => [
         'native_scan_preserved', 'native_authorization_preserved', 'native_encryption_preserved',
         'upload_quarantine', 'provider_region_review', 'provider_security_review', 'provider_exit_plan',
-        'credential_plan', 'rights_aware_delivery', 'short_lived_delivery', 'revocation',
+        'credential_plan', 'key_rotation_recovery', 'rights_aware_delivery', 'short_lived_delivery', 'revocation',
         'deletion_propagation', 'audit',
     ],
     'traffic-analytics' => [
         'declared_measurement_purpose', 'data_minimization', 'optional_analytics_consent',
         'consent_withdrawal', 'no_covert_tracking', 'no_data_sale', 'no_commercial_profiling',
-        'url_query_sanitization', 'no_auth_tokens_in_logs', 'minor_health_interest_profiling_forbidden',
+        'url_query_sanitization', 'private_clinical_path_exclusion', 'low_count_geo_content_suppression', 'no_auth_tokens_in_logs', 'minor_health_interest_profiling_forbidden',
         'export_authorization', 'sensitive_admin_step_up', 'retention_rule', 'incident_route',
     ],
     'disease-intelligence' => [
-        'native_disease_truth_preserved', 'source_provenance', 'medical_review',
+        'native_disease_truth_preserved', 'source_provenance', 'medical_review', 'critical_harm_claim_escalation',
         'no_autonomous_diagnosis', 'no_autonomous_prescription', 'privacy_minimization',
         'ranking_policy_versioned', 'ranking_explainable', 'ranking_rollback',
         'correction_retraction_propagation', 'bot_interest_anomaly_monitor',
@@ -134,6 +134,17 @@ foreach ($fixtures as $key => $controls) {
 
 c278((ConditionalIntegrationCatalog::evaluate('unknown', [], $now)['activation_allowed'] ?? true) === false, 'Unknown conditional integration must fail closed.');
 
+$unsupportedVersion = ConditionalIntegrationCatalog::evaluate('cf-04-media', [
+    'controls' => $fixtures['cf-04-media'],
+    'contract_version' => '2.0.0',
+    'evidence_ref' => 'evidence:cf-04-media:future',
+    'tested_at' => '2026-09-24T07:30:00Z',
+    'native_ownership_preserved' => true,
+    'feature_flag_off_by_default' => true,
+], $now);
+c278(($unsupportedVersion['activation_allowed'] ?? true) === false, 'Unreviewed conditional integration contract versions must fail closed.');
+c278(($unsupportedVersion['contract_version_valid'] ?? true) === false, 'Unsupported conditional integration version must be reported invalid.');
+
 $sourceManifest = json_decode((string) file_get_contents(dirname(__DIR__) . '/docs/SOURCE-MANIFEST-0.99.0.json'), true, 512, JSON_THROW_ON_ERROR);
 c278(($sourceManifest['integration_files']['last'] ?? null) === 26, 'Source manifest must end at File 26.');
 c278(($sourceManifest['integration_files']['count'] ?? null) === 27, 'Source manifest must record 27 permanent files.');
@@ -146,8 +157,8 @@ c278(str_contains($review, 'Clean requested rounds after those fixes | **71**'),
 $ci = (string) file_get_contents(dirname(__DIR__) . '/.github/workflows/ci.yml');
 c278(str_contains($ci, 'cycle278-cross-file-completion.php'), 'CI must explicitly retain the Cycle 278 cross-file completion regression.');
 c278(str_contains($ci, 'ConditionalIntegrationCatalog::repositoryCodingComplete()'), 'CI must gate conditional integration completion.');
-c278(str_contains($ci, 'file24-source-snapshot-cycle279.zip'), 'CI snapshot path naming must reflect the current correction cycle.');
-c278(str_contains($ci, 'file-24-sanitized-source-snapshot-cycle279'), 'CI uploaded artifact name must reflect the current correction cycle.');
+c278(preg_match('/file24-source-snapshot-cycle[0-9]+\\.zip/', $ci) === 1, 'CI must retain a cycle-versioned source snapshot path.');
+c278(preg_match('/file-24-sanitized-source-snapshot-cycle[0-9]+/', $ci) === 1, 'CI must retain a cycle-versioned sanitized source artifact name.');
 
 c278(ReleaseStatus::repositoryCodingComplete(), 'Repository coding status must include the corrected manifest, matrix and conditional-integration gates.');
 c278(! ReleaseStatus::productionReady(), 'Repository correction must not assert staging/live/operational acceptance.');

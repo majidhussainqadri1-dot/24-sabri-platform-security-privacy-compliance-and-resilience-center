@@ -76,8 +76,8 @@ The following remain deliberately outside repository coding and are separate evi
 
 The invariant gates now include:
 
-- PHP source/test files: **at least 296**, all lint-clean on PHP 8.0 and PHP 8.3;
-- independent top-level PHP test programs: **at least 205**, all executed;
+- PHP source/test files: **at least 298**, all lint-clean on PHP 8.0 and PHP 8.3;
+- independent top-level PHP test programs: **at least 207**, all executed;
 - base requirement catalogue: **100/100**;
 - recovered directive catalogue: **18/18**;
 - Continuous Value / final-plan catalogue: **25/25** (`CV-262..CV-285` + `F24-CEN-01`);
@@ -85,10 +85,17 @@ The invariant gates now include:
 - Files 00–26 integration rows: **27/27**;
 - governed logical domains: **29**;
 - release phases encoded: **24A–24L (12/12)**;
-- current-plan and future-superset review evidence remains permanent, with **Cycle 279** adding the semantic completion regression for the eight defects found in the fresh 20-round audit;
+- current-plan and future-superset review evidence remains permanent, with **Cycle 279** adding semantic-completion regression and **Cycle 280** adding the File 19 platform-wide notification-containment regression;
 - explicit CI existence/parity gates for all ten Future Security implementation classes, the Future Superset root/package docs, and cycles `116..135`;
 - deterministic package build, SHA-256 receipt and package/source integrity gates remain mandatory.
 
 **Cycle 279 semantic correction:** the fresh 20-round audit found eight repository/completion defects: blank last-security-test acceptance, missing executable contract-version/deprecation policy, missing File 00/File 20 contract-state bridges, structural-only code-complete gating, stale F24-R088 00–25 wording, non-executable R092 thresholds, no formal R096 blocker record, and stale current documentation. All eight now have executable code/tests or corrected governing documentation.
 
-**Repository coding result:** the identified current governing File-24 coding scope plus the approved Future Security & Privacy Superset is represented and gated after Cycle 279, with zero known unresolved repository-correctable defect in this correction set. This remains a repository claim only; exact companion staging contracts, real performance thresholds, legal/provider evidence, restore drills, independent penetration testing, live deployment and operational acceptance remain unclaimed.
+**Cycle 280 containment correction:** File 24 now derives File 19 external-delivery containment from current canonical security-state evidence for the platform-wide `incident-containment` and `platform-read-only` states without narrowing those states to a selected module-key allowlist. Native File 19 delivery ownership remains intact.
+
+**Repository coding result:** the identified current governing File-24 coding scope plus the approved Future Security & Privacy Superset is represented and gated after Cycle 280, with zero known unresolved repository-correctable defect in this correction set. This remains a repository claim only; exact companion staging contracts, real performance thresholds, legal/provider evidence, restore drills, independent penetration testing, live deployment and operational acceptance remain unclaimed.
+
+
+## 27 September 2026 twenty-round cross-plan review
+
+Seven source-review rounds found repository-correctable gaps and were corrected before the next round: repository-truth/documentation parity, conditional-contract version compatibility, Continuous Value evidence freshness, CF-04 key rotation/recovery assurance, Traffic Analytics private-path/low-count privacy suppression, Disease Intelligence critical-harm escalation, and File 19 plan-level assurance wording. Rounds 8–19 were clean after those fixes. Round 20 is the exact GitHub PR-head/main-head CI gate and is intentionally not self-certified inside this source document.

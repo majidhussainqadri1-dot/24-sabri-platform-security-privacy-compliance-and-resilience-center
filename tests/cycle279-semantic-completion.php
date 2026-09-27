@@ -137,6 +137,6 @@ $ci = (string) file_get_contents($root . '/.github/workflows/ci.yml');
 c279(str_contains($legacyMatrix, 'SUPERSEDED') && str_contains($legacyMatrix, 'FILES-00-26-INTEGRATION-MATRIX-0.99.0.md'), 'Legacy 00–25 document must be explicitly non-governing.');
 c279(str_contains($integrationContracts, '0.99.0') && str_contains($integrationContracts, 'last_security_test'), 'Current integration contract documentation must match the strict manifest contract.');
 c279(str_contains($summary, 'Cycle 279'), 'Code-complete summary must identify the latest semantic correction cycle.');
-c279(str_contains($ci, 'file24-source-snapshot-cycle279.zip') && str_contains($ci, 'cycle279-semantic-completion.php'), 'CI must publish and test the Cycle 279 corrected source.');
+c279(preg_match('/file24-source-snapshot-cycle[0-9]+\\.zip/', $ci) === 1 && str_contains($ci, 'cycle279-semantic-completion.php'), 'CI must publish a cycle-versioned corrected source snapshot and retain the Cycle 279 regression.');
 
 echo "PASS: {$count} Cycle 279 semantic completion assertions\n";
