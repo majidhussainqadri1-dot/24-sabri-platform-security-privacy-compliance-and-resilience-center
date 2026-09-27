@@ -38,7 +38,7 @@ final class ConditionalIntegrationCatalog
             'required_controls' => [
                 'declared_measurement_purpose', 'data_minimization', 'optional_analytics_consent',
                 'consent_withdrawal', 'no_covert_tracking', 'no_data_sale', 'no_commercial_profiling',
-                'url_query_sanitization', 'no_auth_tokens_in_logs', 'minor_health_interest_profiling_forbidden',
+                'url_query_sanitization', 'private_clinical_path_exclusion', 'low_count_geo_content_suppression', 'no_auth_tokens_in_logs', 'minor_health_interest_profiling_forbidden',
                 'export_authorization', 'sensitive_admin_step_up', 'retention_rule', 'incident_route',
             ],
             'activation_default' => 'off',
