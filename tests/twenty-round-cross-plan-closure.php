@@ -65,7 +65,7 @@ $ci = (string) file_get_contents(__DIR__ . '/../.github/workflows/ci.yml');
 $assert(str_contains($ci, "php: ['8.0', '8.3']"), 'CI must run PHP 8.0 and 8.3.');
 $assert(str_contains($ci, "file24-source-snapshot-cycle280.zip"), 'CI source snapshot must reflect Cycle 280.');
 $assert(! str_contains($ci, "file24-source-snapshot-cycle279.zip"), 'CI must not regress to stale Cycle 279 snapshot naming.');
-$assert(str_contains($ci, 'twenty-round-cross-plan-closure.php'), 'CI complete-suite discovery must include this regression by top-level test enumeration.');
+$assert(str_contains($ci, 'find tests -maxdepth 1') && str_contains($ci, "! -name 'bootstrap.php'"), 'CI must enumerate every independent top-level PHP regression, including this review test.');
 
 $sourceManifest = json_decode((string) file_get_contents(__DIR__ . '/../docs/SOURCE-MANIFEST-0.99.0.json'), true, 512, JSON_THROW_ON_ERROR);
 $assert(($sourceManifest['latest_repository_correction_cycle'] ?? null) === 280, 'Source manifest must retain Cycle 280 as latest numbered repository correction.');
