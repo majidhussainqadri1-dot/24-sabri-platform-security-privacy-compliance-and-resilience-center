@@ -50,7 +50,7 @@ foreach ($verifiedFixtures as $id => $controls) {
     $result = ContinuousValueAssurance::evaluate($id, [
         'controls' => $controls,
         'evidence_ref' => 'ev:' . strtolower(str_replace('-', '', $id)) . ':1',
-        'reviewed_at' => '2026-08-08T04:00:00Z',
+        'reviewed_at' => gmdate('c', time() - 60),
     ]);
     $assert(($result['state'] ?? '') === 'verified', $id . ' complete evidence must verify.');
     $assert(($result['write_allowed'] ?? false) === true, $id . ' verified evidence must permit the governed action.');
