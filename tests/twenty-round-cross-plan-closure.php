@@ -70,5 +70,13 @@ $assert(str_contains($ci, 'find tests -maxdepth 1') && str_contains($ci, "! -nam
 $sourceManifest = json_decode((string) file_get_contents(__DIR__ . '/../docs/SOURCE-MANIFEST-0.99.0.json'), true, 512, JSON_THROW_ON_ERROR);
 $assert(($sourceManifest['latest_repository_correction_cycle'] ?? null) === 280, 'Source manifest must retain Cycle 280 as latest numbered repository correction.');
 $assert(($sourceManifest['integration_files']['count'] ?? null) === 27, 'Source manifest must record Files 00-26.');
+$assert(($sourceManifest['checksum_ledger'] ?? '') === 'CI-generated exact-checkout artifact: file24-source-checksums.sha256', 'Source manifest must identify the CI-generated checksum artifact without claiming a nonexistent tracked ledger.');
+
+$packagedSourceManifest = json_decode((string) file_get_contents(__DIR__ . '/../plugin/sabri-security-center/docs/SOURCE-MANIFEST.json'), true, 512, JSON_THROW_ON_ERROR);
+$assert(($packagedSourceManifest['checksum_ledger'] ?? '') === $sourceManifest['checksum_ledger'], 'Repository and packaged source manifests must agree on checksum-ledger generation truth.');
+
+$readme = (string) file_get_contents(__DIR__ . '/../README.md');
+$assert(! str_contains($readme, 'sha256sum -c CHECKSUMS.sha256'), 'README must not require a nonexistent tracked checksum ledger.');
+$assert(str_contains($readme, 'git ls-files -z | sort -z | xargs -0 sha256sum > /tmp/file24-source-checksums.sha256'), 'README must document exact-checkout checksum-ledger generation before verification.');
 
 echo "PASS: {$count} assertions — twenty-round cross-plan closure regression\n";
