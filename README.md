@@ -56,7 +56,8 @@ find plugin tests -type f -name '*.php' -print0 | xargs -0 -n1 php -l
 while IFS= read -r -d '' test_file; do
   php "$test_file"
 done < <(find tests -maxdepth 1 -type f -name '*.php' ! -name 'bootstrap.php' -print0 | sort -z)
-sha256sum -c CHECKSUMS.sha256
+git ls-files -z | sort -z | xargs -0 sha256sum > /tmp/file24-source-checksums.sha256
+sha256sum -c /tmp/file24-source-checksums.sha256
 ./tools/build-release.sh
 ```
 
