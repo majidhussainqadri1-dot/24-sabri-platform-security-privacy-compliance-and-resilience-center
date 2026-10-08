@@ -15,15 +15,19 @@
     "count": 27
   },
   "governed_logical_domains": 29,
-  "conditional_integrations": ["cf-04-media", "traffic-analytics", "disease-intelligence"],
+  "conditional_integrations": [
+    "cf-04-media",
+    "traffic-analytics",
+    "disease-intelligence"
+  ],
   "release_phases": {
     "first": "24A",
     "last": "24L",
     "count": 12
   },
   "verification": {
-    "php_files_minimum": 296,
-    "test_programs_minimum": 205,
+    "php_files_minimum": 298,
+    "test_programs_minimum": 207,
     "code_complete_assertions": 146,
     "php_versions": [
       "8.0",
@@ -47,5 +51,7 @@
     "independent-assurance",
     "live-deployed",
     "operational"
-  ]
+  ],
+  "latest_repository_correction_cycle": 280,
+  "latest_review_batch": "2026-09-27-twenty-round-cross-plan"
 }
