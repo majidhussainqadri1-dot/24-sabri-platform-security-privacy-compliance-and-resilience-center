@@ -24,15 +24,9 @@ final class SecurityGuidance
 
     public function enqueuePublicAssets(): void
     {
-        if (! is_singular()) {
-            return;
-        }
-
-        $post = get_post();
-        if (! $post || ! has_shortcode((string) $post->post_content, self::SHORTCODE)) {
-            return;
-        }
-
+        // The shortcode may be rendered from a reusable block, theme, widget,
+        // page builder or dynamic template after wp_head. Enqueue the tiny
+        // scoped stylesheet early on the public frontend, never on wp-admin.
         wp_enqueue_style('spcrc-security-guidance', SPCRC_PLUGIN_URL . 'assets/security-guidance.css', [], SPCRC_VERSION);
     }
 
@@ -58,6 +52,10 @@ final class SecurityGuidance
     /** Public-safe guidance only: no runtime posture, risk register or secrets. */
     public function renderPublic(): string
     {
+        static $renderCount = 0;
+        $renderCount++;
+        $idPrefix = 'spcrc-public-guidance-' . $renderCount;
+
         $general = [
             'اپنے اکاؤنٹ کے لیے منفرد اور مضبوط پاس ورڈ رکھیں؛ دستیاب ہو تو پاس کی یا دو مرحلہ تصدیق استعمال کریں۔',
             'پاس ورڈ، OTP، پاس کی، ریکوری کوڈ یا تصدیقی لنک کسی شخص کو نہ دیں؛ پلیٹ فارم کا منتظم بھی یہ معلومات نہیں مانگتا۔',
@@ -80,15 +78,15 @@ final class SecurityGuidance
 
         ob_start();
         ?>
-        <section class="spcrc-public-guidance" dir="rtl" lang="ur" aria-labelledby="spcrc-public-guidance-heading">
+        <section class="spcrc-public-guidance" dir="rtl" lang="ur" aria-labelledby="<?php echo esc_attr($idPrefix); ?>">
             <header class="spcrc-public-guidance__header">
                 <p class="spcrc-public-guidance__eyebrow"><?php echo esc_html('Sabri Social Homeopathy Platform'); ?></p>
-                <h2 id="spcrc-public-guidance-heading"><?php echo esc_html('حفاظتی مرکز: آپ کا اکاؤنٹ، آپ کی رازداری'); ?></h2>
+                <h2 id="<?php echo esc_attr($idPrefix); ?>"><?php echo esc_html('حفاظتی مرکز: آپ کا اکاؤنٹ، آپ کی رازداری'); ?></h2>
                 <p><?php echo esc_html('آن لائن حفاظت ایک مشترک ذمہ داری ہے۔ یہ رہنمائی خطرات کم کرنے کے لیے ہے؛ کسی نظام کے ناقابلِ حملہ ہونے کا دعویٰ نہیں۔'); ?></p>
             </header>
-            <?php $this->renderList('عام صارفین اور فالوورز کے لیے', $general); ?>
-            <?php $this->renderList('مریضوں اور ڈاکٹروں کے لیے', $patients); ?>
-            <?php $this->renderList('مشتبہ داخلے یا دھوکے کی صورت میں', $incident); ?>
+            <?php $this->renderList('عام صارفین اور فالوورز کے لیے', $general, $idPrefix); ?>
+            <?php $this->renderList('مریضوں اور ڈاکٹروں کے لیے', $patients, $idPrefix); ?>
+            <?php $this->renderList('مشتبہ داخلے یا دھوکے کی صورت میں', $incident, $idPrefix); ?>
             <p class="spcrc-public-guidance__footnote"><?php echo esc_html('اہم: اس صفحے پر عمومی احتیاطی تدابیر دی گئی ہیں؛ یہ کسی خاص حفاظتی کنٹرول کے فعال ہونے کی تصدیق نہیں۔'); ?></p>
         </section>
         <?php
@@ -129,9 +127,9 @@ final class SecurityGuidance
     }
 
     /** @param array<int,string> $items */
-    private function renderList(string $heading, array $items): void
+    private function renderList(string $heading, array $items, string $idPrefix): void
     {
-        $id = 'spcrc-guidance-' . substr(hash('sha256', $heading), 0, 10);
+        $id = $idPrefix . '-' . substr(hash('sha256', $heading), 0, 10);
         ?>
         <section class="spcrc-public-guidance__section" aria-labelledby="<?php echo esc_attr($id); ?>">
             <h3 id="<?php echo esc_attr($id); ?>"><?php echo esc_html($heading); ?></h3>
