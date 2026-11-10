@@ -33,3 +33,8 @@
 ## ۵۔ ماخذ
 - صارف کی فراہم کردہ «صابری سوشل ہومیوپیتھی پلیٹ فارم کا مستقل حفاظتی ضابطہ»، ۱۰ نومبر ۲۰۲۶، سات شقیں۔
 - «صابری ویب سائٹ کا جامع منصوبہ»، ایڈیشن ۱۲، ابواب ۳، ۵، ۸ اور ۹۔
+
+## ۶۔ تازہ کوڈ آڈٹ اور اصلاح
+- عوامی shortcode صرف raw post content تک محدود نہیں؛ dynamically rendered reusable blocks، template parts اور page builders سے شامل شدہ shortcode پر CSS کے ضائع ہونے سے بچنے کے لیے frontend پر مختصر، مکمل scoped CSS شروع ہی میں enqueue ہوگی۔
+- ایک ہی صفحے پر shortcode متعدد دفعہ آئے تو اب تمام `id` اور `aria-labelledby` کی شناخت منفرد ہوگی؛ accessibility اور screen-reader references کا الگ regression test موجود ہے۔
+- یہ اصلاح صرف frontend رہنمائی اور accessibility کی ہے؛ MFA، WAF یا backup کے عملی فعال ہونے کا ثبوت نہیں۔
