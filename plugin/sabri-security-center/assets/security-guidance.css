@@ -1,0 +1,13 @@
+/* File 24: public-safe Urdu security guidance, isolated from private dashboards. */
+.spcrc-public-guidance {box-sizing:border-box;max-width:960px;margin-inline:auto;padding:clamp(16px,3vw,32px);border:1px solid #d6e1da;border-radius:20px;background:#f4f7f5;color:#15251e;line-height:1.9;text-align:start}
+.spcrc-public-guidance *, .spcrc-public-guidance *::before, .spcrc-public-guidance *::after {box-sizing:border-box}
+.spcrc-public-guidance__header {border-inline-start:5px solid #087a4e;padding-inline-start:16px}
+.spcrc-public-guidance__eyebrow {color:#065f3d;font-size:.82rem;font-weight:700;letter-spacing:.04em;direction:ltr;text-align:start}
+.spcrc-public-guidance h2 {font-size:clamp(1.35rem,3vw,2rem);color:#065f3d;line-height:1.6}
+.spcrc-public-guidance h3 {font-size:1.2rem;color:#15251e;line-height:1.6}
+.spcrc-public-guidance__section {padding:18px 20px;margin-block:18px;background:#fff;border:1px solid #d6e1da;border-radius:14px}
+.spcrc-public-guidance ul {padding-inline-start:1.4em;margin-block:12px}
+.spcrc-public-guidance li {margin-block:.5em}
+.spcrc-public-guidance__footnote {font-size:.92rem;padding-top:16px;border-top:1px solid #d6e1da}
+@media (max-width:480px) {.spcrc-public-guidance__section {padding:14px}}
+@media (prefers-reduced-motion:reduce) {.spcrc-public-guidance * {scroll-behavior:auto}}
