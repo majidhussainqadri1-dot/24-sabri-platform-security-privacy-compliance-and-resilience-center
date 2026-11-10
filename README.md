@@ -16,6 +16,14 @@ File 24 is the cross-platform security-governance and assurance plane for the Sa
 
 This status means the approved repository-coding scope, including the later Continuous Value / Top-20 File-24 delta and the Future Security & Privacy Superset, is implemented, traceable, reviewed, testable and packageable. It does **not** mean Hostinger staging acceptance, independent certification, penetration-test acceptance, restore-drill acceptance, live deployment or operational acceptance.
 
+## Urdu security education (new repository candidate)
+
+- File 24 registers a public, read-only shortcode: [sabri_security_guidance]. Publish it on a reviewed WordPress page, then link that page through File 20's approved navigation.
+- An authorized wp-admin operator sees **Security Center → Security guidance**, with the seven controls to verify using actual live configuration and evidence.
+- Public guidance covers phishing, MFA and OTP safety, devices, patient privacy, reporting suspicious activity and account recovery precautions. It does **not** disclose internal vulnerabilities, secrets, patient records or live incident evidence.
+- These educational interfaces neither enable WAF/MFA/backups nor establish production deployment. Run the new standalone regression: php tests/security-guidance.php, and retain all existing repository and staging gates.
+- Primary specification: docs/SECURITY-EDUCATION-AND-POLICY-URDU-2026-11-10.md.
+
 ## Implemented repository scope
 
 - module manifests, security states and Files 00–26 integration contracts;
