@@ -22,7 +22,7 @@ function esc_html(string $value): string { return htmlspecialchars($value, ENT_Q
 function esc_html__(string $value, string $domain): string { return esc_html($value); }
 function esc_attr(string $value): string { return htmlspecialchars($value, ENT_QUOTES, 'UTF-8'); }
 function current_user_can(string $cap): bool { return $cap === 'spcrc_view_overview' && $GLOBALS['allowed']; }
-function wp_die(string $message): never { throw new RuntimeException($message); }
+function wp_die(string $message): void { throw new RuntimeException($message); }
 function add_submenu_page(string $parent, string $page, string $menu, string $cap, string $slug, callable $callback): void
 {
     $GLOBALS['menus'][$slug] = ['parent' => $parent, 'cap' => $cap, 'callback' => $callback];
