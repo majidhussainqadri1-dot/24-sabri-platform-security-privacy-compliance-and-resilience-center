@@ -14,7 +14,9 @@ final class SecurityGuidance
 
     public function registerHooks(): void
     {
-        add_shortcode(self::SHORTCODE, [$this, 'renderPublic']);
+        if (function_exists('add_shortcode')) {
+            add_shortcode(self::SHORTCODE, [$this, 'renderPublic']);
+        }
         add_action('admin_menu', [$this, 'registerAdminMenu']);
         add_action('wp_enqueue_scripts', [$this, 'enqueuePublicAssets']);
         add_action('admin_enqueue_scripts', [$this, 'enqueueAdminAssets']);
