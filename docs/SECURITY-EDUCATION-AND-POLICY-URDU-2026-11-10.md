@@ -38,3 +38,10 @@
 - عوامی shortcode صرف raw post content تک محدود نہیں؛ dynamically rendered reusable blocks، template parts اور page builders سے شامل شدہ shortcode پر CSS کے ضائع ہونے سے بچنے کے لیے frontend پر مختصر، مکمل scoped CSS شروع ہی میں enqueue ہوگی۔
 - ایک ہی صفحے پر shortcode متعدد دفعہ آئے تو اب تمام `id` اور `aria-labelledby` کی شناخت منفرد ہوگی؛ accessibility اور screen-reader references کا الگ regression test موجود ہے۔
 - یہ اصلاح صرف frontend رہنمائی اور accessibility کی ہے؛ MFA، WAF یا backup کے عملی فعال ہونے کا ثبوت نہیں۔
+
+- File 24 کی اصل CI میں `pull_request` کے GitHub-generated merge ref کو source HEAD فرض کرنے کی خامی دریافت ہوئی؛ workflow اب ہر job میں immutable `github.event.pull_request.head.sha` checkout کرتا اور `git rev-parse HEAD` سے عین مطابقت ثابت کرتا ہے۔ یہ repository-level CI ہے، live deployed parity نہیں۔
+
+## ۷۔ اس آڈٹ میں مکمل و نامکمل حدود
+- اس نئی نظرِ ثانی کے File 24 حصے میں تین ماخذی نقائص: dynamic shortcode CSS، duplicate ARIA IDs، اور CI exact-head verification؛ تینوں کی code-level اصلاح کی گئی۔
+- File 02 کی نئی رجسٹریشن میں دو مزید نقائص: nested interactive link اور unversioned safety acknowledgment؛ متعلقہ مالک File 02 کی Draft PR #27 میں اصلاح۔
+- Live deployment، Hostinger configuration، File00 MFA policy، موجودہ صارف کے لازمی re-consent، recovery/lockout، File20 navigation اور اصل provider backups ابھی علیحدہ ثبوت کے محتاج ہیں۔
