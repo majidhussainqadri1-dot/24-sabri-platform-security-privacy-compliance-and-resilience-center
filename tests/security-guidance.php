@@ -50,7 +50,12 @@ assertTrue(isset($GLOBALS['styles']['spcrc-security-guidance']), 'Scoped CSS loa
 $GLOBALS['styles'] = [];
 $GLOBALS['post_text'] = 'No shortcode';
 $guide->enqueuePublicAssets();
-assertTrue($GLOBALS['styles'] === [], 'No unnecessary CSS on unrelated pages.');
+assertTrue(isset($GLOBALS['styles']['spcrc-security-guidance']), 'Dynamic shortcode or template CSS loaded before rendering, even when raw post content lacks shortcode.');
+$secondPage = $guide->renderPublic();
+preg_match_all('/\\bid="([^"]+)"/', $page . $secondPage, $ids);
+preg_match_all('/\\baria-labelledby="([^"]+)"/', $page . $secondPage, $refs);
+assertTrue(count($ids[1]) === 8 && count($ids[1]) === count(array_unique($ids[1])), 'Each repeated shortcode instance has distinct heading and section ids.');
+assertTrue(count($refs[1]) === 8 && ! array_diff($refs[1], $ids[1]), 'Every section ARIA reference targets an existing unique id.');
 $guide->registerAdminMenu();
 assertTrue(($GLOBALS['menus']['sabri-security-guidance']['cap'] ?? '') === 'spcrc_view_overview', 'Admin capability guard.');
 ob_start();
