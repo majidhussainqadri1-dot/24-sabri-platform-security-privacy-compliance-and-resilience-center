@@ -89,3 +89,13 @@ The second pass discovered **three distinct source root causes**. Including the 
 | Live-deployed or live-retested fixes | 0 — deployment unverified |
 | External acceptance gates | open; do not report 100% production completion |
 
+
+## Additional private-evidence boundary correction — 13 November
+
+**Finding S-2026-11-13-06 — Clinical PII in audit-gap metadata.** A reproducible test invoked `AuditGapStore::record(..., ['patientName'=>'PRIVATE PERSON', 'medicalHistory'=>'PRIVATE HEALTH NARRATIVE'])`. The existing `safeContext()` normalized those camelCase identifiers but persisted their plain-text values because its sensitive-field pattern only recognized some delimited names. The legacy read-normalizer had the same omission.
+
+**Fix:** `AuditGapStore::sensitiveContextKey()` now classifies compact normalized identifiers for identity, patient, guardian, clinical notes, history, diagnosis, symptoms, contact and secret fields. Both the write-side `safeContext()` and the read-side `normalize()` redact those keys. A previously stored record is not silently rewritten; the read projection protects disclosure while an authorized archival/retention process handles existing data. Source program `tests/audit-gap-sensitive-field-aliases.php` proves before-storage redaction, legacy-read masking and retention of innocuous bounded metadata.
+
+**Source QA:** at correction HEAD `57233ebe5d7645657384d8ef6bbc190205fabb9d`, exact PR-head CI Run `43346497766` passed PHP 8.0 and PHP 8.3. Separately executed PHP 8.4 checks: **306 PHP files lint-clean and 214/214 top-level test programs passed**. The deterministic installable ZIP was byte-identical between the GitHub Actions artifact and a local rebuild; its SHA-256: `d9cc7ab2ec965efa7f3538889f35e6bc3f285904988b4454bf32510d8ead2d65`.
+
+**Cumulative reviewed PR finding register:** pre-existing three + earlier two 13-Nov + next three + this additional one = **9 source defects located and 9 source corrections/test regressions present**. No live-scope or staging resolved claim follows. External gates remain unaffected and mandatory.
