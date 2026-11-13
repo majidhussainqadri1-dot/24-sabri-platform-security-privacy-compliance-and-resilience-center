@@ -239,7 +239,26 @@ final class AuditGapStore
     public static function count(string $option): int
     {
         $option = self::optionName($option);
-        return $option === '' ? 0 : count(self::normalize(get_option($option, [])));
+        if ($option === '') {
+            return 0;
+        }
+        $raw = get_option($option, []);
+        if ($raw === []) {
+            return 0;
+        }
+        // Normalization is a read/privacy boundary, not authority to discard
+        // unrecognized persisted evidence. A corrupt non-empty gap store must
+        // still block a release, even if every raw record fails validation.
+        if (! is_array($raw)) {
+            return 1;
+        }
+        foreach ($raw as $row) {
+            if (! is_array($row)) {
+                // Legacy flat records remain one evidence gap.
+                return max(1, count(self::normalize($raw)));
+            }
+        }
+        return max(count($raw), count(self::normalize($raw)));
     }
 
     /** @return array<string,array<string,mixed>> */
