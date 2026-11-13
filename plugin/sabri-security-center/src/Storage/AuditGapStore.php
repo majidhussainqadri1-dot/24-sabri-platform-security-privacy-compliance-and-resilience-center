@@ -73,7 +73,14 @@ final class AuditGapStore
         }
 
         try {
-            $gaps = self::normalize(get_option($option, []));
+            $rawEvidence = get_option($option, []);
+            $gaps = self::normalize($rawEvidence);
+            if (self::normalizationDropsEvidence($rawEvidence, $gaps)) {
+                // Preserve malformed or legacy unresolved evidence; a
+                // normalized read must not silently erase it on a new write.
+                do_action('spcrc/audit_gap_existing_evidence_invalid', $option, 'record');
+                return false;
+            }
             $gapId = SecureIdentifier::uuid4('audit-gap');
             if (is_wp_error($gapId)) {
                 do_action('spcrc/audit_gap_identifier_failed', $option, $entityType, $entityId, $reason, $gapId->get_error_code());
@@ -169,7 +176,12 @@ final class AuditGapStore
         }
 
         try {
-            $gaps = self::normalize(get_option($option, []));
+            $rawEvidence = get_option($option, []);
+            $gaps = self::normalize($rawEvidence);
+            if (self::normalizationDropsEvidence($rawEvidence, $gaps)) {
+                do_action('spcrc/audit_gap_existing_evidence_invalid', $option, 'reconcile');
+                return new \WP_Error('spcrc_audit_gap_existing_evidence_invalid', 'Unrecognized audit evidence must be independently recovered before reconciliation.');
+            }
             if (! isset($gaps[$gapId])) {
                 return new \WP_Error('spcrc_audit_gap_not_found', 'The audit gap could not be found.');
             }
@@ -234,6 +246,23 @@ final class AuditGapStore
         } finally {
             self::releaseLock($lock);
         }
+    }
+
+    /** @param array<string,array<string,mixed>> $normalized */
+    private static function normalizationDropsEvidence(mixed $raw, array $normalized): bool
+    {
+        if ($raw === []) {
+            return false;
+        }
+        if (! is_array($raw) || count($raw) !== count($normalized)) {
+            return true;
+        }
+        foreach ($raw as $row) {
+            if (! is_array($row)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public static function count(string $option): int
