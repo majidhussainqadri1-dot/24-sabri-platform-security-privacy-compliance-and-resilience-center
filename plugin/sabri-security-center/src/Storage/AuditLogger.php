@@ -215,6 +215,15 @@ final class AuditLogger
                 continue;
             }
 
+            // A free-text clinical/audit field may be renamed without using
+            // one of the exact aliases above. Treat semantic patient, medical,
+            // identity and narrative labels as private by default; ordinary
+            // machine-state identifiers remain available for diagnostics.
+            if (preg_match('/(?:patient|clinical|medical|case|guardian|dependent|child|doctor|symptom|diagnos|complaint|history|narrative|notes?|report|identity|freetext|freeform|message|body|summary|telephone|contact|birth|proof|rawdata)/', $compactKey) === 1) {
+                $safe[$safeKey] = '[REDACTED]';
+                continue;
+            }
+
             if (is_array($value)) {
                 $safe[$safeKey] = $this->redact($value, $depth + 1);
             } elseif (is_string($value)) {
