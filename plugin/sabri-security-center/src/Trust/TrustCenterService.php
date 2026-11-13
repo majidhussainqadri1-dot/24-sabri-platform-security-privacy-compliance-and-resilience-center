@@ -52,6 +52,13 @@ final class TrustCenterService
         $reviewedAt = Sanitizer::isoTime($data['reviewed_at'] ?? '');
 
         if ($status === 'verified') {
+            // The approved assertion must not silently erase or advance a
+            // future publication window chosen in the independently authored
+            // draft. A material scheduling change requires a new draft review.
+            $draftEffectiveAt = is_array($existing) ? Sanitizer::isoTime($existing['effective_at'] ?? '') : '';
+            if ($draftEffectiveAt !== '' && $effectiveAt !== $draftEffectiveAt) {
+                return new \WP_Error('spcrc_trust_claim_effective_window_changed', 'The approved claim must preserve its independently reviewed effective time. Edit the draft before approval.');
+            }
             if (! current_user_can('spcrc_approve_governance_decision')) {
                 return new \WP_Error('spcrc_trust_claim_approval_forbidden', 'Verified public claims require independent governance approval authority.');
             }
