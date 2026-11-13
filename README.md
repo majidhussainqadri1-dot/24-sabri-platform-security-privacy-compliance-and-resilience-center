@@ -24,6 +24,7 @@ This status means the approved repository-coding scope, including the later Cont
 - These educational interfaces neither enable WAF/MFA/backups nor establish production deployment. Run the new standalone regression: php tests/security-guidance.php, and retain all existing repository and staging gates.
 - Primary specification: docs/SECURITY-EDUCATION-AND-POLICY-URDU-2026-11-10.md.
 - 13 November source review additionally hardened audit PII field aliases and made P0 release blockers non-waivable. Regressions: `tests/audit-sensitive-field-aliases.php` and `tests/release-p0-nonwaivable.php`. Evidence and remaining external gates: `docs/FILE24-SOURCE-AUDIT-AND-RELEASE-GATES-2026-11-13.md`.
+- A further source review closed three additional operational-assurance defects: filtered mandatory SystemCheck items cannot be suppressed; the full canonical set of detection/remote-evidence/deletion-replay audit gaps is checked; and corrupt nonempty audit-gap state cannot count as clean. Regressions: `tests/system-check-integrity.php`, `tests/system-check-audit-gap-coverage.php`, `tests/audit-gap-corrupt-evidence.php`.
 - This is still a **review branch**, not a production installation. Even successful PR CI does not waive independent review, exact-main CI, staging acceptance, deployed-file/database parity, live verification, backups or legal/privacy checks.
 
 ## Implemented repository scope
