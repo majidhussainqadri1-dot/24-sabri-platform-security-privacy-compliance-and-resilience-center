@@ -162,6 +162,44 @@ final class AuditLogger
                 }
             }
 
+            // Common camelCase and punctuation variants must not bypass
+            // sensitive-field classification. A patient name or narrative
+            // may contain no detectable phone, email or secret pattern.
+            $compactKey = preg_replace('/[^a-z0-9]/', '', $normalized) ?? '';
+            $privateNarrativeKeys = [
+                'firstname', 'lastname', 'fullname', 'legalname', 'displayname',
+                'dateofbirth', 'birthdate', 'dob', 'guardianname',
+                'patientname', 'patientfullname', 'patienthistory',
+                'patientdiagnosis', 'patientsymptoms', 'patientcomplaint',
+                'patientnotes', 'patientaddress', 'patientemail', 'patientphone',
+                'medicalhistory', 'clinicalhistory', 'casehistory',
+                'medicalnotes', 'clinicalnotes', 'casenotes',
+                'symptomdetails', 'diagnosisdetails', 'chiefcomplaint',
+            ];
+            if (in_array($compactKey, $privateNarrativeKeys, true)) {
+                $safe[$safeKey] = '[REDACTED]';
+                continue;
+            }
+
+            // Retain bounded, irreversible correlation for well-known
+            // contact/network identifiers without retaining raw values.
+            $contactAliases = [
+                'emailaddress', 'phonenumber', 'mobilenumber',
+                'postaladdress', 'guardiancontact', 'contactemail', 'contactphone',
+            ];
+            if (in_array($compactKey, $contactAliases, true)) {
+                $safe[$safeKey] = is_scalar($value) ? $this->pseudonymize((string) $value, 'contact') : '[REDACTED]';
+                continue;
+            }
+            if (in_array($compactKey, ['ipaddress', 'remoteaddr'], true)) {
+                $safe[$safeKey] = is_scalar($value) ? $this->pseudonymize((string) $value, 'ip') : '[REDACTED]';
+                continue;
+            }
+            if ($compactKey === 'useragent') {
+                $safe[$safeKey] = is_scalar($value) ? $this->pseudonymize((string) $value, 'ua') : '[REDACTED]';
+                continue;
+            }
+
             if (preg_match('/(^|_)(ip|ip_address|remote_addr)($|_)/', $normalized) === 1) {
                 $safe[$safeKey] = $this->pseudonymize((string) $value, 'ip');
                 continue;
