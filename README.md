@@ -23,6 +23,8 @@ This status means the approved repository-coding scope, including the later Cont
 - Public guidance covers phishing, MFA and OTP safety, devices, patient privacy, reporting suspicious activity and account recovery precautions. It does **not** disclose internal vulnerabilities, secrets, patient records or live incident evidence.
 - These educational interfaces neither enable WAF/MFA/backups nor establish production deployment. Run the new standalone regression: php tests/security-guidance.php, and retain all existing repository and staging gates.
 - Primary specification: docs/SECURITY-EDUCATION-AND-POLICY-URDU-2026-11-10.md.
+- 13 November source review additionally hardened audit PII field aliases and made P0 release blockers non-waivable. Regressions: `tests/audit-sensitive-field-aliases.php` and `tests/release-p0-nonwaivable.php`. Evidence and remaining external gates: `docs/FILE24-SOURCE-AUDIT-AND-RELEASE-GATES-2026-11-13.md`.
+- This is still a **review branch**, not a production installation. Even successful PR CI does not waive independent review, exact-main CI, staging acceptance, deployed-file/database parity, live verification, backups or legal/privacy checks.
 
 ## Implemented repository scope
 
