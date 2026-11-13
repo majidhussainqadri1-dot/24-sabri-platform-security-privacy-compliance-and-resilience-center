@@ -44,7 +44,7 @@ $decoded = is_string($stored) ? json_decode($stored, true) : null;
 assertAuditAlias(is_array($decoded), 'Audit JSON must remain valid.');
 
 foreach ([
-    'patientName', 'medicalHistory', 'chiefComplaint', 'guardianName',
+    'patientname', 'medicalhistory', 'chiefcomplaint', 'guardianname',
 ] as $field) {
     assertAuditAlias(($decoded[$field] ?? null) === '[REDACTED]', "{$field} must not retain sensitive narrative.");
 }
