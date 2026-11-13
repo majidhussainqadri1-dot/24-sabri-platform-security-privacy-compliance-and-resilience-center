@@ -56,3 +56,36 @@ Three earlier defects in the pending PR #32 (dynamic shortcode stylesheet, dupli
 - `operational`: real production controls, alerts and SLO evidence accepted
 
 Never elevate one status to another without its own evidence.
+
+## Second independent-from-history source pass — 13 November 2026
+
+This additional analytical pass reviewed the actual PR branch code, rather than treating earlier CI or the historical 280 correction cycles as fresh assurance.
+
+| Finding | Reproduced root cause | Implemented source correction | Executable regression |
+|---|---|---|---|
+| S-2026-11-13-03 — Base system-check suppression and false green | `SystemCheck::run()` accepted the whole externally filtered result. Reproduction: a `spcrc/system_checks` filter returning only one fabricated green record removed all 13 native checks. | Preserve all native results independently, permit legitimate appended checks, and emit `system_checks_integrity=critical` if any required check is missing, duplicated or changed. | `tests/system-check-integrity.php` |
+| S-2026-11-13-04 — Operational gap categories omitted from status | `SystemCheck::checkAuditGaps()` maintained only an inline 14-category subset, while `AuditGapStore::managedOptions()` included detection, remote evidence and deletion replay (17 managed categories). Thus real gaps could coexist with `audit_gaps=pass`. | Use canonical `AuditGapStore::managedOptions()` and `AuditGapStore::count()` for every category. Updated historical Cycle 16 source assertion to validate the authoritative registry contract rather than stale inline text. | `tests/system-check-audit-gap-coverage.php`, `tests/cycle16-closure.php` |
+| S-2026-11-13-05 — Corrupt audit-gap evidence reported as absent | `AuditGapStore::count()` normalized an invalid nonempty persisted record down to zero. Demonstrated with a nested row missing a `reason`: raw 1, normalized 0, reported 0. | An unrecognized nonempty persisted audit-gap state now counts as at least one unresolved blocker. Release and status paths must not falsely report clean. | `tests/audit-gap-corrupt-evidence.php` |
+
+The second pass discovered **three distinct source root causes**. Including the original draft's three guidance/CI defects and the earlier 13-November two root causes, PR #32 contains **8/8 code-corrected source findings**. The tests cover expected-failure, allowed-extension, legacy and corrupt-evidence scenarios. There is no claim of eight confirmed live defects.
+
+### Verification — second pass
+
+- Exact PR-head GitHub Actions at the code-correction commit `f607b44d1c488edbdee5ce7644a7aedd69fab5c7`, Run `43345358710`: **PHP 8.0 and PHP 8.3 jobs both successful**.
+- Separate local PHP 8.4 validation: **305 PHP source/test files syntax-checked; 213/213 independent top-level tests passed** after updating the historical Cycle 16 assertion.
+- The executable plugin ZIP was built deterministically and compared **byte-for-byte** to the exact-commit GitHub Actions package. The verified inner installable plugin ZIP SHA-256 was `e55e5b8dcb6148d342ebb4a501a0fafe29616530d610952fdfc6f7fd7363625f` at that code-correction commit.
+- Independent human security reviews are not yet recorded as approvals. Do not merge solely because code-level review and CI are green.
+- No deployment, staging acceptance, backup verification or live database/schema inspection was possible through disconnected WordPress/Jetpack access.
+- Deployment-Parity Audit is mandatory before any installation. Unknown live versions/migrations are explicit blockers, not reasons to create speculative live patches.
+
+### Defect disposition — no false closure
+
+| Measure | Count |
+|---|---:|
+| PR #32 source root causes recorded (earlier + this pass) | 8 |
+| Source fixes implemented with regression evidence | 8 |
+| Outstanding **known** source defects in this bounded audited set after QA | 0 |
+| Independent human reviewers recorded for the latest code | 0 |
+| Live-deployed or live-retested fixes | 0 — deployment unverified |
+| External acceptance gates | open; do not report 100% production completion |
+
