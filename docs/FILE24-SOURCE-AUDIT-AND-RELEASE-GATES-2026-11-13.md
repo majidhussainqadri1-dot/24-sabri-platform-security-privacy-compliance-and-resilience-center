@@ -99,3 +99,17 @@ The second pass discovered **three distinct source root causes**. Including the 
 **Source QA:** at correction HEAD `57233ebe5d7645657384d8ef6bbc190205fabb9d`, exact PR-head CI Run `43346497766` passed PHP 8.0 and PHP 8.3. Separately executed PHP 8.4 checks: **306 PHP files lint-clean and 214/214 top-level test programs passed**. The deterministic installable ZIP was byte-identical between the GitHub Actions artifact and a local rebuild; its SHA-256: `d9cc7ab2ec965efa7f3538889f35e6bc3f285904988b4454bf32510d8ead2d65`.
 
 **Cumulative reviewed PR finding register:** pre-existing three + earlier two 13-Nov + next three + this additional one = **9 source defects located and 9 source corrections/test regressions present**. No live-scope or staging resolved claim follows. External gates remain unaffected and mandatory.
+
+## Trust Center publication-window safety — further source correction
+
+**Finding S-2026-11-13-07 — Trust Center scheduled publication bypass:** a draft approved for future public availability could be silently turned into an immediately effective claim. Reproduction: create a draft with `effective_at = now + 1 hour`, then approve the claim without `effective_at`; `TrustCenterService::saveClaim()` previously stored the approved record with no effective date and `publicClaims()` immediately returned it.
+
+**Root cause:** verified-claim authorization protected content/editor separation and evidence windows but did not require a nonempty draft's separately authored effective timestamp to match the approval's effective timestamp.
+
+**Source fix:** preserve the original independently authored effective time at verification; omitting or changing that date fails with `spcrc_trust_claim_effective_window_changed`. Legitimate approval with an exactly matching schedule remains available, and future-effective claims do not publicly publish early.
+
+**Permanent regression:** `tests/trust-approval-effective-window.php` covers omission, attempted advance, nonpublication, and legitimate matching-time approval, while historical Cycle 109 remains intact.
+
+**QA:** code HEAD `df64667c512e5d37c78588c2d4ae8b4d50a1c621`; GitHub Actions Run `43347647625` passed PHP 8.0 and 8.3. Local PHP 8.4 validation: 307 PHP source/test files lint-clean; **215/215** top-level regression tests PASS. Deterministic installable ZIP byte-identical with GitHub Actions artifact; SHA-256 `cda925d5b4f9b74665d098f9becff16e408b2270c3ed5f8382b853b31db333c0`.
+
+**Cumulative PR #32 finding count:** 3 original + 2 initial 13-Nov + 3 operational truth + 1 AuditGapStore PII + 1 Trust Center schedule = **10 source defects found, 10 code corrections and tests present**. This remains source-only; independent reviewers, merge, exact-main CI, Hostinger staging, DB/schema parity, backups/restore and live acceptance are still unverified.
