@@ -137,8 +137,11 @@ final class ReleaseGateManager
             }
             $p0Count = Sanitizer::strictInteger(apply_filters('spcrc/release_blocking_p0_count', 0, $phase), 0, PHP_INT_MAX);
             $blockingDefectCount = Sanitizer::strictInteger(apply_filters('spcrc/release_blocking_defect_count', 0, $phase, $status), 0, PHP_INT_MAX);
-            if ($status !== 'waived' && ($p0Count === null || $p0Count > 0)) {
-                return new \WP_Error('spcrc_release_gate_p0_blocked', 'Known P0 defects block release-phase progression.');
+            // A Founder-governed waiver may document a noncritical exception,
+            // but it must never convert a known P0 safety/security blocker
+            // (or invalid blocker evidence) into an accepted release gate.
+            if ($p0Count === null || $p0Count > 0) {
+                return new \WP_Error('spcrc_release_gate_p0_blocked', 'Known P0 defects cannot be bypassed by a release waiver.');
             }
             if ($status !== 'waived' && ($blockingDefectCount === null || $blockingDefectCount > 0)) {
                 return new \WP_Error('spcrc_release_gate_known_defects_blocked', 'Known unresolved release-blocking defects require correction or an explicit governed waiver.');
