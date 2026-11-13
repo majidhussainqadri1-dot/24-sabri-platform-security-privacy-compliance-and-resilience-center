@@ -315,7 +315,7 @@ final class AuditGapStore
                     if ($key === '' || (! is_scalar($value) && $value !== null)) {
                         continue;
                     }
-                    if (preg_match('/(^|_)(password|token|secret|authorization|cookie|session|nonce|otp|email|phone|mobile|address|identity|passport|national_id)($|_)/', $key) === 1) {
+                    if (self::sensitiveContextKey($key)) {
                         $context[$key] = '[REDACTED]';
                         continue;
                     }
@@ -345,7 +345,7 @@ final class AuditGapStore
             if ($safeKey === '' || (! is_scalar($value) && $value !== null)) {
                 continue;
             }
-            if (preg_match('/(^|_)(password|token|secret|authorization|cookie|session|nonce|otp|email|phone|mobile|address|identity|passport|national_id|guardian)($|_)/', $safeKey) === 1) {
+            if (self::sensitiveContextKey($safeKey)) {
                 $safe[$safeKey] = '[REDACTED]';
                 continue;
             }
@@ -355,6 +355,16 @@ final class AuditGapStore
                 : '[REDACTED]';
         }
         return $safe;
+    }
+
+    /** A privacy-safe field-name check used both before persistence and when reading legacy gaps. */
+    private static function sensitiveContextKey(string $key): bool
+    {
+        $compact = preg_replace('/[^a-z0-9]/', '', strtolower($key)) ?? '';
+        if ($compact === '') {
+            return true;
+        }
+        return preg_match('/(?:password|passwd|passphrase|token|secret|apikey|authorization|cookie|session|nonce|otp|recovery|email|phone|mobile|address|contact|identity|passport|nationalid|guardian|patient|clinical|medical|symptom|diagnos|complaint|history|narrative|notes?|report|freeform|freetext|message|body|fullname|firstname|lastname|birthdate|dateofbirth|dob)/', $compact) === 1;
     }
 
     private static function safeEntityId(string $entityId): string
