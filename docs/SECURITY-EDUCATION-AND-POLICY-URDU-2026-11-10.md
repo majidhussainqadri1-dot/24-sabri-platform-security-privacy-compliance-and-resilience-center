@@ -32,7 +32,7 @@
 
 ## ۵۔ ماخذ
 - صارف کی فراہم کردہ «صابری سوشل ہومیوپیتھی پلیٹ فارم کا مستقل حفاظتی ضابطہ»، ۱۰ نومبر ۲۰۲۶، سات شقیں۔
-- «صابری ویب سائٹ کا جامع منصوبہ»، ایڈیشن ۱۲، ابواب ۳، ۵، ۸ اور ۹۔
+- «صابری ویب سائٹ کا جامع منصوبہ»، ایڈیشن V12.1، مورخہ ۱۰ نومبر ۲۰۲۶ء، ابواب ۳، ۵، ۸، ۹ اور ۱۲؛ اصل V12 شناختیں برقرار۔
 
 ## ۶۔ تازہ کوڈ آڈٹ اور اصلاح
 - عوامی shortcode صرف raw post content تک محدود نہیں؛ dynamically rendered reusable blocks، template parts اور page builders سے شامل شدہ shortcode پر CSS کے ضائع ہونے سے بچنے کے لیے frontend پر مختصر، مکمل scoped CSS شروع ہی میں enqueue ہوگی۔
@@ -45,3 +45,9 @@
 - اس نئی نظرِ ثانی کے File 24 حصے میں تین ماخذی نقائص: dynamic shortcode CSS، duplicate ARIA IDs، اور CI exact-head verification؛ تینوں کی code-level اصلاح کی گئی۔
 - File 02 کی نئی رجسٹریشن میں دو مزید نقائص: nested interactive link اور unversioned safety acknowledgment؛ متعلقہ مالک File 02 کی Draft PR #27 میں اصلاح۔
 - Live deployment، Hostinger configuration، File00 MFA policy، موجودہ صارف کے لازمی re-consent، recovery/lockout، File20 navigation اور اصل provider backups ابھی علیحدہ ثبوت کے محتاج ہیں۔
+
+## ۸۔ ۱۳ نومبر ۲۰۲۶ء — اضافی آزاد ماخذی تنقیح
+- audit لاگز میں `patientName`، `medicalHistory`، `chiefComplaint` جیسی حساس متبادل فیلڈز کی شناخت اور پوشیدگی کے لیے `AuditLogger` میں اضافی حفاظت اور مستقل Regression Test شامل ہے۔
+- انتہائی سنگین `P0` نقص کی موجودگی میں Release Gate کو `waived` بنا کر آگے بڑھانا ممنوع کیا گیا ہے؛ Founder-governed غیر شدید استثنا کے دوسرے قواعد برقرار ہیں۔
+- مکمل ثبوت، حدود اور باقی نفاذی رکاوٹیں `FILE24-SOURCE-AUDIT-AND-RELEASE-GATES-2026-11-13.md` میں درج ہیں۔
+- یہ دونوں اصلاحات ماخذی شاخ کی ہیں؛ حقیقی لائیو تحفظ کا نتیجہ اصل نصب شدہ کوڈ، DB اور عملی آزمائش کے بعد ہی سامنے آئے گا۔
