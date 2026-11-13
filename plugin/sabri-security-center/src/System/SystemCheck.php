@@ -6,6 +6,7 @@ namespace Sabri\Platform\Security\System;
 
 use Sabri\Platform\Security\Registry\ModuleRegistry;
 use Sabri\Platform\Security\Storage\Schema;
+use Sabri\Platform\Security\Storage\AuditGapStore;
 use Sabri\Platform\Security\Support\Sanitizer;
 
 final class SystemCheck
@@ -35,7 +36,52 @@ final class SystemCheck
             $this->checkUpgradeError(),
         ];
 
-        return $this->normalize(apply_filters('spcrc/system_checks', $checks, $this->modules));
+        // External modules may append their checks, but may not silently drop,
+        // replace or turn any native File 24 check into a fabricated PASS.
+        return $this->preserveMandatoryChecks($checks, apply_filters('spcrc/system_checks', $checks, $this->modules));
+    }
+
+    /**
+     * @param array<int,array<string,mixed>> $mandatory
+     * @return array<int,array<string,mixed>>
+     */
+    private function preserveMandatoryChecks(array $mandatory, mixed $filtered): array
+    {
+        $base = $this->normalize($mandatory);
+        $baseByKey = array_column($base, null, 'key');
+        $seenMandatory = [];
+        $seenExtension = [];
+        $extensions = [];
+        $tampered = ! is_array($filtered);
+
+        foreach ($this->normalize($filtered) as $check) {
+            $key = $check['key'];
+            if (isset($baseByKey[$key])) {
+                if (isset($seenMandatory[$key]) || $baseByKey[$key] !== $check) {
+                    $tampered = true;
+                }
+                $seenMandatory[$key] = true;
+                continue;
+            }
+            if (isset($seenExtension[$key])) {
+                $tampered = true;
+                continue;
+            }
+            $seenExtension[$key] = true;
+            $extensions[] = $check;
+        }
+        if (count($seenMandatory) !== count($baseByKey)) {
+            $tampered = true;
+        }
+        if ($tampered) {
+            $extensions[] = $this->result(
+                'system_checks_integrity',
+                'Required File 24 system checks cannot be overwritten or omitted',
+                false,
+                'A system-check extension suppressed, duplicated or altered mandatory assurance evidence.'
+            );
+        }
+        return array_merge($base, $extensions);
     }
 
     /** @return array<string,mixed> */
@@ -203,37 +249,15 @@ final class SystemCheck
     /** @return array<string,mixed> */
     private function checkAuditGaps(): array
     {
-        $options = [
-            'governance' => 'spcrc_governance_audit_gap',
-            'security-state' => 'spcrc_security_state_audit_gap',
-            'assurance' => 'spcrc_assurance_audit_gap',
-            'risk' => 'spcrc_risk_audit_gap',
-            'finding' => 'spcrc_finding_audit_gap',
-            'incident' => 'spcrc_incident_audit_gap',
-            'control' => 'spcrc_control_audit_gap',
-            'risk-reopen' => 'spcrc_risk_reopen_audit_gap',
-            'finding-reopen' => 'spcrc_finding_reopen_audit_gap',
-            'governance-batch' => 'spcrc_governance_batch_audit_gap',
-            'privacy' => 'spcrc_privacy_audit_gap',
-            'privacy-recovery' => 'spcrc_privacy_recovery_audit_gap',
-            'retention' => 'spcrc_retention_audit_gap',
-            'admin' => 'spcrc_admin_audit_gap',
-        ];
+        // Source-of-truth registry, not a stale hand-maintained subset:
+        // detection, remote-evidence and deletion-replay gaps are as critical
+        // to truthful operational posture as governance/privacy gaps.
         $counts = [];
-        foreach ($options as $label => $option) {
-            $raw = get_option($option, []);
-            if (! is_array($raw) || $raw === []) {
-                continue;
+        foreach (AuditGapStore::managedOptions() as $label => $option) {
+            $count = AuditGapStore::count($option);
+            if ($count > 0) {
+                $counts[$label] = $count;
             }
-            $isLegacySingle = isset($raw['reason'])
-                || isset($raw['request_id'])
-                || isset($raw['risk_uuid'])
-                || isset($raw['finding_uuid'])
-                || isset($raw['incident_uuid'])
-                || isset($raw['control_key'])
-                || isset($raw['count'])
-                || isset($raw['recorded_at']);
-            $counts[$label] = $isLegacySingle ? 1 : count($raw);
         }
 
         $total = array_sum($counts);
