@@ -126,4 +126,13 @@ The second pass discovered **three distinct source root causes**. Including the 
 
 **Source-only disposition:** the previously recorded **10** PR-source defects plus **1** reproducible evidence-loss defect = **11 source defects found / 11 source corrections implemented** within this bounded audit. This is NOT a claim of 11 live defects or 100% penetration-test coverage. Fresh exact-head CI, independent review, merge, staging and production parity must be evidenced separately after this commit.
 
+**Independent package/CI verification of the corrective branch HEAD (`1c79d9a816b9b824d73ab47a012cf7ba60dd79d6`):**
+
+- GitHub Actions Run `43349763354`: PHP 8.0 and PHP 8.3 both PASS.
+- Exact CI-exported source snapshot: `524/524` tracked-file SHA-256 receipts PASS, no mismatch.
+- PHP 8.4 local independent re-run from that snapshot: `308/308` PHP syntax checks PASS; `216/216` top-level regression tests PASS.
+- The independently rebuilt ZIP is byte-for-byte equal to GitHub's exact-head packaged ZIP, SHA-256 `30fddfddbe69aedd1c2aa1feca3017bc542163912f9e07844bc82557754e8cee`.
+- This is source and packaging truth only. It does not replace two independent code-review approvals, source-to-live deployment parity, operational configuration, backup restore, staging browser/provider checks, independent penetration testing, applicable privacy review or live re-test.
+
+
 **Deployment truth:** Main HEAD `a5b8d49968a7a5a7d6f3f4655bea541bf38a9acb` remains separate from the pending PR; live installed File24, DB/schema/migration, operational backups and Hostinger controls remain unverified due to unavailable site-scoped access. No production mutation was performed.
