@@ -135,6 +135,16 @@ final class ReleaseGateManager
             if ($this->hasUnresolvedAuditGaps()) {
                 return new \WP_Error('spcrc_release_gate_audit_gaps_open', 'Unresolved operational audit gaps block a positive release decision.');
             }
+            // Final production/staging acceptance cannot infer "zero defects"
+            // from WordPress apply_filters() default values when no canonical
+            // blocker-count provider has registered. Earlier repository-only
+            // implementation phases retain their historical gate semantics.
+            if ($phase === '24l-independent-assurance-staging'
+                && (! has_filter('spcrc/release_blocking_p0_count')
+                    || ! has_filter('spcrc/release_blocking_defect_count'))
+            ) {
+                return new \WP_Error('spcrc_release_gate_blocker_provider_missing', 'Final release requires registered active-defect evidence providers.');
+            }
             $p0Count = Sanitizer::strictInteger(apply_filters('spcrc/release_blocking_p0_count', 0, $phase), 0, PHP_INT_MAX);
             $blockingDefectCount = Sanitizer::strictInteger(apply_filters('spcrc/release_blocking_defect_count', 0, $phase, $status), 0, PHP_INT_MAX);
             // V12.3 CEN-REL-001: every active release scope must have zero
