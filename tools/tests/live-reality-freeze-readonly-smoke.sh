@@ -28,7 +28,10 @@ case " $* " in
     *" core version "*) printf '%s\n' "7.0-test" ;;
     *" plugin list "*) printf '%s\n' 'name,status,version,update' 'sabri-security-center,active,0.99.0,none' ;;
     *" theme list "*) printf '%s\n' 'name,status,version,update' 'synthetic,active,1.0,none' ;;
+    *" option get spcrc_last_upgrade_error "*) printf '%s\n' 'spcrc_test_upgrade_failed' ;;
+    *" option get spcrc_upgrade_lock "*) exit 1 ;;
     *" option get "*) printf '%s\n' '0.25.5' ;;
+    *" cron event list "*) printf '%s\n' 'hook,next_run_gmt,schedule' 'spcrc_privacy_deletion_replay,2026-11-15 00:00:00,hourly' 'external_secret_service,2026-11-15 00:00:00,never' ;;
     *" db query "*) printf '%s\n' 'synthetic-metadata-only' ;;
     *) printf '%s\n' 'Unexpected WP-CLI read operation' >&2; exit 92 ;;
 esac
@@ -63,9 +66,16 @@ fi
 
 for name in README-PRIVATE.txt wordpress-core-version.txt plugin-versions.csv theme-versions.csv \
     file24-version-options.txt database-server-version.txt file24-tables-approximate-rows.txt \
-    file24-columns.txt installed-plugin-source.sha256 plugin-entry-sha256.txt required-five-fields.txt; do
+    file24-columns.txt file24-indexes.txt file24-migration-error-code.txt \
+    file24-upgrade-lock-state.txt file24-cron-schedule.csv \
+    installed-plugin-source.sha256 plugin-entry-sha256.txt required-five-fields.txt; do
     [[ -f "$RECEIPT/$name" ]] || { echo "FAIL: missing receipt $name" >&2; exit 1; }
 done
+grep -q 'spcrc_test_upgrade_failed' "$RECEIPT/file24-migration-error-code.txt"
+grep -q 'NOT PRESENT OR INACCESSIBLE' "$RECEIPT/file24-upgrade-lock-state.txt"
+grep -q 'spcrc_privacy_deletion_replay' "$RECEIPT/file24-cron-schedule.csv"
+! grep -q 'external_secret_service' "$RECEIPT/file24-cron-schedule.csv"
+grep -q 'synthetic-metadata-only' "$RECEIPT/file24-indexes.txt"
 grep -q 'NOT RUN' "$RECEIPT/required-five-fields.txt"
 grep -q 'UNVERIFIED' "$RECEIPT/required-five-fields.txt" \
     || grep -q 'NOT DISCOVERED' "$RECEIPT/required-five-fields.txt"
