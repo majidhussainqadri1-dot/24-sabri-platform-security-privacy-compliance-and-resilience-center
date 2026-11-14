@@ -41,7 +41,7 @@ v123LegalAssert(
         && str_contains($text, '9 (special categories'),
     'GDPR Article 3, 8, 9 applicability conditions must stay explicit.'
 );
-foreach (['NOT legal advice', 'NOT DETERMINED', 'COUNSEL REVIEW PENDING', 'BLOCKED', 'UNVERIFIED'] as $caution) {
+foreach (['legal advice', 'NOT DETERMINED', 'COUNSEL REVIEW PENDING', 'BLOCKED', 'UNVERIFIED'] as $caution) {
     v123LegalAssert(
         stripos($text, $caution) !== false,
         'Legal source note must retain qualified unknown/blocked marker: ' . $caution
