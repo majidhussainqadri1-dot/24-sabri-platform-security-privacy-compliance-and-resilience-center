@@ -60,9 +60,17 @@
 - Regression: `tests/v123-reserved-system-check-integrity.php`, added at `d106f2c8c92157e66660fd7b74bad8ddcc00d4fc`; correction in `2db07f4a9f1c18d1154f2b6dd17aab6cb984eb75`.
 - This is a bounded source-level integrity finding, not a proven live incident.
 
+### Pass E — V12.3 control semantics and historical evidence tokens
+
+**V12.3-F24-006 (new source finding): obsolete Founder waiver alternative in CV-280 assurance.**
+- The prior `ContinuousValueAssurance::REQUIRED['CV-280']` used `zero_known_defect_or_founder_risk_acceptance`, which could mark the two-review release control verified without asserting zero known defects in the active deployment scope. V12.3 `CEN-REL-001` supersedes that rule.
+- Source correction: require `zero_known_active_defects`; legacy risk-acceptance label alone fails closed. Residual risks of independently isolated optional features retain separate governance and must not re-enter an active release silently.
+- Regression: `tests/v123-cv280-zero-active-defects.php` (historical token blocked, current token verified, both reviews still necessary). Update the former Cycle 112 fixture to test current legal source semantics without rewriting the historical audit record.
+- Code commit `8cc2c7ab9aa83388deee82eb04d9940d9ac882e0`, fixture correction `5d4e31896c890da8dfbcb49b25aade17156df945`.
+
 **Prior historical 11 findings:** preserved in `docs/FILE24-SOURCE-AUDIT-AND-RELEASE-GATES-2026-11-13.md` and its associated tests; not rediscovered or recounted as new defects.
 
-**Cumulative within this bounded PR scope:** 11 pre-existing documented source findings + 5 new V12.3 findings = **16 findings, 16 source corrections proposed and regression tests available.** Final exact-head CI must pass for retest-closed status; no live remediation is asserted.
+**Cumulative within this bounded PR scope:** 11 pre-existing documented source findings + 6 new V12.3 findings = **17 findings, 17 source corrections proposed and regression tests available.** Final exact-head CI must pass for retest-closed status; no live remediation is asserted.
 
 ## 4. Checks and evidence
 
