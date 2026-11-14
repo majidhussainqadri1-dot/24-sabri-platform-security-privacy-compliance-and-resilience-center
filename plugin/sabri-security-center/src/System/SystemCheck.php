@@ -53,8 +53,15 @@ final class SystemCheck
         $seenExtension = [];
         $extensions = [];
         $tampered = ! is_array($filtered);
+        $normalizedFiltered = $this->normalize($filtered);
+        // Normalization must not silently erase malformed or overflowed
+        // third-party checks. Missing evidence is an integrity failure, not
+        // proof that every registered check passed (V12.3 M11/QA-24).
+        if (is_array($filtered) && count($normalizedFiltered) !== count($filtered)) {
+            $tampered = true;
+        }
 
-        foreach ($this->normalize($filtered) as $check) {
+        foreach ($normalizedFiltered as $check) {
             $key = $check['key'];
             if (isset($baseByKey[$key])) {
                 if (isset($seenMandatory[$key]) || $baseByKey[$key] !== $check) {
