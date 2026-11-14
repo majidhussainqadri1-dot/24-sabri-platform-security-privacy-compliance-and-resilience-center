@@ -44,9 +44,17 @@
 - Regression: `tests/v123-system-check-no-silent-loss.php`, covering blank IDs, non-array entries, overflow and valid unknown extension without false positives.
 - Source commit `b5ca591bb6162e325f07ebce298b5956e687eb97`; regression commit `920d8263fd4858ae998fd61c8692642abe6b294b`.
 
+### Pass C — multilingual private-data boundary
+
+**V12.3-F24-004 (new source finding): Urdu/Arabic audit-context field values not redacted.**
+- The English-only field-name classifier could not interpret a pure Urdu/Arabic key. `Sanitizer::key()` hashed away its label, but the raw textual value survived because it lacked recognizable phone/email/secret patterns, leaking private clinical context to security-event JSON and the event-forwarding hook.
+- Source correction: any non-ASCII or wholly unrecognized field name now fails closed at `AuditLogger::redact()` with `[REDACTED]`; familiar bounded ASCII operational labels remain accepted.
+- Regression: `tests/v123-multilingual-audit-context-private.php` checks Urdu, Arabic, mixed scripts, nested sensitive values, and safe ordinary metadata. Code correction commit `12a06faae909911a18b66a6affa88564b9e4db32`; test commit `c5c1e1efc492cfc677d13577c614173765dd3f86`.
+- This reproduces a **source-level disclosure path**, not evidence that clinical data was actually exposed in production. If installed logs are later examined, handle them privately under authorized retention policy.
+
 **Prior historical 11 findings:** preserved in `docs/FILE24-SOURCE-AUDIT-AND-RELEASE-GATES-2026-11-13.md` and its associated tests; not rediscovered or recounted as new defects.
 
-**Cumulative within this bounded PR scope:** 11 pre-existing documented source findings + 3 new V12.3 findings = **14 findings, 14 source corrections proposed and regression tests available.** Final exact-head CI must pass for retest-closed status; no live remediation is asserted.
+**Cumulative within this bounded PR scope:** 11 pre-existing documented source findings + 4 new V12.3 findings = **15 findings, 15 source corrections proposed and regression tests available.** Final exact-head CI must pass for retest-closed status; no live remediation is asserted.
 
 ## 4. Checks and evidence
 
