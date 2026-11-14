@@ -219,6 +219,9 @@ final class ReleaseGateManager
 
     private function hasUnresolvedAuditGaps(): bool
     {
+        if (AuditGapStore::capacityEvidenceUnresolved()) {
+            return true;
+        }
         foreach (AuditGapStore::managedOptions() as $option) {
             if (AuditGapStore::count($option) > 0) {
                 return true;
