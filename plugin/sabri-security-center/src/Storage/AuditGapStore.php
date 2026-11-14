@@ -130,6 +130,17 @@ final class AuditGapStore
         return self::MANAGED_OPTIONS;
     }
 
+    /**
+     * A capacity-overflow receipt is unresolved failure evidence even if the
+     * previously stored individual gaps were later deleted. It must not be
+     * silently normalized to a zero-defect state. Only an audited, authorized
+     * recovery process may retire this marker; this read never clears it.
+     */
+    public static function capacityEvidenceUnresolved(): bool
+    {
+        return get_option(self::CAPACITY_MARKER_OPTION, []) !== [];
+    }
+
     /** @return array<string,array<string,mixed>> */
     public static function all(string $option): array
     {
