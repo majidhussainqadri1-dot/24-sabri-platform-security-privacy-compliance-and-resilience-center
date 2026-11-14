@@ -510,6 +510,10 @@ final class AssuranceRepository
             && $restoreTimestamp >= $lastTimestamp
             && $lastTimestamp <= time() + 300
             && $restoreTimestamp <= time() + 300
+            // Repository and SystemCheck share the same fail-closed
+            // V12.3 freshness bounds for daily backup/quarterly restore.
+            && $lastTimestamp >= time() - 2 * DAY_IN_SECONDS
+            && $restoreTimestamp >= time() - 93 * DAY_IN_SECONDS
             && $reference !== '';
 
         return [
