@@ -444,8 +444,8 @@
   },
   "counts": {
     "historical_source_findings": 11,
-    "new_v123_source_findings": 10,
-    "total_source_findings": 21,
+    "new_v123_source_findings": 11,
+    "total_source_findings": 22,
     "live_verified_corrections": 0,
     "independent_human_pr_approvals": 0
   },
