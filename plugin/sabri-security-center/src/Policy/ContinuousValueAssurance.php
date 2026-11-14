@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Sabri\Platform\Security\Policy;
 
+use Sabri\Platform\Security\Support\Sanitizer;
+
 /**
  * Evidence-shape validator for File 24 Continuous Value requirements CV-262..CV-285.
  *
@@ -53,7 +55,7 @@ final class ContinuousValueAssurance
         $controls = self::normalizeList($evidence['controls'] ?? []);
         $missing = array_values(array_diff(self::REQUIRED[$id], $controls));
         $evidenceRef = self::opaqueReference((string) ($evidence['evidence_ref'] ?? ''));
-        $reviewedAt = self::isoTime((string) ($evidence['reviewed_at'] ?? ''));
+        $reviewedAt = Sanitizer::isoTime($evidence['reviewed_at'] ?? '');
         $now ??= time();
         $reviewedTimestamp = $reviewedAt === '' ? false : strtotime($reviewedAt);
         $maxAgeDays = max(1, min(365, (int) apply_filters('spcrc/continuous_value_evidence_max_age_days', 90, $id)));
@@ -96,12 +98,4 @@ final class ContinuousValueAssurance
         return preg_match('/^[A-Za-z0-9][A-Za-z0-9._:-]{2,159}$/', $value) === 1 ? $value : '';
     }
 
-    private static function isoTime(string $value): string
-    {
-        $value = trim($value);
-        if ($value === '') { return ''; }
-        $timestamp = strtotime($value);
-        if ($timestamp === false) { return ''; }
-        return gmdate('c', $timestamp);
-    }
 }
