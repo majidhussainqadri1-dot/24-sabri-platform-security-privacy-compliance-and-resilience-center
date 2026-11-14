@@ -100,5 +100,5 @@ foreach (['repository_head', 'deployed_version', 'db_version', 'migration_state'
 }
 v123LedgerAssert(($ledger['counts']['live_verified_corrections'] ?? null) === 0, 'No live source fixes can be claimed without live evidence.');
 v123LedgerAssert(($ledger['counts']['independent_human_pr_approvals'] ?? null) === 0, 'Do not invent independent human approvals.');
-v123LedgerAssert(($ledger['counts']['total_source_findings'] ?? null) === 19, 'Bounded source finding ledger count must be exact.');
+v123LedgerAssert(($ledger['counts']['total_source_findings'] ?? null) === 20, 'Bounded source finding ledger count must be exact.');
 echo "PASS: V12.3 acceptance ledger has all 52 mapped/blocked entries and no invented live assurance\n";
