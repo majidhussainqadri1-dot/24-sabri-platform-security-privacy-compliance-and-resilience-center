@@ -246,7 +246,13 @@ final class SystemCheck
             && $restoreTimestamp !== false
             && $restoreTimestamp >= $lastTimestamp
             && $lastTimestamp <= time() + 300
-            && $restoreTimestamp <= time() + 300;
+            && $restoreTimestamp <= time() + 300
+            // V12.3 daily backup and quarterly restore evidence must be
+            // recent. 48 hours allows bounded collection delay and 93 days
+            // bounds a quarterly drill; neither is a substitute for an
+            // actual independent restore inspection.
+            && $lastTimestamp >= time() - 2 * DAY_IN_SECONDS
+            && $restoreTimestamp >= time() - 93 * DAY_IN_SECONDS;
 
         return $this->result(
             'backup_evidence',
