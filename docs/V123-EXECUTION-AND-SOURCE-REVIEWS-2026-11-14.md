@@ -52,9 +52,17 @@
 - Regression: `tests/v123-multilingual-audit-context-private.php` checks Urdu, Arabic, mixed scripts, nested sensitive values, and safe ordinary metadata. Code correction commit `12a06faae909911a18b66a6affa88564b9e4db32`; test commit `c5c1e1efc492cfc677d13577c614173765dd3f86`.
 - This reproduces a **source-level disclosure path**, not evidence that clinical data was actually exposed in production. If installed logs are later examined, handle them privately under authorized retention policy.
 
+### Pass D — reserved diagnostic integrity key
+
+**V12.3-F24-005 (new source finding): forged native integrity-result PASS.**
+- The `spcrc/system_checks` extension could append a record named `system_checks_integrity` with `status=pass`; this reserved field was not protected against forgery when the native 13 results were untouched.
+- Source correction: reject reserved namespace entries submitted by extensions, preserve the 13 native checks, and create one canonical `system_checks_integrity=critical` incident rather than displaying fabricated success. Ordinary legitimate module checks remain.
+- Regression: `tests/v123-reserved-system-check-integrity.php`, added at `d106f2c8c92157e66660fd7b74bad8ddcc00d4fc`; correction in `2db07f4a9f1c18d1154f2b6dd17aab6cb984eb75`.
+- This is a bounded source-level integrity finding, not a proven live incident.
+
 **Prior historical 11 findings:** preserved in `docs/FILE24-SOURCE-AUDIT-AND-RELEASE-GATES-2026-11-13.md` and its associated tests; not rediscovered or recounted as new defects.
 
-**Cumulative within this bounded PR scope:** 11 pre-existing documented source findings + 4 new V12.3 findings = **15 findings, 15 source corrections proposed and regression tests available.** Final exact-head CI must pass for retest-closed status; no live remediation is asserted.
+**Cumulative within this bounded PR scope:** 11 pre-existing documented source findings + 5 new V12.3 findings = **16 findings, 16 source corrections proposed and regression tests available.** Final exact-head CI must pass for retest-closed status; no live remediation is asserted.
 
 ## 4. Checks and evidence
 
