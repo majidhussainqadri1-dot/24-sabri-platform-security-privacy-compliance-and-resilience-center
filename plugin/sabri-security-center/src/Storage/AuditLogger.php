@@ -148,8 +148,13 @@ final class AuditLogger
 
             $rawKey = (string) $key;
             $normalized = strtolower($rawKey);
+            // WordPress sanitize_key() strips Urdu/Arabic letters while
+            // retaining underscores. Hash non-ASCII names even when a
+            // punctuation-only remnant survives, avoiding collisions and
+            // revealing no private Unicode labels in the audit store.
+            $unicodeField = preg_match('/[^\\x00-\\x7F]/', $rawKey) === 1;
             $safeKey = Sanitizer::key($rawKey, 80);
-            if ($safeKey === '') {
+            if ($safeKey === '' || $unicodeField) {
                 $safeKey = 'field_' . substr(hash('sha256', $rawKey), 0, 16);
             }
             if (array_key_exists($safeKey, $safe)) {
@@ -171,7 +176,7 @@ final class AuditLogger
             // those keys describe a patient, guardian or clinical narrative.
             // Fail closed rather than persisting unchecked raw text under a
             // harmless-looking hash of the original non-ASCII field name.
-            if ($compactKey === '' || preg_match('/[^\\x00-\\x7F]/', $rawKey) === 1) {
+            if ($compactKey === '' || $unicodeField) {
                 $safe[$safeKey] = '[REDACTED]';
                 continue;
             }
