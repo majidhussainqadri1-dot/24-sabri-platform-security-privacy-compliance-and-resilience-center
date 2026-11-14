@@ -166,6 +166,15 @@ final class AuditLogger
             // sensitive-field classification. A patient name or narrative
             // may contain no detectable phone, email or secret pattern.
             $compactKey = preg_replace('/[^a-z0-9]/', '', $normalized) ?? '';
+            // File 24 V12.3: keys may be written in Urdu, Arabic or other
+            // scripts. The ASCII name classifier cannot establish whether
+            // those keys describe a patient, guardian or clinical narrative.
+            // Fail closed rather than persisting unchecked raw text under a
+            // harmless-looking hash of the original non-ASCII field name.
+            if ($compactKey === '' || preg_match('/[^\\x00-\\x7F]/', $rawKey) === 1) {
+                $safe[$safeKey] = '[REDACTED]';
+                continue;
+            }
             $privateNarrativeKeys = [
                 'firstname', 'lastname', 'fullname', 'legalname', 'displayname',
                 'dateofbirth', 'birthdate', 'dob', 'guardianname',
