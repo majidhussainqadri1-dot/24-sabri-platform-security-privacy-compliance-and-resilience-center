@@ -68,9 +68,30 @@
 - Regression: `tests/v123-cv280-zero-active-defects.php` (historical token blocked, current token verified, both reviews still necessary). Update the former Cycle 112 fixture to test current legal source semantics without rewriting the historical audit record.
 - Code commit `8cc2c7ab9aa83388deee82eb04d9940d9ac882e0`, fixture correction `5d4e31896c890da8dfbcb49b25aade17156df945`.
 
+### Pass F — timestamp spoofing in requirement evidence
+
+**V12.3-F24-007: Relative time accepted as a source of freshness.**
+- Direct local reproduction against PR HEAD `ee0f4964...`: with all control labels present and an opaque evidence reference, `ContinuousValueAssurance::evaluate('CV-280', ... 'reviewed_at' => 'now')` and `'-3 hours'` both returned `state=verified`. This is a source-level false-green possibility, not a live exposure.
+- Root cause: permissive `strtotime()` interprets relative timestamp text; it does not prove an actual recorded human review instant. Correction: use shared strict `Sanitizer::isoTime`, reject ambiguous relative and impossible inputs, preserve explicitly absolute timestamps.
+- Source commit `7cadbcd2eecfea8b721cb344e736b807c7898419`, negative regression `tests/v123-cv-evidence-absolute-date.php`.
+
+### Pass G — independent dual-review authenticity
+
+**V12.3-F24-008: Two distinct strings were accepted as two human approvals at final phase.**
+- Root cause: `approval_refs` strings were de-duplicated and hashed but did not require a trusted provider to verify actual reviewer identities, review freshness and exact reviewed candidate. A generic artifact with two arbitrary strings could meet this *source* branch of the final decision.
+- Correction: phase 24L additionally demands the registered `spcrc/verify_independent_release_reviews` integration. A missing or false provider blocks the final release, retaining generic dual-string requirements only for earlier repository phases.
+- Regression `tests/v123-final-independent-review-provenance.php` covers absent, negative and positive simulated trusted provider paths. Test `v123-final-release-blocker-provider-required.php` is adjusted to prove the reviewer gate separately. Actual GitHub human reviews are still **0/2**, not replaced by simulated test fixtures.
+- Important trust limit: WordPress filter registration alone is not proof of independent human authorization. The trusted native integration must check actual 2 different human identities, exact artifact SHA, review state and non-expiry; external audit must inspect that provider. This release stays HOLD without it.
+
+### Pass H — canonical source-ID traceability completion
+
+- New exact-source JSON `docs/V123-LEGACY-168-AND-UX14-SOURCE-TRACEABILITY.json`: 100 F24-R, 18 CHAT, 25 CV/CEN, 25 FUT and 14 Master Plan UX journeys. Original four GitHub source-document blob hashes and titles are retained without writing invented Live evidence.
+- New `tests/v123-complete-224-id-source-ux-traceability.php` verifies 168+14 plus 42 existing distinct V12.3 IDs = **224/224 source/UX/QA identifiers mapped**. This proves catalogue traceability, not the feature itself.
+- Source reviewer cannot claim 100% implementation of 224 runtime journeys from catalogue existence. Native owner and staging/live evidence remain separate.
+
 **Prior historical 11 findings:** preserved in `docs/FILE24-SOURCE-AUDIT-AND-RELEASE-GATES-2026-11-13.md` and its associated tests; not rediscovered or recounted as new defects.
 
-**Cumulative within this bounded PR scope:** 11 pre-existing documented source findings + 6 new V12.3 findings = **17 findings, 17 source corrections proposed and regression tests available.** Final exact-head CI must pass for retest-closed status; no live remediation is asserted.
+**Cumulative within this bounded PR scope:** 11 pre-existing documented source findings + 8 new V12.3 findings = **19 findings, 19 source corrections proposed and regression tests available.** Final exact-head CI must pass for retest-closed status; no live remediation is asserted.
 
 ## 4. Checks and evidence
 
