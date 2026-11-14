@@ -89,9 +89,17 @@
 - New `tests/v123-complete-224-id-source-ux-traceability.php` verifies 168+14 plus 42 existing distinct V12.3 IDs = **224/224 source/UX/QA identifiers mapped**. This proves catalogue traceability, not the feature itself.
 - Source reviewer cannot claim 100% implementation of 224 runtime journeys from catalogue existence. Native owner and staging/live evidence remain separate.
 
+### Pass I — disaster-recovery evidence freshness
+
+**V12.3-F24-009: Stale historical backup proof could remain green.**
+- On the exact pre-patch source, a synthetically supplied `status=verified`, `evidence_ref=vault:...`, backup at -400 days, and later restore at -399 days yielded a `SystemCheck` backup PASS. Both relevant code paths only checked structure, chronology and future-date bounds.
+- Source correction: `AssuranceRepository::normalizeBackupEvidence` and `SystemCheck::checkBackupEvidenceAdapter` now require a related successful backup timestamp within 48 hours and associated restore exercise within 93 days (plus prior structural/chronological safeguards). Missing and stale evidence remains non-green.
+- New regression `tests/v123-backup-restore-evidence-freshness.php` covers both code paths with past evidence and valid recent pair. Relevant commits `b6f8a4aeb93c1b767a1e81d2ea3c860ffd89b541`, `de08de16cda66fdcc751dd147d4a0ed99b77f494`.
+- **Operational boundary:** The status `verified` and opaque reference are still assertions from external providers and human operators, not the actual proof of a successful Hostinger restore; QA-24, G6, RPO/RTO and Founder release approval remain blocked.
+
 **Prior historical 11 findings:** preserved in `docs/FILE24-SOURCE-AUDIT-AND-RELEASE-GATES-2026-11-13.md` and its associated tests; not rediscovered or recounted as new defects.
 
-**Cumulative within this bounded PR scope:** 11 pre-existing documented source findings + 8 new V12.3 findings = **19 findings, 19 source corrections proposed and regression tests available.** Final exact-head CI must pass for retest-closed status; no live remediation is asserted.
+**Cumulative within this bounded PR scope:** 11 pre-existing documented source findings + 9 new V12.3 findings = **20 findings, 20 source corrections proposed and regression tests available.** Final exact-head CI must pass for retest-closed status; no live remediation is asserted.
 
 ## 4. Checks and evidence
 
