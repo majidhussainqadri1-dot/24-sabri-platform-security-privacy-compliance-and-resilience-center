@@ -49,8 +49,8 @@ foreach ($items as $id => $item) {
         "Actual deployed acceptance must not be inferred: {$id}"
     );
     v123FullTraceAssert(
-        ($item['actual_evidence_ref'] ?? 'MISSING') === null,
-        "Unverified acceptance must not contain invented evidence: {$id}"
+        array_key_exists('actual_evidence_ref', $item) && $item['actual_evidence_ref'] === null,
+        "Unverified acceptance must explicitly carry a null evidence reference: {$id}"
     );
 
     if (str_starts_with($id, 'CHAT-')) {
