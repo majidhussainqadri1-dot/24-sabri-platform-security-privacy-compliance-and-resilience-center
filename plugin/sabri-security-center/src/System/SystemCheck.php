@@ -279,6 +279,13 @@ final class SystemCheck
             }
         }
 
+        // Capacity-exhaustion markers represent an attempted audit write that
+        // had no place in the 100-gap store. They must remain independently
+        // visible even when the managed stores subsequently appear empty.
+        if (AuditGapStore::capacityEvidenceUnresolved()) {
+            $counts['capacity-overflow'] = 1;
+        }
+
         $total = array_sum($counts);
         $detail = $total === 0
             ? 'No unresolved File 24 audit-evidence gaps detected'
