@@ -97,9 +97,17 @@
 - New regression `tests/v123-backup-restore-evidence-freshness.php` covers both code paths with past evidence and valid recent pair. Relevant commits `b6f8a4aeb93c1b767a1e81d2ea3c860ffd89b541`, `de08de16cda66fdcc751dd147d4a0ed99b77f494`.
 - **Operational boundary:** The status `verified` and opaque reference are still assertions from external providers and human operators, not the actual proof of a successful Hostinger restore; QA-24, G6, RPO/RTO and Founder release approval remain blocked.
 
+### Pass J — audit capacity overflow evidence durability
+
+**V12.3-F24-010: Capacity-failure marker not represented in release health.**
+- Reproduction on original PR branch source: a pending `spcrc_audit_gap_capacity_marker` record with `unresolved_count=100` and otherwise empty managed options yielded `SystemCheck audit_gaps=pass`. The marker is an independent indication that a failed mandatory audit-gap write could not be recorded, so its omission could lead to a false-green source release decision.
+- Correction: `AuditGapStore::capacityEvidenceUnresolved()` centralizes its read-only presence check. `SystemCheck` reports a critical `capacity-overflow` category; `ReleaseGateManager` prevents a positive decision if marker remains, without dumping any private evidence. This adds no new managed audit-gap domain and retains 17 native option categories.
+- Regression: `tests/v123-capacity-marker-release-blocker.php`, detecting a marker-only false green and ensuring an attempted release does not mutate a pending gate.
+- Operational limitation: resolution/recovery of a marker requires real private evidence, approved procedure and audit trail. The code does **not** silently delete historical capacity failure.
+
 **Prior historical 11 findings:** preserved in `docs/FILE24-SOURCE-AUDIT-AND-RELEASE-GATES-2026-11-13.md` and its associated tests; not rediscovered or recounted as new defects.
 
-**Cumulative within this bounded PR scope:** 11 pre-existing documented source findings + 9 new V12.3 findings = **20 findings, 20 source corrections proposed and regression tests available.** Final exact-head CI must pass for retest-closed status; no live remediation is asserted.
+**Cumulative within this bounded PR scope:** 11 pre-existing documented source findings + 10 new V12.3 findings = **21 findings, 21 source corrections proposed and regression tests available.** Final exact-head CI must pass for retest-closed status; no live remediation is asserted.
 
 ## 4. Checks and evidence
 
