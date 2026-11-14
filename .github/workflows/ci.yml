@@ -37,6 +37,8 @@ jobs:
           bash -n tools/live-reality-freeze-readonly.sh
           test -f docs/V123-READONLY-LIVE-FREEZE-OPERATOR-GUIDE.md
           test -f docs/V123-IMPLEMENTATION-RTM-AND-GATES-2026-11-14.md
+          bash -n tools/tests/live-reality-freeze-readonly-smoke.sh
+          bash tools/tests/live-reality-freeze-readonly-smoke.sh
 
       - name: Set up PHP ${{ matrix.php }}
         uses: shivammathur/setup-php@v2
