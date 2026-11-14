@@ -137,14 +137,16 @@ final class ReleaseGateManager
             }
             $p0Count = Sanitizer::strictInteger(apply_filters('spcrc/release_blocking_p0_count', 0, $phase), 0, PHP_INT_MAX);
             $blockingDefectCount = Sanitizer::strictInteger(apply_filters('spcrc/release_blocking_defect_count', 0, $phase, $status), 0, PHP_INT_MAX);
-            // A Founder-governed waiver may document a noncritical exception,
-            // but it must never convert a known P0 safety/security blocker
-            // (or invalid blocker evidence) into an accepted release gate.
+            // V12.3 CEN-REL-001: every active release scope must have zero
+            // known unresolved defects. A governed waiver is only for residual
+            // risk after defects have been corrected, or an independently
+            // isolated optional capability already excluded by the native owner
+            // from the active blocker inventory. No waiver changes this count.
             if ($p0Count === null || $p0Count > 0) {
                 return new \WP_Error('spcrc_release_gate_p0_blocked', 'Known P0 defects cannot be bypassed by a release waiver.');
             }
-            if ($status !== 'waived' && ($blockingDefectCount === null || $blockingDefectCount > 0)) {
-                return new \WP_Error('spcrc_release_gate_known_defects_blocked', 'Known unresolved release-blocking defects require correction or an explicit governed waiver.');
+            if ($blockingDefectCount === null || $blockingDefectCount > 0) {
+                return new \WP_Error('spcrc_release_gate_known_defects_blocked', 'Known unresolved active release defects cannot be bypassed by a waiver.');
             }
             if ($status === 'waived') {
                 $riskAcceptanceRef = Sanitizer::opaqueReference($context['risk_acceptance_reference'] ?? '');
