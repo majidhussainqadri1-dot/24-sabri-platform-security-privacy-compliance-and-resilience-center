@@ -53,7 +53,13 @@ TMPDIR="$WORK/private" bash "$ROOT/tools/live-reality-freeze-readonly.sh" \
 find "$WORK/private" -mindepth 1 -maxdepth 1 -type d -name 'file24-private-freeze.*' -print > "$WORK/folders.txt"
 [[ "$(wc -l < "$WORK/folders.txt")" -eq 1 ]] || { echo "FAIL: expected one private receipt" >&2; exit 1; }
 RECEIPT="$(head -n1 "$WORK/folders.txt")"
-[[ "$(stat -c %a "$RECEIPT")" == "700" ]] || { echo "FAIL: receipt not private" >&2; exit 1; }
+MODE="$(stat -c %a "$RECEIPT")"
+# Some private host paths inherit the setgid bit (2700 rather than 700).
+# What matters is owner-only rwx with zero group/other permission bits.
+if (( (8#$MODE & 0700) != 0700 || (8#$MODE & 0077) != 0 )); then
+    echo "FAIL: receipt has unsafe filesystem permissions ($MODE)" >&2
+    exit 1
+fi
 
 for name in README-PRIVATE.txt wordpress-core-version.txt plugin-versions.csv theme-versions.csv \
     file24-version-options.txt database-server-version.txt file24-tables-approximate-rows.txt \
