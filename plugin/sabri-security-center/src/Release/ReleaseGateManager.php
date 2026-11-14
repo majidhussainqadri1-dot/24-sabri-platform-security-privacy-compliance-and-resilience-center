@@ -172,10 +172,29 @@ final class ReleaseGateManager
                 }
                 $riskAcceptanceHash = hash('sha256', $riskAcceptanceRef);
             }
-            if ($phase === '24l-independent-assurance-staging'
-                && ! Sanitizer::boolean(apply_filters('spcrc/release_external_acceptance_ready', false, $phase, $evidenceRef))
-            ) {
-                return new \WP_Error('spcrc_release_gate_external_acceptance_missing', 'Independent assurance and staging acceptance evidence is required for Phase 24L.');
+            if ($phase === '24l-independent-assurance-staging') {
+                if (! Sanitizer::boolean(apply_filters('spcrc/release_external_acceptance_ready', false, $phase, $evidenceRef))) {
+                    return new \WP_Error('spcrc_release_gate_external_acceptance_missing', 'Independent assurance and staging acceptance evidence is required for Phase 24L.');
+                }
+                // Two strings in approval_refs are *not* evidence of two
+                // independent humans. At the final external-acceptance phase
+                // a native trusted reviewer-provenance provider must confirm
+                // the approvals against the exact reviewed artifact/source,
+                // approver identities, independence and their current state.
+                // Repository-only phases still use the prior bounded contract.
+                if (! has_filter('spcrc/verify_independent_release_reviews')) {
+                    return new \WP_Error('spcrc_release_gate_review_verifier_missing', 'Final release requires a configured independent-review provenance verifier.');
+                }
+                if (! Sanitizer::boolean(apply_filters(
+                    'spcrc/verify_independent_release_reviews',
+                    false,
+                    $approvals,
+                    $phase,
+                    $evidenceRef,
+                    $actor
+                ))) {
+                    return new \WP_Error('spcrc_release_gate_independent_reviews_unverified', 'Two independent human release reviews were not authenticated for the exact candidate.');
+                }
             }
         }
 
