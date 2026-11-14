@@ -73,6 +73,12 @@ assertV123FinalProvider(
 );
 
 add_filter('spcrc/release_external_acceptance_ready', '__return_true', 10, 3);
+$unverifiedReviews = $final();
+assertV123FinalProvider(
+    is_wp_error($unverifiedReviews) && $unverifiedReviews->get_error_code() === 'spcrc_release_gate_review_verifier_missing',
+    'Zero-defect and staging evidence must not stand in for two authentic independent reviews.'
+);
+add_filter('spcrc/verify_independent_release_reviews', '__return_true', 10, 5);
 $ready = $final();
 assertV123FinalProvider(is_string($ready), 'Only explicitly provided zero-defect evidence plus external acceptance can pass.');
 assertV123FinalProvider(
