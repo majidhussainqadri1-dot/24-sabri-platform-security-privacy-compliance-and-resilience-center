@@ -105,9 +105,17 @@
 - Regression: `tests/v123-capacity-marker-release-blocker.php`, detecting a marker-only false green and ensuring an attempted release does not mutate a pending gate.
 - Operational limitation: resolution/recovery of a marker requires real private evidence, approved procedure and audit trail. The code does **not** silently delete historical capacity failure.
 
+### Pass K — backup/restore evidence event-model separation
+
+**V12.3-F24-011: false negative for a fresh daily backup with a separately restored older snapshot.**
+- In the previous source, the only chronology supported was `restore_tested_at >= last_success_at`. This assumes the most recent daily backup is exactly the snapshot tested in the quarterly restore, often false. Direct source reproduction: 1-hour-old latest backup and a 30-day-old restore returned `AssuranceRepository status=unknown` and `SystemCheck=warning`.
+- Correction introduces *opt-in* independent-cycle evidence only when `evidence_model=independent-cycles`, a valid `restore_source_backup_at`, a separate opaque `restore_evidence_ref`, source-backup date <= its restore-test date and <= newest backup date, plus all prior 48h/93d freshness and future bounds. The four-field paired-snapshot form remains unchanged; missing or duplicated evidence cannot pass. Both original owner-adapter and system health recognize the same logical model.
+- Regression: `tests/v123-independent-backup-restore-cycles.php`, covering current 1h/30d fixture, missing source, duplicate receipts, invalid chronology, stale 120d restore, and unchanged legacy four-field contract.
+- Trust boundary: no opaque reference alone proves a restored Hostinger artifact. The quarterly drill still requires actual restoration and independent authenticated infrastructure receipts, with G6/G7 permanently blocking certification absent those.
+
 **Prior historical 11 findings:** preserved in `docs/FILE24-SOURCE-AUDIT-AND-RELEASE-GATES-2026-11-13.md` and its associated tests; not rediscovered or recounted as new defects.
 
-**Cumulative within this bounded PR scope:** 11 pre-existing documented source findings + 10 new V12.3 findings = **21 findings, 21 source corrections proposed and regression tests available.** Final exact-head CI must pass for retest-closed status; no live remediation is asserted.
+**Cumulative within this bounded PR scope:** 11 pre-existing documented source findings + 11 new V12.3 findings = **22 findings, 22 source corrections proposed and regression tests available.** Final exact-head CI must pass for retest-closed status; no live remediation is asserted.
 
 ## 4. Checks and evidence
 
