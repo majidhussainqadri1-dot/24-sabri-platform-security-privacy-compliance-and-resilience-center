@@ -22,7 +22,7 @@ bash tools/live-reality-freeze-readonly.sh --authorized-read-only \
   /absolute/path/to/wp-content/plugins/sabri-security-center
 ```
 
-The command reads only core/plugin/theme metadata, a small allowlisted set of File24 version options, DB-server/schema **metadata**, approximate table counts, and installed source-code hashes. This process intentionally does **not** extract raw table rows, patient charts, passwords, secrets, WP configuration, or private logs. The output directory is generated under private temp storage with mode 0700 by `mktemp` and `umask 077`. It is not a full migration or installed-build parity audit.
+The command reads only core/plugin/theme metadata, a small allowlisted set of File24 version options, the **sanitized upgrade error code**, an upgrade-lock *presence flag* (never lock contents), File24-only cron hook/schedule names, DB-server/schema **metadata**, table/column/index shapes, approximate table counts, and installed source-code hashes. This process intentionally does **not** extract raw table rows, patient charts, passwords, secrets, WP configuration, private logs, cron payloads or raw serialized error options. The output directory is generated under private temp storage with owner-only permissions by `mktemp` and `umask 077`. It is not a full migration or installed-build parity audit.
 
 **Important:** WP-CLI loads WordPress infrastructure and must be operated by a qualified administrator. `--skip-plugins --skip-themes` avoids ordinary plugin/theme execution but does not necessarily disable mu-plugins or custom host bootstrap. Review the site's exact environment before execution. The script performs no deliberate database update; it does not certify every third-party boot hook as side-effect-free.
 
