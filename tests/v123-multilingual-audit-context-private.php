@@ -69,7 +69,7 @@ assertV123MultilingualAudit(
     'Nested Urdu narrative field must not leak.'
 );
 assertV123MultilingualAudit(
-    ($decoded['patientname_'] ?? $decoded['patientname'] ?? null) === '[REDACTED]',
+    ($decoded['field_' . substr(hash('sha256', 'patientName_مریض'), 0, 16)] ?? null) === '[REDACTED]',
     'Mixed ASCII/Urdu sensitive label must fail closed.'
 );
 echo "PASS: File 24 V12.3 multilingual Urdu/Arabic audit context cannot leak patient data\n";
