@@ -240,17 +240,29 @@ final class SystemCheck
         $evidenceRef = is_array($evidence) ? Sanitizer::opaqueReference($evidence['evidence_ref'] ?? '') : '';
         $lastTimestamp = $lastSuccess === '' ? false : strtotime($lastSuccess);
         $restoreTimestamp = $restoreTest === '' ? false : strtotime($restoreTest);
+        $independent = is_array($evidence)
+            && Sanitizer::key($evidence['evidence_model'] ?? '', 40) === 'independent-cycles';
+        $sourceBackup = $independent ? Sanitizer::isoTime($evidence['restore_source_backup_at'] ?? '') : '';
+        $sourceTimestamp = $sourceBackup === '' ? false : strtotime($sourceBackup);
+        $restoreRef = $independent ? Sanitizer::opaqueReference($evidence['restore_evidence_ref'] ?? '') : '';
+        $evidenceChronology = $independent
+            ? ($sourceTimestamp !== false
+                && $restoreTimestamp !== false
+                && $lastTimestamp !== false
+                && $sourceTimestamp <= $restoreTimestamp
+                && $sourceTimestamp <= $lastTimestamp
+                && $restoreRef !== ''
+                && $restoreRef !== $evidenceRef)
+            : ($restoreTimestamp !== false && $lastTimestamp !== false && $restoreTimestamp >= $lastTimestamp);
         $chronologyValid = $status === 'verified'
             && $evidenceRef !== ''
             && $lastTimestamp !== false
             && $restoreTimestamp !== false
-            && $restoreTimestamp >= $lastTimestamp
+            && $evidenceChronology
             && $lastTimestamp <= time() + 300
             && $restoreTimestamp <= time() + 300
-            // V12.3 daily backup and quarterly restore evidence must be
-            // recent. 48 hours allows bounded collection delay and 93 days
-            // bounds a quarterly drill; neither is a substitute for an
-            // actual independent restore inspection.
+            // Daily backup within 48h, quarterly independent restore within
+            // 93d; the evidence source must still be genuinely authenticated.
             && $lastTimestamp >= time() - 2 * DAY_IN_SECONDS
             && $restoreTimestamp >= time() - 93 * DAY_IN_SECONDS;
 
@@ -259,8 +271,10 @@ final class SystemCheck
             'Backup and restore evidence adapter',
             $chronologyValid,
             $chronologyValid
-                ? 'Verified backup and later restore-test evidence received'
-                : 'Complete, chronological backup and restore evidence is not configured',
+                ? ($independent
+                    ? 'Recent backup and separately referenced restore-test evidence received'
+                    : 'Verified backup and later restore-test evidence received')
+                : 'Complete, current, linked backup and restore evidence is not configured',
             'warning'
         );
     }
