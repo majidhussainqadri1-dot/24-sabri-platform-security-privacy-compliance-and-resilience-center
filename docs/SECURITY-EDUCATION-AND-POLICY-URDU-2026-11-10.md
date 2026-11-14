@@ -1,0 +1,53 @@
+# صابری سوشل ہومیوپیتھی پلیٹ فارم — مستقل سائبر تحفظ، عوامی رہنمائی اور انتظامی ذمہ داری
+
+**حیثیت:** File 24 repository/source candidate؛ live deployment غیر مصدقہ۔
+
+## ۱۔ مرکزی فیصلہ اور ذمہ داری
+- File 24 سلامتی، رازداری، incident evidence اور assurance کا مرکزی مالک ہے۔
+- File 00 شناخت و کردار؛ File 02 login/MFA/sessions؛ File 20 عوامی menu؛ File 19/CF02 alerts/support؛ CF01/CF04 مریض و میڈیا کی رازداری۔
+- File 24، اصل authentication، host WAF، backup یا native clinical authorization کا متبادل نہیں۔
+- عوامی مواد میں secrets، خطرات کی نجی تفصیل، patient charts، backup location، incident logs اور credential information ظاہر نہ ہو۔
+
+## ۲۔ سات مستقل حفاظتی ضوابط
+1. انتظامی رسائی: ہوسٹنگ، WordPress، رجسٹرار اور recovery email پر MFA؛ passkeys جہاں دستیاب؛ least privilege اور محفوظ recovery codes۔
+2. اپ ڈیٹس: WordPress، تھیم، پلگ اِنز، سرور اور dependencies کی بروقت حفاظتی اصلاح؛ غیر ضروری components ختم۔
+3. بیک اپ: فائل + database؛ روزانہ حساس کاروباری تبدیلیوں پر روزانہ؛ الگ encrypted copy؛ isolated restore drill۔
+4. ویب تحفظ: WAF، DDoS، login rate limiting، TLS؛ Cloudflare ہو تو Full (strict) اور valid origin certificate؛ رجسٹریشن اور اپائنٹمنٹ retest۔
+5. نگرانی: بندش، نامعلوم administrator، مشتبہ فائل/DB تبدیلی اور alerts کی تحقیق۔
+6. مریض کی رازداری: وصولی سے private storage؛ ہر view/download پر server-side object access؛ authorized doctor only؛ upload validation and malware scanning۔
+7. مشتبہ حملہ: containment، host notice، log preservation، revoked credentials، root cause، clean verified restore اور live retest۔
+
+## ۳۔ اصل coded interfaces
+- عوامی WordPress صفحے میں shortcode: [sabri_security_guidance]۔ File 20 سے منظور شدہ مرکزی مینو link دیجیے۔
+- Public content: OTP/passkeys، phishing، device safety، patient privacy، suspicious-account response اور Support/Report guidance۔
+- Admin: File 24 Security Center کے اندر capability-gated، read-only operator checklist۔
+- جامد رہنمائی کو MFA، WAF یا restore کے حقیقی نفاذ کا ثبوت نہیں کہا جائے گا۔
+
+## ۴۔ قبولیت اور Live-First
+- Source syntax، registration، public/privacy boundary اور admin authorization tests الگ چلیں۔
+- Staging پر WP/PHP version، RTL/mobile/keyboard/400% zoom، page publication، menu integration، File 02 login اور incident-report journey تصدیق ہو۔
+- Live، staging اور GitHub الگ؛ exact deployed plugin/code، DB/schema، migrations اور package checksum سے parity ثابت کی جائے۔
+- ہر رپورٹ میں defects found/fixed/retested/unresolved/blocked الگ؛ live re-test کے بغیر Resolved نہیں۔
+- یہ code change real infrastructure WAF، backup، email-MFA یا independent pen-test activate نہیں کرتا۔
+
+## ۵۔ ماخذ
+- صارف کی فراہم کردہ «صابری سوشل ہومیوپیتھی پلیٹ فارم کا مستقل حفاظتی ضابطہ»، ۱۰ نومبر ۲۰۲۶، سات شقیں۔
+- «صابری ویب سائٹ کا جامع منصوبہ»، ایڈیشن V12.1، مورخہ ۱۰ نومبر ۲۰۲۶ء، ابواب ۳، ۵، ۸، ۹ اور ۱۲؛ اصل V12 شناختیں برقرار۔
+
+## ۶۔ تازہ کوڈ آڈٹ اور اصلاح
+- عوامی shortcode صرف raw post content تک محدود نہیں؛ dynamically rendered reusable blocks، template parts اور page builders سے شامل شدہ shortcode پر CSS کے ضائع ہونے سے بچنے کے لیے frontend پر مختصر، مکمل scoped CSS شروع ہی میں enqueue ہوگی۔
+- ایک ہی صفحے پر shortcode متعدد دفعہ آئے تو اب تمام `id` اور `aria-labelledby` کی شناخت منفرد ہوگی؛ accessibility اور screen-reader references کا الگ regression test موجود ہے۔
+- یہ اصلاح صرف frontend رہنمائی اور accessibility کی ہے؛ MFA، WAF یا backup کے عملی فعال ہونے کا ثبوت نہیں۔
+
+- File 24 کی اصل CI میں `pull_request` کے GitHub-generated merge ref کو source HEAD فرض کرنے کی خامی دریافت ہوئی؛ workflow اب ہر job میں immutable `github.event.pull_request.head.sha` checkout کرتا اور `git rev-parse HEAD` سے عین مطابقت ثابت کرتا ہے۔ یہ repository-level CI ہے، live deployed parity نہیں۔
+
+## ۷۔ اس آڈٹ میں مکمل و نامکمل حدود
+- اس نئی نظرِ ثانی کے File 24 حصے میں تین ماخذی نقائص: dynamic shortcode CSS، duplicate ARIA IDs، اور CI exact-head verification؛ تینوں کی code-level اصلاح کی گئی۔
+- File 02 کی نئی رجسٹریشن میں دو مزید نقائص: nested interactive link اور unversioned safety acknowledgment؛ متعلقہ مالک File 02 کی Draft PR #27 میں اصلاح۔
+- Live deployment، Hostinger configuration، File00 MFA policy، موجودہ صارف کے لازمی re-consent، recovery/lockout، File20 navigation اور اصل provider backups ابھی علیحدہ ثبوت کے محتاج ہیں۔
+
+## ۸۔ ۱۳ نومبر ۲۰۲۶ء — اضافی آزاد ماخذی تنقیح
+- audit لاگز میں `patientName`، `medicalHistory`، `chiefComplaint` جیسی حساس متبادل فیلڈز کی شناخت اور پوشیدگی کے لیے `AuditLogger` میں اضافی حفاظت اور مستقل Regression Test شامل ہے۔
+- انتہائی سنگین `P0` نقص کی موجودگی میں Release Gate کو `waived` بنا کر آگے بڑھانا ممنوع کیا گیا ہے؛ Founder-governed غیر شدید استثنا کے دوسرے قواعد برقرار ہیں۔
+- مکمل ثبوت، حدود اور باقی نفاذی رکاوٹیں `FILE24-SOURCE-AUDIT-AND-RELEASE-GATES-2026-11-13.md` میں درج ہیں۔
+- یہ دونوں اصلاحات ماخذی شاخ کی ہیں؛ حقیقی لائیو تحفظ کا نتیجہ اصل نصب شدہ کوڈ، DB اور عملی آزمائش کے بعد ہی سامنے آئے گا۔

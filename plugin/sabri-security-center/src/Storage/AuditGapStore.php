@@ -73,7 +73,14 @@ final class AuditGapStore
         }
 
         try {
-            $gaps = self::normalize(get_option($option, []));
+            $rawEvidence = get_option($option, []);
+            $gaps = self::normalize($rawEvidence);
+            if (self::normalizationDropsEvidence($rawEvidence, $gaps)) {
+                // Preserve malformed or legacy unresolved evidence; a
+                // normalized read must not silently erase it on a new write.
+                do_action('spcrc/audit_gap_existing_evidence_invalid', $option, 'record');
+                return false;
+            }
             $gapId = SecureIdentifier::uuid4('audit-gap');
             if (is_wp_error($gapId)) {
                 do_action('spcrc/audit_gap_identifier_failed', $option, $entityType, $entityId, $reason, $gapId->get_error_code());
@@ -123,6 +130,17 @@ final class AuditGapStore
         return self::MANAGED_OPTIONS;
     }
 
+    /**
+     * A capacity-overflow receipt is unresolved failure evidence even if the
+     * previously stored individual gaps were later deleted. It must not be
+     * silently normalized to a zero-defect state. Only an audited, authorized
+     * recovery process may retire this marker; this read never clears it.
+     */
+    public static function capacityEvidenceUnresolved(): bool
+    {
+        return get_option(self::CAPACITY_MARKER_OPTION, []) !== [];
+    }
+
     /** @return array<string,array<string,mixed>> */
     public static function all(string $option): array
     {
@@ -169,7 +187,12 @@ final class AuditGapStore
         }
 
         try {
-            $gaps = self::normalize(get_option($option, []));
+            $rawEvidence = get_option($option, []);
+            $gaps = self::normalize($rawEvidence);
+            if (self::normalizationDropsEvidence($rawEvidence, $gaps)) {
+                do_action('spcrc/audit_gap_existing_evidence_invalid', $option, 'reconcile');
+                return new \WP_Error('spcrc_audit_gap_existing_evidence_invalid', 'Unrecognized audit evidence must be independently recovered before reconciliation.');
+            }
             if (! isset($gaps[$gapId])) {
                 return new \WP_Error('spcrc_audit_gap_not_found', 'The audit gap could not be found.');
             }
@@ -236,10 +259,46 @@ final class AuditGapStore
         }
     }
 
+    /** @param array<string,array<string,mixed>> $normalized */
+    private static function normalizationDropsEvidence(mixed $raw, array $normalized): bool
+    {
+        if ($raw === []) {
+            return false;
+        }
+        if (! is_array($raw) || count($raw) !== count($normalized)) {
+            return true;
+        }
+        foreach ($raw as $row) {
+            if (! is_array($row)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public static function count(string $option): int
     {
         $option = self::optionName($option);
-        return $option === '' ? 0 : count(self::normalize(get_option($option, [])));
+        if ($option === '') {
+            return 0;
+        }
+        $raw = get_option($option, []);
+        if ($raw === []) {
+            return 0;
+        }
+        // Normalization is a read/privacy boundary, not authority to discard
+        // unrecognized persisted evidence. A corrupt non-empty gap store must
+        // still block a release, even if every raw record fails validation.
+        if (! is_array($raw)) {
+            return 1;
+        }
+        foreach ($raw as $row) {
+            if (! is_array($row)) {
+                // Legacy flat records remain one evidence gap.
+                return max(1, count(self::normalize($raw)));
+            }
+        }
+        return max(count($raw), count(self::normalize($raw)));
     }
 
     /** @return array<string,array<string,mixed>> */
@@ -296,7 +355,7 @@ final class AuditGapStore
                     if ($key === '' || (! is_scalar($value) && $value !== null)) {
                         continue;
                     }
-                    if (preg_match('/(^|_)(password|token|secret|authorization|cookie|session|nonce|otp|email|phone|mobile|address|identity|passport|national_id)($|_)/', $key) === 1) {
+                    if (self::sensitiveContextKey($key)) {
                         $context[$key] = '[REDACTED]';
                         continue;
                     }
@@ -326,7 +385,7 @@ final class AuditGapStore
             if ($safeKey === '' || (! is_scalar($value) && $value !== null)) {
                 continue;
             }
-            if (preg_match('/(^|_)(password|token|secret|authorization|cookie|session|nonce|otp|email|phone|mobile|address|identity|passport|national_id|guardian)($|_)/', $safeKey) === 1) {
+            if (self::sensitiveContextKey($safeKey)) {
                 $safe[$safeKey] = '[REDACTED]';
                 continue;
             }
@@ -336,6 +395,16 @@ final class AuditGapStore
                 : '[REDACTED]';
         }
         return $safe;
+    }
+
+    /** A privacy-safe field-name check used both before persistence and when reading legacy gaps. */
+    private static function sensitiveContextKey(string $key): bool
+    {
+        $compact = preg_replace('/[^a-z0-9]/', '', strtolower($key)) ?? '';
+        if ($compact === '') {
+            return true;
+        }
+        return preg_match('/(?:password|passwd|passphrase|token|secret|apikey|authorization|cookie|session|nonce|otp|recovery|email|phone|mobile|address|contact|identity|passport|nationalid|guardian|patient|clinical|medical|symptom|diagnos|complaint|history|narrative|notes?|report|freeform|freetext|message|body|fullname|firstname|lastname|birthdate|dateofbirth|dob)/', $compact) === 1;
     }
 
     private static function safeEntityId(string $entityId): string

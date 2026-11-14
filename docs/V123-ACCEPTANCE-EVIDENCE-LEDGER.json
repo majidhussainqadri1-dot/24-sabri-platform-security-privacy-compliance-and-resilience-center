@@ -1,0 +1,453 @@
+{
+  "schema": "sabri-file24/v12.3-acceptance-ledger/1.0",
+  "published_utc_date": "2026-11-14",
+  "source_of_authority": "Sabri-Website-Master-Plan-V12.3.docx",
+  "source_candidate_runtime": "0.99.0",
+  "source_candidate_schema": "0.25.5",
+  "baseline_main_head": "a5b8d49968a7a5a7d6f3f4655bea541bf38a9acb",
+  "pending_branch": "feature/urdu-security-guidance-2026-11-10",
+  "release_candidate_status": "review_pending_unmerged_not_deployed",
+  "mandatory_incident_fields": {
+    "repository_head": "read from GitHub at decision time",
+    "deployed_version": "unverified",
+    "db_version": "unverified",
+    "migration_state": "unverified",
+    "live_verification_status": "not_run"
+  },
+  "gates": [
+    {
+      "id": "G0",
+      "title": "V12.3 scope/RTM freeze",
+      "owner": "Founder + File 24",
+      "status": "mapped",
+      "reason": "Approve active scope and evidence owners",
+      "evidence_ref": null
+    },
+    {
+      "id": "G1",
+      "title": "Deployed-state read-only freeze",
+      "owner": "Hostinger authorized operator",
+      "status": "blocked",
+      "reason": "Exact installed package/DB/schema/migrations/checksum missing",
+      "evidence_ref": null
+    },
+    {
+      "id": "G2",
+      "title": "First code review and correction",
+      "owner": "File 24 source reviewer",
+      "status": "source_corrected",
+      "reason": "Exact current PR head regressions and independent evidence",
+      "evidence_ref": null
+    },
+    {
+      "id": "G3",
+      "title": "Second independent review",
+      "owner": "2 genuinely independent security reviewers",
+      "status": "pending",
+      "reason": "0 signed independent security approvals",
+      "evidence_ref": null
+    },
+    {
+      "id": "G4",
+      "title": "Release merge/package",
+      "owner": "Repository maintainer + File 01B",
+      "status": "blocked",
+      "reason": "Review and authorized merge, exact-main CI, ZIP receipt",
+      "evidence_ref": null
+    },
+    {
+      "id": "G5",
+      "title": "Hostinger staging integration",
+      "owner": "File 00/02/19/20/CF04/native owners",
+      "status": "blocked",
+      "reason": "Installed real module contract/end-to-end receipt",
+      "evidence_ref": null
+    },
+    {
+      "id": "G6",
+      "title": "WAF/MFA/backup/restore/rollback",
+      "owner": "Infrastructure + operations owner",
+      "status": "blocked",
+      "reason": "Real provider and recovery drill evidence",
+      "evidence_ref": null
+    },
+    {
+      "id": "G7",
+      "title": "Security/legal/accessibility review",
+      "owner": "Independent assessors and legal qualified reviewer",
+      "status": "blocked",
+      "reason": "Pen test, privacy applicability, accessible journeys",
+      "evidence_ref": null
+    },
+    {
+      "id": "G8",
+      "title": "Founder production decision",
+      "owner": "Founder",
+      "status": "pending",
+      "reason": "Zero active defects and accepted external release evidence",
+      "evidence_ref": null
+    },
+    {
+      "id": "G9",
+      "title": "Live deployment/parity/retest",
+      "owner": "Release operator + File 24 independent verifier",
+      "status": "blocked",
+      "reason": "Exact deployed hash/schema and fresh live journeys",
+      "evidence_ref": null
+    }
+  ],
+  "checks": {
+    "outcome_metrics": [
+      {
+        "id": "M01",
+        "owner": "File 24 independent assurance + native owners",
+        "source_mapping_status": "mapped",
+        "staging_status": "not_run",
+        "live_status": "not_run",
+        "evidence_ref": null
+      },
+      {
+        "id": "M02",
+        "owner": "File 24 independent assurance + native owners",
+        "source_mapping_status": "mapped",
+        "staging_status": "not_run",
+        "live_status": "not_run",
+        "evidence_ref": null
+      },
+      {
+        "id": "M03",
+        "owner": "File 24 independent assurance + native owners",
+        "source_mapping_status": "mapped",
+        "staging_status": "not_run",
+        "live_status": "not_run",
+        "evidence_ref": null
+      },
+      {
+        "id": "M04",
+        "owner": "File 24 independent assurance + native owners",
+        "source_mapping_status": "mapped",
+        "staging_status": "not_run",
+        "live_status": "not_run",
+        "evidence_ref": null
+      },
+      {
+        "id": "M05",
+        "owner": "File 24 independent assurance + native owners",
+        "source_mapping_status": "mapped",
+        "staging_status": "not_run",
+        "live_status": "not_run",
+        "evidence_ref": null
+      },
+      {
+        "id": "M06",
+        "owner": "File 24 independent assurance + native owners",
+        "source_mapping_status": "mapped",
+        "staging_status": "not_run",
+        "live_status": "not_run",
+        "evidence_ref": null
+      },
+      {
+        "id": "M07",
+        "owner": "File 24 independent assurance + native owners",
+        "source_mapping_status": "mapped",
+        "staging_status": "not_run",
+        "live_status": "not_run",
+        "evidence_ref": null
+      },
+      {
+        "id": "M08",
+        "owner": "File 24 independent assurance + native owners",
+        "source_mapping_status": "mapped",
+        "staging_status": "not_run",
+        "live_status": "not_run",
+        "evidence_ref": null
+      },
+      {
+        "id": "M09",
+        "owner": "File 24 independent assurance + native owners",
+        "source_mapping_status": "mapped",
+        "staging_status": "not_run",
+        "live_status": "not_run",
+        "evidence_ref": null
+      },
+      {
+        "id": "M10",
+        "owner": "File 24 independent assurance + native owners",
+        "source_mapping_status": "mapped",
+        "staging_status": "not_run",
+        "live_status": "not_run",
+        "evidence_ref": null
+      },
+      {
+        "id": "M11",
+        "owner": "File 24 independent assurance + native owners",
+        "source_mapping_status": "mapped",
+        "staging_status": "not_run",
+        "live_status": "not_run",
+        "evidence_ref": null
+      },
+      {
+        "id": "M12",
+        "owner": "File 24 independent assurance + native owners",
+        "source_mapping_status": "mapped",
+        "staging_status": "not_run",
+        "live_status": "not_run",
+        "evidence_ref": null
+      }
+    ],
+    "acceptance_qa": [
+      {
+        "id": "QA-15",
+        "owner": "File 24 QA + journey owner",
+        "source_mapping_status": "mapped",
+        "staging_status": "not_run",
+        "live_status": "not_run",
+        "evidence_ref": null
+      },
+      {
+        "id": "QA-16",
+        "owner": "File 24 QA + journey owner",
+        "source_mapping_status": "mapped",
+        "staging_status": "not_run",
+        "live_status": "not_run",
+        "evidence_ref": null
+      },
+      {
+        "id": "QA-17",
+        "owner": "File 24 QA + journey owner",
+        "source_mapping_status": "mapped",
+        "staging_status": "not_run",
+        "live_status": "not_run",
+        "evidence_ref": null
+      },
+      {
+        "id": "QA-18",
+        "owner": "File 24 QA + journey owner",
+        "source_mapping_status": "mapped",
+        "staging_status": "not_run",
+        "live_status": "not_run",
+        "evidence_ref": null
+      },
+      {
+        "id": "QA-19",
+        "owner": "File 24 QA + journey owner",
+        "source_mapping_status": "mapped",
+        "staging_status": "not_run",
+        "live_status": "not_run",
+        "evidence_ref": null
+      },
+      {
+        "id": "QA-20",
+        "owner": "File 24 QA + journey owner",
+        "source_mapping_status": "mapped",
+        "staging_status": "not_run",
+        "live_status": "not_run",
+        "evidence_ref": null
+      },
+      {
+        "id": "QA-21",
+        "owner": "File 24 QA + journey owner",
+        "source_mapping_status": "mapped",
+        "staging_status": "not_run",
+        "live_status": "not_run",
+        "evidence_ref": null
+      },
+      {
+        "id": "QA-22",
+        "owner": "File 24 QA + journey owner",
+        "source_mapping_status": "mapped",
+        "staging_status": "not_run",
+        "live_status": "not_run",
+        "evidence_ref": null
+      },
+      {
+        "id": "QA-23",
+        "owner": "File 24 QA + journey owner",
+        "source_mapping_status": "mapped",
+        "staging_status": "not_run",
+        "live_status": "not_run",
+        "evidence_ref": null
+      },
+      {
+        "id": "QA-24",
+        "owner": "File 24 QA + journey owner",
+        "source_mapping_status": "mapped",
+        "staging_status": "not_run",
+        "live_status": "not_run",
+        "evidence_ref": null
+      }
+    ],
+    "storage_lifecycle": [
+      {
+        "id": "STO-01",
+        "owner": "CF04 / original object owner; File 24 assurance",
+        "source_mapping_status": "mapped",
+        "staging_status": "not_run",
+        "live_status": "not_run",
+        "evidence_ref": null
+      },
+      {
+        "id": "STO-02",
+        "owner": "CF04 / original object owner; File 24 assurance",
+        "source_mapping_status": "mapped",
+        "staging_status": "not_run",
+        "live_status": "not_run",
+        "evidence_ref": null
+      },
+      {
+        "id": "STO-03",
+        "owner": "CF04 / original object owner; File 24 assurance",
+        "source_mapping_status": "mapped",
+        "staging_status": "not_run",
+        "live_status": "not_run",
+        "evidence_ref": null
+      },
+      {
+        "id": "STO-04",
+        "owner": "CF04 / original object owner; File 24 assurance",
+        "source_mapping_status": "mapped",
+        "staging_status": "not_run",
+        "live_status": "not_run",
+        "evidence_ref": null
+      },
+      {
+        "id": "STO-05",
+        "owner": "CF04 / original object owner; File 24 assurance",
+        "source_mapping_status": "mapped",
+        "staging_status": "not_run",
+        "live_status": "not_run",
+        "evidence_ref": null
+      },
+      {
+        "id": "STO-06",
+        "owner": "CF04 / original object owner; File 24 assurance",
+        "source_mapping_status": "mapped",
+        "staging_status": "not_run",
+        "live_status": "not_run",
+        "evidence_ref": null
+      },
+      {
+        "id": "STO-07",
+        "owner": "CF04 / original object owner; File 24 assurance",
+        "source_mapping_status": "mapped",
+        "staging_status": "not_run",
+        "live_status": "not_run",
+        "evidence_ref": null
+      },
+      {
+        "id": "STO-08",
+        "owner": "CF04 / original object owner; File 24 assurance",
+        "source_mapping_status": "mapped",
+        "staging_status": "not_run",
+        "live_status": "not_run",
+        "evidence_ref": null
+      },
+      {
+        "id": "STO-09",
+        "owner": "CF04 / original object owner; File 24 assurance",
+        "source_mapping_status": "mapped",
+        "staging_status": "not_run",
+        "live_status": "not_run",
+        "evidence_ref": null
+      },
+      {
+        "id": "STO-10",
+        "owner": "CF04 / original object owner; File 24 assurance",
+        "source_mapping_status": "mapped",
+        "staging_status": "not_run",
+        "live_status": "not_run",
+        "evidence_ref": null
+      }
+    ],
+    "v123_changes": [
+      {
+        "id": "V12.3-01",
+        "owner": "Relevant master-plan owner + File 24 assurance",
+        "source_mapping_status": "mapped",
+        "staging_status": "not_run",
+        "live_status": "not_run",
+        "evidence_ref": null
+      },
+      {
+        "id": "V12.3-02",
+        "owner": "Relevant master-plan owner + File 24 assurance",
+        "source_mapping_status": "mapped",
+        "staging_status": "not_run",
+        "live_status": "not_run",
+        "evidence_ref": null
+      },
+      {
+        "id": "V12.3-03",
+        "owner": "Relevant master-plan owner + File 24 assurance",
+        "source_mapping_status": "mapped",
+        "staging_status": "not_run",
+        "live_status": "not_run",
+        "evidence_ref": null
+      },
+      {
+        "id": "V12.3-04",
+        "owner": "Relevant master-plan owner + File 24 assurance",
+        "source_mapping_status": "mapped",
+        "staging_status": "not_run",
+        "live_status": "not_run",
+        "evidence_ref": null
+      },
+      {
+        "id": "V12.3-05",
+        "owner": "Relevant master-plan owner + File 24 assurance",
+        "source_mapping_status": "mapped",
+        "staging_status": "not_run",
+        "live_status": "not_run",
+        "evidence_ref": null
+      },
+      {
+        "id": "V12.3-06",
+        "owner": "Relevant master-plan owner + File 24 assurance",
+        "source_mapping_status": "mapped",
+        "staging_status": "not_run",
+        "live_status": "not_run",
+        "evidence_ref": null
+      },
+      {
+        "id": "V12.3-07",
+        "owner": "Relevant master-plan owner + File 24 assurance",
+        "source_mapping_status": "mapped",
+        "staging_status": "not_run",
+        "live_status": "not_run",
+        "evidence_ref": null
+      },
+      {
+        "id": "V12.3-08",
+        "owner": "Relevant master-plan owner + File 24 assurance",
+        "source_mapping_status": "mapped",
+        "staging_status": "not_run",
+        "live_status": "not_run",
+        "evidence_ref": null
+      },
+      {
+        "id": "V12.3-09",
+        "owner": "Relevant master-plan owner + File 24 assurance",
+        "source_mapping_status": "mapped",
+        "staging_status": "not_run",
+        "live_status": "not_run",
+        "evidence_ref": null
+      },
+      {
+        "id": "V12.3-10",
+        "owner": "Relevant master-plan owner + File 24 assurance",
+        "source_mapping_status": "mapped",
+        "staging_status": "not_run",
+        "live_status": "not_run",
+        "evidence_ref": null
+      }
+    ]
+  },
+  "counts": {
+    "historical_source_findings": 11,
+    "new_v123_source_findings": 11,
+    "total_source_findings": 22,
+    "live_verified_corrections": 0,
+    "independent_human_pr_approvals": 0
+  },
+  "private_evidence_policy": "Never commit raw runtime logs, patient data, identities, tokens, backup paths, or private host inventory; evidence_ref must be an opaque approved locator."
+}

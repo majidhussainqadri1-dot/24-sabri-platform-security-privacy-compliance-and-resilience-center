@@ -16,6 +16,20 @@ File 24 is the cross-platform security-governance and assurance plane for the Sa
 
 This status means the approved repository-coding scope, including the later Continuous Value / Top-20 File-24 delta and the Future Security & Privacy Superset, is implemented, traceable, reviewed, testable and packageable. It does **not** mean Hostinger staging acceptance, independent certification, penetration-test acceptance, restore-drill acceptance, live deployment or operational acceptance.
 
+## Urdu security education (new repository candidate)
+
+- File 24 registers a public, read-only shortcode: [sabri_security_guidance]. Publish it on a reviewed WordPress page, then link that page through File 20's approved navigation.
+- An authorized wp-admin operator sees **Security Center → Security guidance**, with the seven controls to verify using actual live configuration and evidence.
+- Public guidance covers phishing, MFA and OTP safety, devices, patient privacy, reporting suspicious activity and account recovery precautions. It does **not** disclose internal vulnerabilities, secrets, patient records or live incident evidence.
+- These educational interfaces neither enable WAF/MFA/backups nor establish production deployment. Run the new standalone regression: php tests/security-guidance.php, and retain all existing repository and staging gates.
+- Primary specification: docs/SECURITY-EDUCATION-AND-POLICY-URDU-2026-11-10.md.
+- 13 November source review additionally hardened audit PII field aliases and made P0 release blockers non-waivable. Regressions: `tests/audit-sensitive-field-aliases.php` and `tests/release-p0-nonwaivable.php`. Evidence and remaining external gates: `docs/FILE24-SOURCE-AUDIT-AND-RELEASE-GATES-2026-11-13.md`.
+- A further source review closed three additional operational-assurance defects: filtered mandatory SystemCheck items cannot be suppressed; the full canonical set of detection/remote-evidence/deletion-replay audit gaps is checked; and corrupt nonempty audit-gap state cannot count as clean. Regressions: `tests/system-check-integrity.php`, `tests/system-check-audit-gap-coverage.php`, `tests/audit-gap-corrupt-evidence.php`.
+- A separate audit of the `AuditGapStore` evidence boundary found clinical PII leaks in compact/camelCase context fields; both write- and legacy-read projections now redact those identifiers. Regression: `tests/audit-gap-sensitive-field-aliases.php`.
+- Trust Center approval also now preserves a nonempty draft's independently authored future effective time; `tests/trust-approval-effective-window.php` prevents early publication by an omitted approval timestamp. **Cumulative PR scope: 11 source-level fixes**, none a claim of live remediation.
+- Further evidence-retention regression found that normalizing mixed valid/corrupt audit-gap records before either append or reconciliation could erase the corrupt unresolved record. Both mutation paths now stop without rewriting when normalization would lose evidence. Test: `tests/audit-gap-no-evidence-loss.php`.
+- This is still a **review branch**, not a production installation. Even successful PR CI does not waive independent review, exact-main CI, staging acceptance, deployed-file/database parity, live verification, backups or legal/privacy checks.
+
 ## Implemented repository scope
 
 - module manifests, security states and Files 00–26 integration contracts;

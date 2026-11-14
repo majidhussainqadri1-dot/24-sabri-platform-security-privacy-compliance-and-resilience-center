@@ -11,6 +11,7 @@ use Sabri\Platform\Security\Admin\FindingAdmin;
 use Sabri\Platform\Security\Admin\GovernanceAdmin;
 use Sabri\Platform\Security\Admin\RegistryAdmin;
 use Sabri\Platform\Security\Admin\VerifiedPrivacyAdmin;
+use Sabri\Platform\Security\Guidance\SecurityGuidance;
 use Sabri\Platform\Security\Future\AgenticAiSecurity;
 use Sabri\Platform\Security\Future\ArtifactProvenanceVerifier;
 use Sabri\Platform\Security\Future\AttackPathEngine;
@@ -116,6 +117,7 @@ final class Plugin
         (new File00Adapter())->registerHooks();
         (new File02Adapter())->registerHooks();
         (new File20Adapter())->registerHooks();
+        (new SecurityGuidance())->registerHooks();
         (new SecurityHeaders())->registerHooks();
         (new RetentionManager($audit))->registerHooks();
         (new DeletionReplayManager($artifacts, $audit))->registerHooks();

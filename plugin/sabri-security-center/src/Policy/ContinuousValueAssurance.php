@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Sabri\Platform\Security\Policy;
 
+use Sabri\Platform\Security\Support\Sanitizer;
+
 /**
  * Evidence-shape validator for File 24 Continuous Value requirements CV-262..CV-285.
  *
@@ -32,7 +34,7 @@ final class ContinuousValueAssurance
         'CV-277' => ['core_read_fallback','auth_safe_fallback','downstream_degraded_state','no_security_fail_open'],
         'CV-278' => ['rpo_by_data_class','rto_by_data_class','immutable_copy','quarterly_restore_evidence','snapshot_not_domain_backup'],
         'CV-279' => ['local_ring','ci_ring','staging_ring','staff_ring','canary_ring','gradual_ring','full_ring','feature_flags','rollback_rehearsed'],
-        'CV-280' => ['review_round_1','review_round_2','fix_after_each_review','retest_after_fix','zero_known_defect_or_founder_risk_acceptance'],
+        'CV-280' => ['review_round_1','review_round_2','fix_after_each_review','retest_after_fix','zero_known_active_defects'],
         'CV-281' => ['help_articles','ticket','status','escalation','multilingual_sla','not_medical_emergency_channel'],
         'CV-282' => ['storage_forecast','transcode_forecast','ai_forecast','search_forecast','realtime_forecast','bandwidth_forecast','caps_without_quality_safety_cut'],
         'CV-283' => ['versioned_schema','dry_run','backup','verification','rollback','no_duplicate_live_owner'],
@@ -53,7 +55,7 @@ final class ContinuousValueAssurance
         $controls = self::normalizeList($evidence['controls'] ?? []);
         $missing = array_values(array_diff(self::REQUIRED[$id], $controls));
         $evidenceRef = self::opaqueReference((string) ($evidence['evidence_ref'] ?? ''));
-        $reviewedAt = self::isoTime((string) ($evidence['reviewed_at'] ?? ''));
+        $reviewedAt = Sanitizer::isoTime($evidence['reviewed_at'] ?? '');
         $now ??= time();
         $reviewedTimestamp = $reviewedAt === '' ? false : strtotime($reviewedAt);
         $maxAgeDays = max(1, min(365, (int) apply_filters('spcrc/continuous_value_evidence_max_age_days', 90, $id)));
@@ -96,12 +98,4 @@ final class ContinuousValueAssurance
         return preg_match('/^[A-Za-z0-9][A-Za-z0-9._:-]{2,159}$/', $value) === 1 ? $value : '';
     }
 
-    private static function isoTime(string $value): string
-    {
-        $value = trim($value);
-        if ($value === '') { return ''; }
-        $timestamp = strtotime($value);
-        if ($timestamp === false) { return ''; }
-        return gmdate('c', $timestamp);
-    }
 }

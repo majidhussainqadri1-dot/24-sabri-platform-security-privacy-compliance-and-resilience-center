@@ -504,20 +504,47 @@ final class AssuranceRepository
 
         $lastTimestamp = $last === '' ? false : strtotime($last);
         $restoreTimestamp = $restore === '' ? false : strtotime($restore);
+        // Legacy four-field proof is a paired snapshot restored AFTER backup.
+        // A daily backup and separately scheduled quarterly restore have a
+        // different chronology. An independent model must explicitly identify
+        // the restored backup and supply a distinct opaque restore receipt.
+        $independent = Sanitizer::key($input['evidence_model'] ?? '', 40) === 'independent-cycles';
+        $sourceBackup = $independent ? Sanitizer::isoTime($input['restore_source_backup_at'] ?? '') : '';
+        $restoreReference = $independent ? Sanitizer::opaqueReference($input['restore_evidence_ref'] ?? '') : '';
+        $sourceTimestamp = $sourceBackup === '' ? false : strtotime($sourceBackup);
+        $chronologyValid = $independent
+            ? ($sourceTimestamp !== false
+                && $restoreTimestamp !== false
+                && $lastTimestamp !== false
+                && $sourceTimestamp <= $restoreTimestamp
+                && $sourceTimestamp <= $lastTimestamp
+                && $restoreReference !== ''
+                && $restoreReference !== $reference)
+            : ($restoreTimestamp !== false && $lastTimestamp !== false && $restoreTimestamp >= $lastTimestamp);
         $verified = $status === 'verified'
             && $lastTimestamp !== false
             && $restoreTimestamp !== false
-            && $restoreTimestamp >= $lastTimestamp
+            && $chronologyValid
             && $lastTimestamp <= time() + 300
             && $restoreTimestamp <= time() + 300
+            // Daily backup 48h and independent quarterly restore 93d max.
+            // Opaque receipts still require authentic native-provider proof.
+            && $lastTimestamp >= time() - 2 * DAY_IN_SECONDS
+            && $restoreTimestamp >= time() - 93 * DAY_IN_SECONDS
             && $reference !== '';
 
-        return [
+        $normalized = [
             'status' => $verified ? 'verified' : ($status === 'verified' ? 'unknown' : $status),
             'last_success_at' => $last,
             'restore_tested_at' => $restore,
             'evidence_ref' => $reference,
         ];
+        if ($independent) {
+            $normalized['evidence_model'] = 'independent-cycles';
+            $normalized['restore_source_backup_at'] = $sourceBackup;
+            $normalized['restore_evidence_ref'] = $restoreReference;
+        }
+        return $normalized;
     }
 
     private function recordAuditGap(string $recordUuid, string $reason): bool

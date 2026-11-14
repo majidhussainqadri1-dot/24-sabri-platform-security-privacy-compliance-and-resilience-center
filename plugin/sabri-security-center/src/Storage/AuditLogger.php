@@ -148,8 +148,13 @@ final class AuditLogger
 
             $rawKey = (string) $key;
             $normalized = strtolower($rawKey);
+            // WordPress sanitize_key() strips Urdu/Arabic letters while
+            // retaining underscores. Hash non-ASCII names even when a
+            // punctuation-only remnant survives, avoiding collisions and
+            // revealing no private Unicode labels in the audit store.
+            $unicodeField = preg_match('/[^\\x00-\\x7F]/', $rawKey) === 1;
             $safeKey = Sanitizer::key($rawKey, 80);
-            if ($safeKey === '') {
+            if ($safeKey === '' || $unicodeField) {
                 $safeKey = 'field_' . substr(hash('sha256', $rawKey), 0, 16);
             }
             if (array_key_exists($safeKey, $safe)) {
@@ -160,6 +165,53 @@ final class AuditLogger
                     $safe[$safeKey] = '[REDACTED]';
                     continue 2;
                 }
+            }
+
+            // Common camelCase and punctuation variants must not bypass
+            // sensitive-field classification. A patient name or narrative
+            // may contain no detectable phone, email or secret pattern.
+            $compactKey = preg_replace('/[^a-z0-9]/', '', $normalized) ?? '';
+            // File 24 V12.3: keys may be written in Urdu, Arabic or other
+            // scripts. The ASCII name classifier cannot establish whether
+            // those keys describe a patient, guardian or clinical narrative.
+            // Fail closed rather than persisting unchecked raw text under a
+            // harmless-looking hash of the original non-ASCII field name.
+            if ($compactKey === '' || $unicodeField) {
+                $safe[$safeKey] = '[REDACTED]';
+                continue;
+            }
+            $privateNarrativeKeys = [
+                'firstname', 'lastname', 'fullname', 'legalname', 'displayname',
+                'dateofbirth', 'birthdate', 'dob', 'guardianname',
+                'patientname', 'patientfullname', 'patienthistory',
+                'patientdiagnosis', 'patientsymptoms', 'patientcomplaint',
+                'patientnotes', 'patientaddress', 'patientemail', 'patientphone',
+                'medicalhistory', 'clinicalhistory', 'casehistory',
+                'medicalnotes', 'clinicalnotes', 'casenotes',
+                'symptomdetails', 'diagnosisdetails', 'chiefcomplaint',
+            ];
+            if (in_array($compactKey, $privateNarrativeKeys, true)) {
+                $safe[$safeKey] = '[REDACTED]';
+                continue;
+            }
+
+            // Retain bounded, irreversible correlation for well-known
+            // contact/network identifiers without retaining raw values.
+            $contactAliases = [
+                'emailaddress', 'phonenumber', 'mobilenumber',
+                'postaladdress', 'guardiancontact', 'contactemail', 'contactphone',
+            ];
+            if (in_array($compactKey, $contactAliases, true)) {
+                $safe[$safeKey] = is_scalar($value) ? $this->pseudonymize((string) $value, 'contact') : '[REDACTED]';
+                continue;
+            }
+            if (in_array($compactKey, ['ipaddress', 'remoteaddr'], true)) {
+                $safe[$safeKey] = is_scalar($value) ? $this->pseudonymize((string) $value, 'ip') : '[REDACTED]';
+                continue;
+            }
+            if ($compactKey === 'useragent') {
+                $safe[$safeKey] = is_scalar($value) ? $this->pseudonymize((string) $value, 'ua') : '[REDACTED]';
+                continue;
             }
 
             if (preg_match('/(^|_)(ip|ip_address|remote_addr)($|_)/', $normalized) === 1) {
@@ -174,6 +226,15 @@ final class AuditLogger
 
             if (preg_match('/(^|_)(email|email_address|phone|phone_number|mobile|mobile_number|address|postal_address|guardian_contact)($|_)/', $normalized) === 1) {
                 $safe[$safeKey] = $this->pseudonymize((string) $value, 'contact');
+                continue;
+            }
+
+            // A free-text clinical/audit field may be renamed without using
+            // one of the exact aliases above. Treat semantic patient, medical,
+            // identity and narrative labels as private by default; ordinary
+            // machine-state identifiers remain available for diagnostics.
+            if (preg_match('/(?:patient|clinical|medical|case|guardian|dependent|child|doctor|symptom|diagnos|complaint|history|narrative|notes?|report|identity|freetext|freeform|message|body|summary|telephone|contact|birth|proof|rawdata)/', $compactKey) === 1) {
+                $safe[$safeKey] = '[REDACTED]';
                 continue;
             }
 

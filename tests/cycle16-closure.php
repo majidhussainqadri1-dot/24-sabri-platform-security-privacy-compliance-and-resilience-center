@@ -124,8 +124,11 @@ foreach ([
     'spcrc_finding_reopen_audit_gap',
     'spcrc_governance_batch_audit_gap',
 ] as $option) {
-    expectCycle16(str_contains($systemCheckSource, $option), "System Check must include {$option}.");
+    expectCycle16(in_array($option, AuditGapStore::managedOptions(), true), "Canonical audit-gap registry must include {$option}.");
 }
+expectCycle16(str_contains($systemCheckSource, 'AuditGapStore::managedOptions()')
+    && str_contains($systemCheckSource, 'AuditGapStore::count('),
+    'System Check must consume the complete canonical audit-gap registry instead of a stale inline subset.');
 expectCycle16(str_contains($dispatcherSource, 'AuditGapStore::record'), 'Privacy dispatch must preserve failed audit evidence as a gap.');
 expectCycle16(str_contains($retentionSource, 'AuditGapStore::record'), 'Retention must preserve failed audit evidence as a gap.');
 expectCycle16(str_contains($dashboardSource, 'AuditGapStore::record'), 'Admin operations must preserve failed audit evidence as a gap.');

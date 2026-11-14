@@ -135,13 +135,28 @@ final class ReleaseGateManager
             if ($this->hasUnresolvedAuditGaps()) {
                 return new \WP_Error('spcrc_release_gate_audit_gaps_open', 'Unresolved operational audit gaps block a positive release decision.');
             }
+            // Final production/staging acceptance cannot infer "zero defects"
+            // from WordPress apply_filters() default values when no canonical
+            // blocker-count provider has registered. Earlier repository-only
+            // implementation phases retain their historical gate semantics.
+            if ($phase === '24l-independent-assurance-staging'
+                && (! has_filter('spcrc/release_blocking_p0_count')
+                    || ! has_filter('spcrc/release_blocking_defect_count'))
+            ) {
+                return new \WP_Error('spcrc_release_gate_blocker_provider_missing', 'Final release requires registered active-defect evidence providers.');
+            }
             $p0Count = Sanitizer::strictInteger(apply_filters('spcrc/release_blocking_p0_count', 0, $phase), 0, PHP_INT_MAX);
             $blockingDefectCount = Sanitizer::strictInteger(apply_filters('spcrc/release_blocking_defect_count', 0, $phase, $status), 0, PHP_INT_MAX);
-            if ($status !== 'waived' && ($p0Count === null || $p0Count > 0)) {
-                return new \WP_Error('spcrc_release_gate_p0_blocked', 'Known P0 defects block release-phase progression.');
+            // V12.3 CEN-REL-001: every active release scope must have zero
+            // known unresolved defects. A governed waiver is only for residual
+            // risk after defects have been corrected, or an independently
+            // isolated optional capability already excluded by the native owner
+            // from the active blocker inventory. No waiver changes this count.
+            if ($p0Count === null || $p0Count > 0) {
+                return new \WP_Error('spcrc_release_gate_p0_blocked', 'Known P0 defects cannot be bypassed by a release waiver.');
             }
-            if ($status !== 'waived' && ($blockingDefectCount === null || $blockingDefectCount > 0)) {
-                return new \WP_Error('spcrc_release_gate_known_defects_blocked', 'Known unresolved release-blocking defects require correction or an explicit governed waiver.');
+            if ($blockingDefectCount === null || $blockingDefectCount > 0) {
+                return new \WP_Error('spcrc_release_gate_known_defects_blocked', 'Known unresolved active release defects cannot be bypassed by a waiver.');
             }
             if ($status === 'waived') {
                 $riskAcceptanceRef = Sanitizer::opaqueReference($context['risk_acceptance_reference'] ?? '');
@@ -157,10 +172,29 @@ final class ReleaseGateManager
                 }
                 $riskAcceptanceHash = hash('sha256', $riskAcceptanceRef);
             }
-            if ($phase === '24l-independent-assurance-staging'
-                && ! Sanitizer::boolean(apply_filters('spcrc/release_external_acceptance_ready', false, $phase, $evidenceRef))
-            ) {
-                return new \WP_Error('spcrc_release_gate_external_acceptance_missing', 'Independent assurance and staging acceptance evidence is required for Phase 24L.');
+            if ($phase === '24l-independent-assurance-staging') {
+                if (! Sanitizer::boolean(apply_filters('spcrc/release_external_acceptance_ready', false, $phase, $evidenceRef))) {
+                    return new \WP_Error('spcrc_release_gate_external_acceptance_missing', 'Independent assurance and staging acceptance evidence is required for Phase 24L.');
+                }
+                // Two strings in approval_refs are *not* evidence of two
+                // independent humans. At the final external-acceptance phase
+                // a native trusted reviewer-provenance provider must confirm
+                // the approvals against the exact reviewed artifact/source,
+                // approver identities, independence and their current state.
+                // Repository-only phases still use the prior bounded contract.
+                if (! has_filter('spcrc/verify_independent_release_reviews')) {
+                    return new \WP_Error('spcrc_release_gate_review_verifier_missing', 'Final release requires a configured independent-review provenance verifier.');
+                }
+                if (! Sanitizer::boolean(apply_filters(
+                    'spcrc/verify_independent_release_reviews',
+                    false,
+                    $approvals,
+                    $phase,
+                    $evidenceRef,
+                    $actor
+                ))) {
+                    return new \WP_Error('spcrc_release_gate_independent_reviews_unverified', 'Two independent human release reviews were not authenticated for the exact candidate.');
+                }
             }
         }
 
@@ -185,6 +219,9 @@ final class ReleaseGateManager
 
     private function hasUnresolvedAuditGaps(): bool
     {
+        if (AuditGapStore::capacityEvidenceUnresolved()) {
+            return true;
+        }
         foreach (AuditGapStore::managedOptions() as $option) {
             if (AuditGapStore::count($option) > 0) {
                 return true;
