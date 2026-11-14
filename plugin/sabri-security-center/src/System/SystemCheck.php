@@ -63,6 +63,12 @@ final class SystemCheck
 
         foreach ($normalizedFiltered as $check) {
             $key = $check['key'];
+            // This diagnostic identity is owned exclusively by File 24.
+            // An extension must not publish a fabricated integrity PASS.
+            if ($key === 'system_checks_integrity') {
+                $tampered = true;
+                continue;
+            }
             if (isset($baseByKey[$key])) {
                 if (isset($seenMandatory[$key]) || $baseByKey[$key] !== $check) {
                     $tampered = true;
