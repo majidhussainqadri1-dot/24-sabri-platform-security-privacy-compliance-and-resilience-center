@@ -206,7 +206,7 @@ final class FakeWpdb
                 'spcrc_controls' => ['PRIMARY', 'control_key', 'status', 'framework', 'updated_at'],
                 'spcrc_privacy_requests' => ['PRIMARY', 'request_uuid', 'status_due', 'status_retry', 'requester_type', 'verification_status', 'verified_by', 'updated_status'],
                 'spcrc_module_manifests' => ['PRIMARY', 'module_key', 'posture_seen'],
-                'spcrc_governance_decisions' => ['PRIMARY', 'decision_uuid', 'status_expires', 'subject_status', 'module_status'],
+                'spcrc_governance_decisions' => ['PRIMARY', 'decision_uuid', 'status_expiry', 'type_subject', 'requester_status', 'approver_decided'],
                 'spcrc_assurance_records' => ['PRIMARY', 'record_uuid', 'type_record', 'type_status', 'next_review', 'backup_restore', 'updated_at'],
             ];
             foreach ($indexes as $table => $available) {
