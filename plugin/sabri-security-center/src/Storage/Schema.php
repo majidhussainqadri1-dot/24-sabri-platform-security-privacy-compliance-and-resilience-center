@@ -31,7 +31,7 @@ final class Schema
         'controls' => ['PRIMARY', 'control_key', 'status', 'updated_at'],
         'privacy' => ['PRIMARY', 'request_uuid', 'status_due', 'status_retry', 'updated_status'],
         'manifests' => ['PRIMARY', 'module_key', 'posture_seen'],
-        'governance' => ['PRIMARY', 'decision_uuid', 'status_expires', 'subject_status'],
+        'governance' => ['PRIMARY', 'decision_uuid', 'status_expiry', 'type_subject'],
         'assurance' => ['PRIMARY', 'record_uuid', 'type_record', 'type_status', 'next_review'],
     ];
 
